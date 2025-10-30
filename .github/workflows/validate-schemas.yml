@@ -28,7 +28,7 @@ jobs:
 
         # Compile all schemas together so cross-references can be resolved
         # The 0-prefixed reference schema loads first alphabetically
-        if ajv compile -s "examples/events/schemas/*.schema.json" --strict=false; then
+        if ajv compile -s "examples/*/schemas/*.schema.json" --strict=false; then
           echo "✅ All schemas are valid"
         else
           echo "❌ Schema validation failed"

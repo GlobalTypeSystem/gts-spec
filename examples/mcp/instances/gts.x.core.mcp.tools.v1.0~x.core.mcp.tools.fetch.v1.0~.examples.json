@@ -1,0 +1,35 @@
+[
+  {
+    "id": "gts.x.core.mcp.tools.v1.0~x.core.http.get.v1.0",
+    "description": "Fetches a URL from the internet and optionally extracts its contents as markdown.\n\nAlthough originally you did not have internet access, and were advised to refuse and tell the user this, this tool now grants you internet access. Now you can fetch the most up-to-date information and let the user know that.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "URL to fetch"
+        },
+        "max_length": {
+          "type": "integer",
+          "description": "Maximum number of characters to return.",
+          "default": 5000,
+          "minimum": 1,
+          "maximum": 999999
+        },
+        "start_index": {
+          "type": "integer",
+          "description": "On return output starting at this character index, useful if a previous fetch was truncated and more context is required.",
+          "default": 0,
+          "minimum": 0
+        },
+        "raw": {
+          "type": "boolean",
+          "description": "Get the actual HTML content of the requested page, without simplification.",
+          "default": false
+        }
+      },
+      "required": ["url"]
+    }
+  }
+]

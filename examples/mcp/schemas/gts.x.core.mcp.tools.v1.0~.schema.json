@@ -1,0 +1,30 @@
+{
+  "$id": "gts.x.core.mcp.tools.v1.0~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MCP Tool (Base)",
+  "type": "object",
+  "description": "Base MCP tool definition following Model Context Protocol specification",
+  "required": [
+    "description",
+    "inputSchema"
+  ],
+  "properties": {
+    "type": {
+      "description": "Identifier of the tool type in GTS format.",
+      "type": "string",
+      "x-gts-type": "./$id"
+    },
+    "name": {
+      "type": "string",
+      "description": "Unique identifier for the tool"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of what the tool does"
+    },
+    "inputSchema": {
+      "type": "object",
+      "description": "JSON Schema defining the tool's input parameters"
+    }
+  }
+}
