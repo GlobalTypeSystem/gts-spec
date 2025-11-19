@@ -1,0 +1,114 @@
+gtsId: gts.x.ui.core.item.v1~x.ui.components.grid.v1~
+id: 550e8400-e29b-41d4-a716-446655440012
+type: grid
+label: Users List
+description: Searchable and sortable list of system users
+visible: true
+enabled: true
+
+position:
+  order: 0
+
+permissions:
+  - view:users
+  - list:users
+
+columns:
+  - field: username
+    header: Username
+    width: 200
+    sortable: true
+    filterable: true
+    resizable: true
+    formatter: text
+    align: left
+
+  - field: email
+    header: Email Address
+    width: 250
+    sortable: true
+    filterable: true
+    resizable: true
+    formatter: text
+    align: left
+
+  - field: fullName
+    header: Full Name
+    width: 200
+    sortable: true
+    filterable: true
+    resizable: true
+    formatter: text
+    align: left
+
+  - field: status
+    header: Status
+    width: 120
+    sortable: true
+    filterable: true
+    resizable: false
+    formatter: boolean
+    align: center
+
+  - field: createdAt
+    header: Created
+    width: 180
+    sortable: true
+    filterable: false
+    resizable: true
+    formatter: datetime
+    align: left
+
+  - field: lastLogin
+    header: Last Login
+    width: 180
+    sortable: true
+    filterable: false
+    resizable: true
+    formatter: datetime
+    align: left
+
+dataSource:
+  type: api
+  url: https://api.example.com/v1/users
+  method: GET
+  params:
+    includeInactive: false
+
+pagination:
+  enabled: true
+  pageSize: 25
+  pageSizeOptions:
+    - 10
+    - 25
+    - 50
+    - 100
+
+selection:
+  enabled: true
+  mode: multiple
+
+actions:
+  - id: edit-user
+    label: Edit
+    icon: edit-icon
+
+  - id: deactivate-user
+    label: Deactivate
+    icon: block-icon
+
+  - id: reset-password
+    label: Reset Password
+    icon: key-icon
+
+style:
+  borderColor: "#e0e0e0"
+  headerBackground: "#f5f5f5"
+
+metadata:
+  exportEnabled: true
+  exportFormats:
+    - csv
+    - excel
+  refreshInterval: 60000
+  cacheEnabled: true

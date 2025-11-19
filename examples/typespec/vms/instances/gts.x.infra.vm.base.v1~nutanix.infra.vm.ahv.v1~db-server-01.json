@@ -1,0 +1,30 @@
+{
+  "gtsId": "gts.x.infra.vm.base.v1~nutanix.infra.vm.ahv.v1~",
+  "id": "550e8400-e29b-41d4-a716-446655440002",
+  "name": "db-server-01",
+  "cpuCores": 8,
+  "ramMb": 32768,
+  "powerState": "running",
+  "osType": "Red Hat Enterprise Linux 9",
+  "createdAt": "2024-02-20T14:15:00Z",
+  "nutanix": {
+    "vmUuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "clusterUuid": "00061234-5678-90ab-cdef-0123456789ab",
+    "clusterName": "NTNX-Cluster-DB",
+    "hostUuid": "00051234-5678-90ab-cdef-fedcba987654",
+    "hostName": "ntnx-node-03",
+    "guestToolsStatus": "enabled",
+    "protectionDomain": "PD-Database",
+    "categories": {
+      "AppType": "Database",
+      "Tier": "Critical"
+    },
+    "storageContainer": "SSD-Container-01",
+    "haPriority": "high"
+  },
+  "metadata": {
+    "environment": "production",
+    "owner": "database-team",
+    "backupSchedule": "daily"
+  }
+}

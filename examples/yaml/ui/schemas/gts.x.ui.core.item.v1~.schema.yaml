@@ -1,0 +1,86 @@
+$id: gts.x.ui.core.item.v1~
+$schema: http://json-schema.org/draft-07/schema#
+title: Base UI Item
+description: |
+  Base type for all UI elements in the system.
+  This schema defines common properties shared by all UI components
+  (menus, grids, forms, buttons, etc.).
+
+type: object
+
+required:
+  - gtsId
+  - id
+  - type
+  - label
+
+properties:
+  gtsId:
+    type: string
+    description: GTS identifier of the UI item type
+    x-gts-ref: /$id
+
+  id:
+    type: string
+    description: Unique identifier of the UI item instance
+    format: uuid
+
+  type:
+    type: string
+    description: UI component type (menu, grid, form, button, etc.)
+    minLength: 1
+    maxLength: 50
+
+  label:
+    type: string
+    description: Display label for the UI item
+    minLength: 1
+    maxLength: 255
+
+  description:
+    type: string
+    description: Optional description or tooltip text
+    maxLength: 1000
+
+  visible:
+    type: boolean
+    description: Whether the UI item is visible
+    default: true
+
+  enabled:
+    type: boolean
+    description: Whether the UI item is enabled for interaction
+    default: true
+
+  position:
+    type: object
+    description: Position and layout properties
+    properties:
+      order:
+        type: integer
+        description: Display order relative to siblings
+        minimum: 0
+      x:
+        type: number
+        description: X coordinate (if absolute positioning)
+      y:
+        type: number
+        description: Y coordinate (if absolute positioning)
+
+  permissions:
+    type: array
+    description: Required permissions to view/interact with this item
+    items:
+      type: string
+
+  style:
+    type: object
+    description: CSS-like styling properties
+    additionalProperties: true
+
+  metadata:
+    type: object
+    description: Additional custom properties
+    additionalProperties: true
+
+additionalProperties: false

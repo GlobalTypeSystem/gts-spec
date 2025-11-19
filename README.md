@@ -4,6 +4,8 @@
 
 This document defines GTS — a simple, human-readable, globally unique identifier and referencing system for data type definitions (e.g., JSON Schemas) and data instances (e.g., JSON objects). It is specification-first, language-agnostic, and intentionally minimal, with primary focus on JSON and JSON Schema.
 
+**Format Support**: GTS schemas and instances can be represented in multiple formats including JSON, YAML, and TypeSpec. See the [examples directory](./examples/) for demonstrations in different formats.
+
 The GTS identifiers are strings in a format like:
 
 ```
@@ -985,7 +987,12 @@ When the event manager receives the event it processes it as follows:
 
 > **Note**: use the [GTS Kit](https://github.com/globaltypesystem/gts-kit) for visualization of the entities relationship and validation
 
-See some other definitions in the [examples folder](./examples/)
+See additional GTS examples in the [examples folder](./examples/):
+- [Event Examples](./examples/events/) - Event-driven architecture with topic and event type definitions
+- [Module Examples](./examples/modules/) - Modular system capabilities and plugins
+- [MCP Examples](./examples/mcp/) - AI/LLM tool definitions using Model Context Protocol
+- [TypeSpec VM Examples](./examples/typespec/vms/) - Virtual machine types across different platforms (VMWare, Nutanix, Virtuozzo) defined in TypeSpec format
+- [YAML UI Examples](./examples/yaml/ui/) - User interface component definitions (menus, grids) in YAML format
 
 
 ### 5.3 Schema Registry Requirement
