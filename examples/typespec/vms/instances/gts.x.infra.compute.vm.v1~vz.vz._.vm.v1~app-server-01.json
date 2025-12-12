@@ -7,6 +7,8 @@
   "powerState": "running",
   "osType": "CentOS 7",
   "createdAt": "2024-03-10T09:45:00Z",
+  "environment": "staging",
+  "owner": "app-team",
   "metadata": {
     "veid": "1001",
     "envType": "vm",
@@ -19,8 +21,6 @@
     "cpuUnits": 1000,
     "diskSpaceGb": 100,
     "backupNodeName": "vz-node-02.example.com",
-    "environment": "staging",
-    "owner": "app-team",
     "project": "microservices-platform"
   }
 }

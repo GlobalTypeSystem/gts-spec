@@ -7,6 +7,8 @@
   "powerState": "running",
   "osType": "Red Hat Enterprise Linux 9",
   "createdAt": "2024-02-20T14:15:00Z",
+  "environment": "production",
+  "owner": "database-team",
   "metadata": {
     "vmUuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "clusterUuid": "00061234-5678-90ab-cdef-0123456789ab",
@@ -21,8 +23,6 @@
     },
     "storageContainer": "SSD-Container-01",
     "haPriority": "high",
-    "environment": "production",
-    "owner": "database-team",
     "backupSchedule": "daily"
   }
 }

@@ -17,7 +17,8 @@ TypeSpec is a language for describing APIs and generating schemas. These `.tsp` 
 
 - **[gts.x.infra.compute.vm.v1~](schemas/gts.x.infra.compute.vm.v1~.tsp)**
   - Base virtual machine type with common properties
-  - Properties: `gtsId`, `id`, `name`, `cpuCores`, `ramMb`, `powerState`, `osType`, `createdAt`, `metadata`
+  - Properties: `gtsId`, `id`, `name`, `cpuCores`, `ramMb`, `powerState`, `osType`, `createdAt`, `environment`, `owner`, `metadata`
+  - Power states: `running`, `stopped`, `suspended`, `paused`, `starting`, `stopping`, `suspending`, `rebooting`, `migrating`
 
 ### Derived Types
 

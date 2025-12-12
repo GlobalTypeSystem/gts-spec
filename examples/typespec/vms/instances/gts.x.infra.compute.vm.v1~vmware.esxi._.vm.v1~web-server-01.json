@@ -7,6 +7,8 @@
   "powerState": "running",
   "osType": "Ubuntu 22.04 LTS",
   "createdAt": "2024-01-15T10:30:00Z",
+  "environment": "production",
+  "owner": "web-team",
   "metadata": {
     "moRefId": "vm-1234",
     "hostName": "esxi-host-01.example.com",
@@ -17,8 +19,6 @@
     "hardwareVersion": "vmx-19",
     "resourcePool": "Production",
     "vMotionEnabled": true,
-    "environment": "production",
-    "owner": "web-team",
     "costCenter": "CC-1001"
   }
 }

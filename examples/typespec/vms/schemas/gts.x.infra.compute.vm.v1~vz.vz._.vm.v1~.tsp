@@ -46,9 +46,9 @@ model VirtuozzoVM {
   ramMb: int32;
 
   /**
-   * Power state
+   * Power state with transient states
    */
-  powerState: "running" | "stopped" | "suspended" | "paused";
+  powerState: "running" | "stopped" | "suspended" | "paused" | "starting" | "stopping" | "suspending" | "rebooting" | "migrating";
 
   /**
    * Operating system type
@@ -60,6 +60,16 @@ model VirtuozzoVM {
    */
   @format("date-time")
   createdAt: utcDateTime;
+
+  /**
+   * Environment where the VM is deployed
+   */
+  environment?: string;
+
+  /**
+   * Owner of the VM
+   */
+  owner?: string;
 
   /**
    * Platform-specific metadata (Virtuozzo properties)

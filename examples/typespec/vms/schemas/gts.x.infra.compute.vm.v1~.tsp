@@ -46,9 +46,12 @@ model BaseVM {
   ramMb: int32;
 
   /**
-   * Current power state of the virtual machine
+   * Current power state of the virtual machine.
+   * Reference to gts.x.infra.compute.vm_state.v1~ for extensibility.
+   * Base states: running, stopped, suspended, paused
+   * Transient states: starting, stopping, suspending, rebooting, migrating
    */
-  powerState: "running" | "stopped" | "suspended" | "paused";
+  powerState: "running" | "stopped" | "suspended" | "paused" | "starting" | "stopping" | "suspending" | "rebooting" | "migrating";
 
   /**
    * Operating system type running on the VM
@@ -62,7 +65,18 @@ model BaseVM {
   createdAt: utcDateTime;
 
   /**
+   * Environment where the VM is deployed.
+   * Reference to gts.x.infra.env.v1~ for extensibility.
+   */
+  environment?: string;
+
+  /**
+   * Owner of the VM (team, user, or service account)
+   */
+  owner?: string;
+
+  /**
    * Additional metadata and platform-specific properties
    */
-  metadata?: Record<string>;
+  metadata?: Record<unknown>;
 }
