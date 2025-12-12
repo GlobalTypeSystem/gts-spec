@@ -1,5 +1,5 @@
 {
-  "gtsId": "gts.x.infra.vm.base.v1~nutanix.infra.vm.ahv.v1~",
+  "gtsId": "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
   "id": "550e8400-e29b-41d4-a716-446655440002",
   "name": "db-server-01",
   "cpuCores": 8,
@@ -7,7 +7,7 @@
   "powerState": "running",
   "osType": "Red Hat Enterprise Linux 9",
   "createdAt": "2024-02-20T14:15:00Z",
-  "nutanix": {
+  "metadata": {
     "vmUuid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "clusterUuid": "00061234-5678-90ab-cdef-0123456789ab",
     "clusterName": "NTNX-Cluster-DB",
@@ -20,9 +20,7 @@
       "Tier": "Critical"
     },
     "storageContainer": "SSD-Container-01",
-    "haPriority": "high"
-  },
-  "metadata": {
+    "haPriority": "high",
     "environment": "production",
     "owner": "database-team",
     "backupSchedule": "daily"

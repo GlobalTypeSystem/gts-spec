@@ -1,5 +1,5 @@
 {
-  "gtsId": "gts.x.infra.vm.base.v1~virtuozzo.infra.vm.vz.v1~",
+  "gtsId": "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~",
   "id": "550e8400-e29b-41d4-a716-446655440003",
   "name": "app-server-01",
   "cpuCores": 2,
@@ -7,7 +7,7 @@
   "powerState": "running",
   "osType": "CentOS 7",
   "createdAt": "2024-03-10T09:45:00Z",
-  "virtuozzo": {
+  "metadata": {
     "veid": "1001",
     "envType": "vm",
     "nodeName": "vz-node-01.example.com",
@@ -18,9 +18,7 @@
     "cpuLimitMhz": 4000,
     "cpuUnits": 1000,
     "diskSpaceGb": 100,
-    "backupNodeName": "vz-node-02.example.com"
-  },
-  "metadata": {
+    "backupNodeName": "vz-node-02.example.com",
     "environment": "staging",
     "owner": "app-team",
     "project": "microservices-platform"

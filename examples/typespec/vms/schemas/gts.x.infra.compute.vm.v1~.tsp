@@ -5,12 +5,12 @@ using TypeSpec.JsonSchema;
 /**
  * Base Virtual Machine Type
  *
- * GTS ID: gts.x.infra.vm.base.v1~
+ * GTS ID: gts.x.infra.compute.vm.v1~
  *
  * This is the base type for all virtual machine definitions across
  * different virtualization platforms (VMWare, Nutanix, Virtuozzo, etc.).
  */
-@jsonSchema("/schemas/gts.x.infra.vm.base.v1~.schema.json")
+@jsonSchema("/schemas/gts.x.infra.compute.vm.v1~.schema.json")
 model BaseVM {
   /**
    * GTS identifier of the VM type
