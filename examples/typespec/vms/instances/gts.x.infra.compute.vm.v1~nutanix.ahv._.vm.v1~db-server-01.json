@@ -4,7 +4,7 @@
   "name": "db-server-01",
   "cpuCores": 8,
   "ramMb": 32768,
-  "powerState": "running",
+  "powerState": "gts.x.infra.compute.vm_state.v1~x.infra._.running.v1",
   "osType": "Red Hat Enterprise Linux 9",
   "createdAt": "2024-02-20T14:15:00Z",
   "environment": "production",

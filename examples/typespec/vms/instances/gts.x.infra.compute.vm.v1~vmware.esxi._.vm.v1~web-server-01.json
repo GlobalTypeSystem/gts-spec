@@ -4,7 +4,7 @@
   "name": "web-server-01",
   "cpuCores": 4,
   "ramMb": 8192,
-  "powerState": "running",
+  "powerState": "gts.x.infra.compute.vm_state.v1~x.infra._.running.v1",
   "osType": "Ubuntu 22.04 LTS",
   "createdAt": "2024-01-15T10:30:00Z",
   "environment": "production",

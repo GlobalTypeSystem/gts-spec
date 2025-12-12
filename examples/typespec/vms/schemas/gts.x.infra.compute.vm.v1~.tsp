@@ -47,11 +47,11 @@ model BaseVM {
 
   /**
    * Current power state of the virtual machine.
-   * Reference to gts.x.infra.compute.vm_state.v1~ for extensibility.
-   * Base states: running, stopped, suspended, paused
-   * Transient states: starting, stopping, suspending, rebooting, migrating
+   * Reference to gts.x.infra.compute.vm_state.v1~ type.
+   * See states/ directory for available state definitions.
    */
-  powerState: "running" | "stopped" | "suspended" | "paused" | "starting" | "stopping" | "suspending" | "rebooting" | "migrating";
+  @jsonSchema({ "x-gts-ref": "/gts.x.infra.compute.vm_state.v1~" })
+  powerState: string;
 
   /**
    * Operating system type running on the VM

@@ -4,7 +4,7 @@
   "name": "app-server-01",
   "cpuCores": 2,
   "ramMb": 4096,
-  "powerState": "running",
+  "powerState": "gts.x.infra.compute.vm_state.v1~x.infra._.running.v1",
   "osType": "CentOS 7",
   "createdAt": "2024-03-10T09:45:00Z",
   "environment": "staging",

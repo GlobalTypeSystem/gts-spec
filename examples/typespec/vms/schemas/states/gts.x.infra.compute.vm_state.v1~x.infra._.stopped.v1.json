@@ -1,0 +1,6 @@
+{
+    "gtsId": "gts.x.infra.compute.vm_state.v1~x.infra._.stopped.v1",
+    "description": "Virtual machine is stopped and not consuming compute resources",
+    "isTransient": false,
+    "icon": "stop"
+}
