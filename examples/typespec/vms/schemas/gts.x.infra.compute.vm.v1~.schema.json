@@ -1,0 +1,73 @@
+{
+    "$id": "gts.x.infra.compute.vm.v1~",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Base Virtual Machine Type",
+    "description": "Base type for all virtual machine definitions across different virtualization platforms.",
+    "type": "object",
+    "required": [
+        "gtsId",
+        "id",
+        "name",
+        "cpuCores",
+        "ramMb",
+        "powerState",
+        "createdAt"
+    ],
+    "properties": {
+        "gtsId": {
+            "type": "string",
+            "const": "gts.x.infra.compute.vm.v1~",
+            "description": "GTS identifier of the VM type",
+            "x-gts-ref": "/$id"
+        },
+        "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique identifier of the VM instance"
+        },
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "description": "Human-readable name of the virtual machine"
+        },
+        "cpuCores": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 256,
+            "description": "Number of virtual CPU cores allocated to the VM"
+        },
+        "ramMb": {
+            "type": "integer",
+            "minimum": 512,
+            "maximum": 1048576,
+            "description": "Amount of RAM in megabytes (MB)"
+        },
+        "powerState": {
+            "type": "string",
+            "description": "Current power state of the virtual machine. Reference to gts.x.infra.compute.vm_state.v1~ type.",
+            "x-gts-ref": "/gts.x.infra.compute.vm_state.v1~"
+        },
+        "osType": {
+            "type": "string",
+            "description": "Operating system type running on the VM"
+        },
+        "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp when the VM was created"
+        },
+        "environment": {
+            "type": "string",
+            "description": "Environment where the VM is deployed."
+        },
+        "owner": {
+            "type": "string",
+            "description": "Owner of the VM (team, user, or service account)"
+        },
+        "metadata": {
+            "type": "object",
+            "description": "Additional metadata and platform-specific properties"
+        }
+    }
+}
