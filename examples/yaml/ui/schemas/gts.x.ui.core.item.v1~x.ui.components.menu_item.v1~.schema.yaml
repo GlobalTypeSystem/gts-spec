@@ -1,4 +1,4 @@
-$id: gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~
+$id: gts://gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~
 $schema: http://json-schema.org/draft-07/schema#
 title: Menu Item
 description: |
