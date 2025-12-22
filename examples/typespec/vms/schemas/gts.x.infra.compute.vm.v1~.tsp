@@ -1,4 +1,5 @@
 import "@typespec/json-schema";
+import "./common.tsp";
 
 using TypeSpec.JsonSchema;
 
@@ -15,7 +16,7 @@ model BaseVM {
   /**
    * GTS identifier of the VM type
    */
-  @jsonSchema({ "x-gts-ref": "/$id" })
+  @extension("x-gts-ref", "/$id")
   gtsId: string;
 
   /**
@@ -34,15 +35,15 @@ model BaseVM {
   /**
    * Number of virtual CPU cores allocated to the VM
    */
-  @minimum(1)
-  @maximum(256)
+  @minValue(1)
+  @maxValue(256)
   cpuCores: int32;
 
   /**
    * Amount of RAM in megabytes (MB)
    */
-  @minimum(512)
-  @maximum(1048576)
+  @minValue(512)
+  @maxValue(1048576)
   ramMb: int32;
 
   /**
@@ -50,7 +51,7 @@ model BaseVM {
    * Reference to gts.x.infra.compute.vm_state.v1~ type.
    * See states/ directory for available state definitions.
    */
-  @jsonSchema({ "x-gts-ref": "/gts.x.infra.compute.vm_state.v1~" })
+  @extension("x-gts-ref", "/gts.x.infra.compute.vm_state.v1~")
   powerState: string;
 
   /**
@@ -76,7 +77,7 @@ model BaseVM {
   owner?: string;
 
   /**
-   * Additional metadata and platform-specific properties
+   * Additional metadata (strictly typed)
    */
-  metadata?: Record<unknown>;
+  metadata?: VMMetadata;
 }

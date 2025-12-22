@@ -1,4 +1,5 @@
 import "@typespec/json-schema";
+import "./common.tsp";
 
 using TypeSpec.JsonSchema;
 
@@ -11,7 +12,7 @@ using TypeSpec.JsonSchema;
  */
 @jsonSchema("/schemas/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.schema.json")
 model VirtuozzoVM {
-  @jsonSchema({ "x-gts-ref": "/$id" })
+  @extension("x-gts-ref", "/$id")
   gtsId: "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~";
 
   @format("uuid")
@@ -21,16 +22,16 @@ model VirtuozzoVM {
   @maxLength(255)
   name: string;
 
-  @minimum(1)
-  @maximum(256)
+  @minValue(1)
+  @maxValue(256)
   cpuCores: int32;
 
-  @minimum(512)
-  @maximum(1048576)
+  @minValue(512)
+  @maxValue(1048576)
   ramMb: int32;
 
   /** Reference to gts.x.infra.compute.vm_state.v1~ */
-  @jsonSchema({ "x-gts-ref": "/gts.x.infra.compute.vm_state.v1~" })
+  @extension("x-gts-ref", "/gts.x.infra.compute.vm_state.v1~")
   powerState: string;
 
   osType?: string;
@@ -40,5 +41,7 @@ model VirtuozzoVM {
 
   environment?: string;
   owner?: string;
-  metadata?: Record<unknown>;
+  
+  /** Virtuozzo-specific metadata (strictly typed) */
+  metadata?: VirtuozzoMetadata;
 }
