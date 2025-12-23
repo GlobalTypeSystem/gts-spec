@@ -6,15 +6,71 @@
     "type": "object",
     "allOf": [
         {
-            "$ref": "./gts.x.infra.compute.vm.v1~.schema.json"
+            "$ref": "gts://gts.x.infra.compute.vm.v1~.schema.json"
+        },
+        {
+            "type": "object",
+            "properties": {
+                "gtsId": {
+                    "type": "string",
+                    "const": "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
+                    "description": "GTS identifier of the VM type",
+                    "x-gts-ref": "/$id"
+                },
+                "metadata": {
+                    "type": "object",
+                    "description": "Nutanix-specific metadata",
+                    "properties": {
+                        "vmUuid": {
+                            "type": "string",
+                            "description": "Nutanix VM UUID"
+                        },
+                        "clusterUuid": {
+                            "type": "string",
+                            "description": "Nutanix cluster UUID"
+                        },
+                        "clusterName": {
+                            "type": "string",
+                            "description": "Nutanix cluster name"
+                        },
+                        "hostUuid": {
+                            "type": "string",
+                            "description": "Host UUID where VM is running"
+                        },
+                        "hostName": {
+                            "type": "string",
+                            "description": "Host name where VM is running"
+                        },
+                        "guestToolsStatus": {
+                            "type": "string",
+                            "description": "Status of Nutanix Guest Tools"
+                        },
+                        "protectionDomain": {
+                            "type": "string",
+                            "description": "Protection domain for DR"
+                        },
+                        "categories": {
+                            "type": "object",
+                            "description": "Nutanix categories for organization",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        },
+                        "storageContainer": {
+                            "type": "string",
+                            "description": "Storage container name"
+                        },
+                        "haPriority": {
+                            "type": "string",
+                            "description": "High availability priority"
+                        },
+                        "backupSchedule": {
+                            "type": "string",
+                            "description": "Backup schedule identifier"
+                        }
+                    }
+                }
+            }
         }
-    ],
-    "properties": {
-        "gtsId": {
-            "type": "string",
-            "const": "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
-            "description": "GTS identifier of the VM type",
-            "x-gts-ref": "/$id"
-        }
-    }
+    ]
 }

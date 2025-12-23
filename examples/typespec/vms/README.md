@@ -60,9 +60,9 @@ gts.x.infra.compute.vm_state.v1~vmware.esxi._.paused_due_error.v1
 
 ## Instance Examples
 
-- **[web-server-01.json](instances/gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~web-server-01.json)** - VMWare ESXi (4 CPU, 8GB)
-- **[db-server-01.json](instances/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~db-server-01.json)** - Nutanix AHV (8 CPU, 32GB)
-- **[app-server-01.json](instances/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~app-server-01.json)** - Virtuozzo (2 CPU, 4GB)
+- **[web-server-01.json](instances/vms/gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~web-server-01.json)** - VMWare ESXi (4 CPU, 8GB)
+- **[db-server-01.json](instances/vms/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~db-server-01.json)** - Nutanix AHV (8 CPU, 32GB)
+- **[app-server-01.json](instances/vms/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~app-server-01.json)** - Virtuozzo (2 CPU, 4GB)
 
 ## GTS Identifier Pattern
 

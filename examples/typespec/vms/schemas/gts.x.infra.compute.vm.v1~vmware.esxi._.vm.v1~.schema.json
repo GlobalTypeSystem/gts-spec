@@ -6,15 +6,68 @@
     "type": "object",
     "allOf": [
         {
-            "$ref": "./gts.x.infra.compute.vm.v1~.schema.json"
+            "$ref": "gts://gts.x.infra.compute.vm.v1~.schema.json"
+        },
+        {
+            "type": "object",
+            "properties": {
+                "gtsId": {
+                    "type": "string",
+                    "const": "gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~",
+                    "description": "GTS identifier of the VM type",
+                    "x-gts-ref": "/$id"
+                },
+                "metadata": {
+                    "type": "object",
+                    "description": "VMWare ESXi-specific metadata",
+                    "properties": {
+                        "vmId": {
+                            "type": "string",
+                            "description": "VMWare VM identifier"
+                        },
+                        "instanceUuid": {
+                            "type": "string",
+                            "description": "VMWare instance UUID"
+                        },
+                        "bios": {
+                            "type": "string",
+                            "description": "BIOS UUID"
+                        },
+                        "hostId": {
+                            "type": "string",
+                            "description": "ESXi host identifier"
+                        },
+                        "hostName": {
+                            "type": "string",
+                            "description": "ESXi host name"
+                        },
+                        "datastore": {
+                            "type": "string",
+                            "description": "Datastore name"
+                        },
+                        "cluster": {
+                            "type": "string",
+                            "description": "vSphere cluster name"
+                        },
+                        "resourcePool": {
+                            "type": "string",
+                            "description": "Resource pool name"
+                        },
+                        "folder": {
+                            "type": "string",
+                            "description": "VM folder path"
+                        },
+                        "vmwareToolsStatus": {
+                            "type": "string",
+                            "description": "VMWare Tools installation status"
+                        },
+                        "guestFamily": {
+                            "type": "string",
+                            "description": "Guest OS family"
+                        }
+                    }
+                }
+            }
         }
-    ],
-    "properties": {
-        "gtsId": {
-            "type": "string",
-            "const": "gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~",
-            "description": "GTS identifier of the VM type",
-            "x-gts-ref": "/$id"
-        }
-    }
+    ]
 }
