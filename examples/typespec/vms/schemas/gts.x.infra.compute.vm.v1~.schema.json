@@ -1,5 +1,5 @@
 {
-    "$id": "gts.x.infra.compute.vm.v1~",
+    "$id": "gts://gts.x.infra.compute.vm.v1~",
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Base Virtual Machine Type",
     "description": "Base type for all virtual machine definitions across different virtualization platforms.",
@@ -16,7 +16,7 @@
     "properties": {
         "gtsId": {
             "type": "string",
-            "const": "gts.x.infra.compute.vm.v1~",
+            "const": "gts://gts.x.infra.compute.vm.v1~",
             "description": "GTS identifier of the VM type",
             "x-gts-ref": "/$id"
         },

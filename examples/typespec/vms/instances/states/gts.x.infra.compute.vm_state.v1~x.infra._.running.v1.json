@@ -1,5 +1,5 @@
 {
-    "gtsId": "gts.x.infra.compute.vm_state.v1~x.infra._.running.v1",
+    "gtsId": "gts://gts.x.infra.compute.vm_state.v1~x.infra._.running.v1",
     "description": "Virtual machine is running and operational",
     "isTransient": false,
     "icon": "play"

@@ -1,4 +1,4 @@
-gtsId: gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~
+gtsId: gts://gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~
 id: 550e8400-e29b-41d4-a716-446655440010
 type: menu_item
 label: Dashboard
@@ -13,17 +13,15 @@ permissions:
   - view:dashboard
   - read:metrics
 
-navigation:
-  target: /dashboard
-  targetType: route
-  openInNewTab: false
-
-icon: dashboard-icon
-
 style:
   color: "#1976d2"
   fontWeight: "600"
 
 metadata:
+  navigation:
+    target: /dashboard
+    targetType: route
+    openInNewTab: false
+  icon: dashboard-icon
   category: main-navigation
   analyticsId: menu-dashboard

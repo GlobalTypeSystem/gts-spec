@@ -1,5 +1,5 @@
 {
-    "$id": "gts.x.infra.compute.vm_state.v1~",
+    "$id": "gts://gts.x.infra.compute.vm_state.v1~",
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Base VM Power State Type",
     "description": "Base type for all VM power states.",
@@ -11,7 +11,7 @@
     "properties": {
         "gtsId": {
             "type": "string",
-            "const": "gts.x.infra.compute.vm_state.v1~",
+            "const": "gts://gts.x.infra.compute.vm_state.v1~",
             "description": "GTS identifier of the power state type",
             "x-gts-ref": "/$id"
         },

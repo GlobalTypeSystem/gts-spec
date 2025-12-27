@@ -1,174 +1,179 @@
-$id: gts.x.ui.core.item.v1~x.ui.components.grid.v1~
+$id: gts://gts.x.ui.core.item.v1~x.ui.components.grid.v1~
 $schema: http://json-schema.org/draft-07/schema#
 title: Data Grid
 description: |
   Data grid UI component - extends base UI item with grid-specific properties.
-  Supports columns, sorting, filtering, and pagination.
+  All grid-specific properties (columns, dataSource, pagination, etc.) are
+  placed inside the `metadata` field as required by GTS inheritance rules.
 
 type: object
 
 allOf:
-  - $ref: gts.x.ui.core.item.v1~
+  - $ref: gts://gts.x.ui.core.item.v1~
   - type: object
     required:
       - type
-      - columns
-      - dataSource
+      - metadata
     properties:
       type:
         type: string
         const: grid
 
-      columns:
-        type: array
-        description: Grid column definitions
-        minItems: 1
-        items:
-          type: object
-          required:
-            - field
-            - header
-          properties:
-            field:
-              type: string
-              description: Data field name
-              minLength: 1
-              maxLength: 100
-
-            header:
-              type: string
-              description: Column header label
-              minLength: 1
-              maxLength: 255
-
-            width:
-              type: integer
-              description: Column width in pixels
-              minimum: 50
-              maximum: 2000
-
-            sortable:
-              type: boolean
-              description: Whether column is sortable
-              default: true
-
-            filterable:
-              type: boolean
-              description: Whether column is filterable
-              default: true
-
-            resizable:
-              type: boolean
-              description: Whether column is resizable
-              default: true
-
-            formatter:
-              type: string
-              description: Data formatter type
-              enum:
-                - text
-                - number
-                - date
-                - datetime
-                - currency
-                - boolean
-                - custom
-
-            align:
-              type: string
-              description: Text alignment
-              enum:
-                - left
-                - center
-                - right
-              default: left
-
-      dataSource:
+      metadata:
         type: object
-        description: Data source configuration
+        description: Grid-specific configuration
         required:
-          - type
+          - columns
+          - dataSource
         properties:
-          type:
-            type: string
-            description: Data source type
-            enum:
-              - api
-              - static
-              - graphql
-
-          url:
-            type: string
-            description: API endpoint URL
-            format: uri
-
-          method:
-            type: string
-            description: HTTP method for API calls
-            enum:
-              - GET
-              - POST
-            default: GET
-
-          params:
-            type: object
-            description: Query parameters
-            additionalProperties: true
-
-      pagination:
-        type: object
-        description: Pagination configuration
-        properties:
-          enabled:
-            type: boolean
-            default: true
-
-          pageSize:
-            type: integer
-            description: Number of rows per page
-            minimum: 10
-            maximum: 1000
-            default: 25
-
-          pageSizeOptions:
+          columns:
             type: array
-            description: Available page size options
+            description: Grid column definitions
+            minItems: 1
             items:
-              type: integer
-              minimum: 10
+              type: object
+              required:
+                - field
+                - header
+              properties:
+                field:
+                  type: string
+                  description: Data field name
+                  minLength: 1
+                  maxLength: 100
 
-      selection:
-        type: object
-        description: Row selection configuration
-        properties:
-          enabled:
-            type: boolean
-            default: false
+                header:
+                  type: string
+                  description: Column header label
+                  minLength: 1
+                  maxLength: 255
 
-          mode:
-            type: string
-            description: Selection mode
-            enum:
-              - single
-              - multiple
-            default: single
+                width:
+                  type: integer
+                  description: Column width in pixels
+                  minimum: 50
+                  maximum: 2000
 
-      actions:
-        type: array
-        description: Row-level or bulk actions
-        items:
-          type: object
-          required:
-            - id
-            - label
-          properties:
-            id:
-              type: string
-              minLength: 1
-            label:
-              type: string
-              minLength: 1
-            icon:
-              type: string
+                sortable:
+                  type: boolean
+                  description: Whether column is sortable
+                  default: true
 
-additionalProperties: false
+                filterable:
+                  type: boolean
+                  description: Whether column is filterable
+                  default: true
+
+                resizable:
+                  type: boolean
+                  description: Whether column is resizable
+                  default: true
+
+                formatter:
+                  type: string
+                  description: Data formatter type
+                  enum:
+                    - text
+                    - number
+                    - date
+                    - datetime
+                    - currency
+                    - boolean
+                    - custom
+
+                align:
+                  type: string
+                  description: Text alignment
+                  enum:
+                    - left
+                    - center
+                    - right
+                  default: left
+
+          dataSource:
+            type: object
+            description: Data source configuration
+            required:
+              - type
+            properties:
+              type:
+                type: string
+                description: Data source type
+                enum:
+                  - api
+                  - static
+                  - graphql
+
+              url:
+                type: string
+                description: API endpoint URL
+                format: uri
+
+              method:
+                type: string
+                description: HTTP method for API calls
+                enum:
+                  - GET
+                  - POST
+                default: GET
+
+              params:
+                type: object
+                description: Query parameters
+                additionalProperties: true
+
+          pagination:
+            type: object
+            description: Pagination configuration
+            properties:
+              enabled:
+                type: boolean
+                default: true
+
+              pageSize:
+                type: integer
+                description: Number of rows per page
+                minimum: 10
+                maximum: 1000
+                default: 25
+
+              pageSizeOptions:
+                type: array
+                description: Available page size options
+                items:
+                  type: integer
+                  minimum: 10
+
+          selection:
+            type: object
+            description: Row selection configuration
+            properties:
+              enabled:
+                type: boolean
+                default: false
+
+              mode:
+                type: string
+                description: Selection mode
+                enum:
+                  - single
+                  - multiple
+                default: single
+
+          actions:
+            type: array
+            description: Row-level or bulk actions
+            items:
+              type: object
+              required:
+                - id
+                - label
+              properties:
+                id:
+                  type: string
+                  minLength: 1
+                label:
+                  type: string
+                  minLength: 1
+                icon:
+                  type: string

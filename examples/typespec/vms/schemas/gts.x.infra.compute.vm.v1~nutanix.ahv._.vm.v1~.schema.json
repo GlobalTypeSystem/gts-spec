@@ -1,5 +1,5 @@
 {
-    "$id": "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
+    "$id": "gts://gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "Nutanix AHV Virtual Machine Type",
     "description": "Extends the base VM type with Nutanix AHV specific properties.",
@@ -13,7 +13,7 @@
             "properties": {
                 "gtsId": {
                     "type": "string",
-                    "const": "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
+                    "const": "gts://gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
                     "description": "GTS identifier of the VM type",
                     "x-gts-ref": "/$id"
                 },

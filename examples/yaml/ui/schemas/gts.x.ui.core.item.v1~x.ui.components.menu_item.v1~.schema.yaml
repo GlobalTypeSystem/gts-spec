@@ -3,93 +3,98 @@ $schema: http://json-schema.org/draft-07/schema#
 title: Menu Item
 description: |
   Menu item UI component - extends base UI item with menu-specific properties.
-  Supports hierarchical menu structures with parent-child relationships.
+  All menu-specific properties (navigation, icon, badge, etc.) are placed
+  inside the `metadata` field as required by GTS inheritance rules.
 
 type: object
 
 allOf:
-  - $ref: gts.x.ui.core.item.v1~
+  - $ref: gts://gts.x.ui.core.item.v1~
   - type: object
     required:
       - type
-      - navigation
+      - metadata
     properties:
       type:
         type: string
         const: menu_item
 
-      navigation:
+      metadata:
         type: object
-        description: Navigation behavior configuration
+        description: Menu-specific configuration
         required:
-          - target
+          - navigation
         properties:
-          target:
-            type: string
-            description: |
-              Navigation target - can be a route, URL, or action
-            minLength: 1
-            maxLength: 500
-
-          targetType:
-            type: string
-            description: Type of navigation target
-            enum:
-              - route
-              - url
-              - action
-              - modal
-            default: route
-
-          openInNewTab:
-            type: boolean
-            description: Whether to open link in new tab
-            default: false
-
-          params:
+          navigation:
             type: object
-            description: Navigation parameters or query string
-            additionalProperties: true
+            description: Navigation behavior configuration
+            required:
+              - target
+            properties:
+              target:
+                type: string
+                description: |
+                  Navigation target - can be a route, URL, or action
+                minLength: 1
+                maxLength: 500
 
-      icon:
-        type: string
-        description: Icon identifier (e.g., icon name from icon library)
-        maxLength: 100
+              targetType:
+                type: string
+                description: Type of navigation target
+                enum:
+                  - route
+                  - url
+                  - action
+                  - modal
+                default: route
 
-      badge:
-        type: object
-        description: Badge/notification indicator
-        properties:
-          text:
+              openInNewTab:
+                type: boolean
+                description: Whether to open link in new tab
+                default: false
+
+              params:
+                type: object
+                description: Navigation parameters or query string
+                additionalProperties: true
+
+          icon:
             type: string
-            description: Badge text content
-            maxLength: 20
-          color:
+            description: Icon identifier (e.g., icon name from icon library)
+            maxLength: 100
+
+          badge:
+            type: object
+            description: Badge/notification indicator
+            properties:
+              text:
+                type: string
+                description: Badge text content
+                maxLength: 20
+              color:
+                type: string
+                description: Badge color
+                enum:
+                  - primary
+                  - success
+                  - warning
+                  - danger
+                  - info
+
+          parentMenuId:
             type: string
-            description: Badge color
-            enum:
-              - primary
-              - success
-              - warning
-              - danger
-              - info
+            description: Parent menu item ID for nested menus
+            format: uuid
 
-      parentMenuId:
-        type: string
-        description: Parent menu item ID for nested menus
-        format: uuid
+          children:
+            type: array
+            description: Child menu items
+            items:
+              type: string
+              format: uuid
+              description: Child menu item IDs
 
-      children:
-        type: array
-        description: Child menu items
-        items:
-          type: string
-          format: uuid
-          description: Child menu item IDs
-
-      shortcut:
-        type: string
-        description: Keyboard shortcut (e.g., "Ctrl+S")
-        maxLength: 50
-
-additionalProperties: false
+          shortcut:
+            type: string
+            description: Keyboard shortcut (e.g., "Ctrl+S")
+            maxLength: 50

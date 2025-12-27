@@ -1,5 +1,5 @@
 {
-    "gtsId": "gts.x.infra.compute.vm_state.v1~x.infra._.suspending.v1",
+    "gtsId": "gts://gts.x.infra.compute.vm_state.v1~x.infra._.suspending.v1",
     "description": "Virtual machine is saving state to disk",
     "isTransient": true,
     "icon": "loader"
