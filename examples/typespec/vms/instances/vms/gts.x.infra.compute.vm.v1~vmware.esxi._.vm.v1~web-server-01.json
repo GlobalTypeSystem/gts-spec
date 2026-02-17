@@ -1,5 +1,5 @@
 {
-  "gtsId": "gts://gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~",
+  "gtsId": "gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~",
   "id": "550e8400-e29b-41d4-a716-446655440001",
   "name": "web-server-01",
   "cpuCores": 4,

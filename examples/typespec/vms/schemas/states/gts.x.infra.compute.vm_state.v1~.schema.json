@@ -11,7 +11,7 @@
     "properties": {
         "gtsId": {
             "type": "string",
-            "const": "gts://gts.x.infra.compute.vm_state.v1~",
+            "const": "gts.x.infra.compute.vm_state.v1~",
             "description": "GTS identifier of the power state type",
             "x-gts-ref": "/$id"
         },

@@ -1,5 +1,5 @@
 {
-    "gtsId": "gts://gts.x.infra.compute.vm_state.v1~x.infra._.migrating.v1",
+    "gtsId": "gts.x.infra.compute.vm_state.v1~x.infra._.migrating.v1",
     "description": "Virtual machine is being migrated to another host",
     "isTransient": true,
     "icon": "move"

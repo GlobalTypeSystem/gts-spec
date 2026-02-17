@@ -15,6 +15,12 @@ allOf:
       - type
       - metadata
     properties:
+      gtsId:
+        type: string
+        const: gts.x.ui.core.item.v1~x.ui.components.grid.v1~
+        description: GTS identifier of the UI item type
+        x-gts-ref: /$id
+
       type:
         type: string
         const: grid

@@ -1,5 +1,5 @@
 {
-    "gtsId": "gts://gts.x.infra.compute.vm_state.v1~x.infra._.starting.v1",
+    "gtsId": "gts.x.infra.compute.vm_state.v1~x.infra._.starting.v1",
     "description": "Virtual machine is starting up",
     "isTransient": true,
     "icon": "loader"

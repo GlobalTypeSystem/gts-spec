@@ -1,5 +1,5 @@
 {
-    "gtsId": "gts://gts.x.infra.compute.vm_state.v1~x.infra._.suspended.v1",
+    "gtsId": "gts.x.infra.compute.vm_state.v1~x.infra._.suspended.v1",
     "description": "Virtual machine state is saved to disk and can be resumed quickly",
     "isTransient": false,
     "icon": "pause"

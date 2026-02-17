@@ -6,14 +6,14 @@
     "type": "object",
     "allOf": [
         {
-            "$ref": "gts://gts.x.infra.compute.vm.v1~.schema.json"
+            "$ref": "gts://gts.x.infra.compute.vm.v1~"
         },
         {
             "type": "object",
             "properties": {
                 "gtsId": {
                     "type": "string",
-                    "const": "gts://gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
+                    "const": "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
                     "description": "GTS identifier of the VM type",
                     "x-gts-ref": "/$id"
                 },
