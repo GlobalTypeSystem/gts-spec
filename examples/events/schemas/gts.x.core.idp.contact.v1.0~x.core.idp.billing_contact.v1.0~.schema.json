@@ -1,10 +1,10 @@
 {
-  "$id": "gts.x.core.idp.contact.v1.0~x.core.idp.billing_contact.v1.0~",
+  "$id": "gts://gts.x.core.idp.contact.v1.0~x.core.idp.billing_contact.v1.0~",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "User",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.idp.contact.v1.0~" },
+    { "$ref": "gts://gts.x.core.idp.contact.v1.0~" },
     {
       "type": "object",
       "properties": {

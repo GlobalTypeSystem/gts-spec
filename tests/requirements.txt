@@ -1,0 +1,12 @@
+#
+# Test dependencies for the GTS specification test suite.
+#
+# NOTE:
+# - The tests currently use `httprunner`, which depends on `pydantic` v1.
+# - On Python 3.12, older `pydantic` v1 releases may crash during import with:
+#   "ForwardRef._evaluate() missing 1 required keyword-only argument: 'recursive_guard'"
+#   (because Python 3.12 changed the ForwardRef API).
+# - Pin `pydantic` to a Python-3.12-compatible v1 range to keep tests importable.
+#
+httprunner
+pydantic>=1.10.13,<2

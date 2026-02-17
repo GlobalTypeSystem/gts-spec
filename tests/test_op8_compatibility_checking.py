@@ -8,7 +8,7 @@ def register_base_schema():
         RunRequest("register base schema")
         .post("/entities")
         .with_json({
-            "$$id": "gts.x.test8.compat.base.v1~",
+            "$$id": "gts://gts.x.test8.compat.base.v1~",
             "$$schema": "http://json-schema.org/draft-07/schema#",
             "type": "object",
             "required": ["eventId", "timestamp"],
@@ -38,7 +38,7 @@ class TestCaseTestOp8Compatibility_BackwardCompatible(HttpRunner):
             RunRequest("register v1.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.event.v1.0~",
+                "$$id": "gts://gts.x.test8.compat.event.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "timestamp", "userId"],
@@ -56,7 +56,7 @@ class TestCaseTestOp8Compatibility_BackwardCompatible(HttpRunner):
             RunRequest("register v1.1 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.event.v1.1~",
+                "$$id": "gts://gts.x.test8.compat.event.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "timestamp", "userId"],
@@ -107,7 +107,7 @@ class TestCaseTestOp8Compatibility_BackwardIncompatible(HttpRunner):
             RunRequest("register v1.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.breaking.v1.0~",
+                "$$id": "gts://gts.x.test8.compat.breaking.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId"],
@@ -123,7 +123,7 @@ class TestCaseTestOp8Compatibility_BackwardIncompatible(HttpRunner):
             RunRequest("register v1.1 schema with new required field")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.breaking.v1.1~",
+                "$$id": "gts://gts.x.test8.compat.breaking.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "newRequiredField"],
@@ -167,7 +167,7 @@ class TestCaseTestOp8Compatibility_ForwardCompatible(HttpRunner):
             RunRequest("register v1.0 schema (open model)")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.forward.v1.0~",
+                "$$id": "gts://gts.x.test8.compat.forward.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId"],
@@ -184,7 +184,7 @@ class TestCaseTestOp8Compatibility_ForwardCompatible(HttpRunner):
             RunRequest("register v1.1 schema with new field")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.forward.v1.1~",
+                "$$id": "gts://gts.x.test8.compat.forward.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "newField"],
@@ -229,7 +229,7 @@ class TestCaseTestOp8Compatibility_ForwardIncompatible(HttpRunner):
             RunRequest("register v1.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.fwd_break.v1.0~",
+                "$$id": "gts://gts.x.test8.compat.fwd_break.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "importantField"],
@@ -246,7 +246,7 @@ class TestCaseTestOp8Compatibility_ForwardIncompatible(HttpRunner):
             RunRequest("register v1.1 schema without required field")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.fwd_break.v1.1~",
+                "$$id": "gts://gts.x.test8.compat.fwd_break.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId"],
@@ -289,7 +289,7 @@ class TestCaseTestOp8Compatibility_FullyCompatible(HttpRunner):
             RunRequest("register v1.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.full.v1.0~",
+                "$$id": "gts://gts.x.test8.compat.full.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId"],
@@ -306,7 +306,7 @@ class TestCaseTestOp8Compatibility_FullyCompatible(HttpRunner):
             RunRequest("register v1.1 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.full.v1.1~",
+                "$$id": "gts://gts.x.test8.compat.full.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId"],
@@ -356,7 +356,7 @@ class TestCaseTestOp8Compatibility_TypeChange(HttpRunner):
             RunRequest("register v1.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.typechange.v1.0~",
+                "$$id": "gts://gts.x.test8.compat.typechange.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "count"],
@@ -373,7 +373,7 @@ class TestCaseTestOp8Compatibility_TypeChange(HttpRunner):
             RunRequest("register v1.1 schema with type change")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.typechange.v1.1~",
+                "$$id": "gts://gts.x.test8.compat.typechange.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "count"],
@@ -419,7 +419,7 @@ class TestCaseTestOp8Compatibility_EnumExpansion(HttpRunner):
             RunRequest("register v1.0 schema with enum")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.enum.v1.0~",
+                "$$id": "gts://gts.x.test8.compat.enum.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "status"],
@@ -439,7 +439,7 @@ class TestCaseTestOp8Compatibility_EnumExpansion(HttpRunner):
             RunRequest("register v1.1 schema with expanded enum")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.compat.enum.v1.1~",
+                "$$id": "gts://gts.x.test8.compat.enum.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "status"],
@@ -490,7 +490,7 @@ class TestCaseTestOp8Compatibility_NestedObjectChanges(HttpRunner):
             RunRequest("register v1.0 with nested object")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.nested_compat.order.v1.0~",
+                "$$id": "gts://gts.x.test8.nested_compat.order.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["orderId", "customer"],
@@ -514,7 +514,7 @@ class TestCaseTestOp8Compatibility_NestedObjectChanges(HttpRunner):
             RunRequest("register v1.1 with additional nested field")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.nested_compat.order.v1.1~",
+                "$$id": "gts://gts.x.test8.nested_compat.order.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["orderId", "customer"],
@@ -570,7 +570,7 @@ class TestCaseTestOp8Compatibility_ConstraintRelaxation(HttpRunner):
             RunRequest("register v1.0 with strict constraints")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.constraints.product.v1.0~",
+                "$$id": "gts://gts.x.test8.constraints.product.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["productId", "price"],
@@ -596,7 +596,7 @@ class TestCaseTestOp8Compatibility_ConstraintRelaxation(HttpRunner):
             RunRequest("register v1.1 with relaxed constraints")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.constraints.product.v1.1~",
+                "$$id": "gts://gts.x.test8.constraints.product.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["productId", "price"],
@@ -653,7 +653,7 @@ class TestCaseTestOp8Compatibility_ConstraintTightening(HttpRunner):
             RunRequest("register v1.0 with loose constraints")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.tight.item.v1.0~",
+                "$$id": "gts://gts.x.test8.tight.item.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["itemId", "quantity"],
@@ -674,7 +674,7 @@ class TestCaseTestOp8Compatibility_ConstraintTightening(HttpRunner):
             RunRequest("register v1.1 with tighter constraints")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.tight.item.v1.1~",
+                "$$id": "gts://gts.x.test8.tight.item.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["itemId", "quantity"],
@@ -722,7 +722,7 @@ class TestCaseTestOp8Compatibility_ArrayItemSchemaChange(HttpRunner):
             RunRequest("register v1.0 with simple array items")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.array_compat.list.v1.0~",
+                "$$id": "gts://gts.x.test8.array_compat.list.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["listId", "items"],
@@ -749,7 +749,7 @@ class TestCaseTestOp8Compatibility_ArrayItemSchemaChange(HttpRunner):
             RunRequest("register v1.1 with additional array item field")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test8.array_compat.list.v1.1~",
+                "$$id": "gts://gts.x.test8.array_compat.list.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["listId", "items"],

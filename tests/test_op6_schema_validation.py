@@ -15,7 +15,7 @@ class TestCaseTestOp6ValidateInstance_ValidInstance(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.events.type.v1~",
+                "$$id": "gts://gts.x.test6.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "type", "tenantId", "occurredAt"],
@@ -36,11 +36,11 @@ class TestCaseTestOp6ValidateInstance_ValidInstance(HttpRunner):
             RunRequest("register derived event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.events.type.v1~x.commerce.orders.order_placed.v1.0~",
+                "$$id": "gts://gts.x.test6.events.type.v1~x.commerce.orders.order_placed.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test6.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test6.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -113,7 +113,7 @@ class TestCaseTestOp6ValidateInstance_InvalidInstance(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.events.type.v1~",
+                "$$id": "gts://gts.x.test6.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "type", "tenantId", "occurredAt"],
@@ -134,11 +134,11 @@ class TestCaseTestOp6ValidateInstance_InvalidInstance(HttpRunner):
             RunRequest("register derived event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.events.type.v1~x.test6.invalid.event.v1.0~",
+                "$$id": "gts://gts.x.test6.events.type.v1~x.test6.invalid.event.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test6.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test6.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -189,6 +189,142 @@ class TestCaseTestOp6ValidateInstance_InvalidInstance(HttpRunner):
     ]
 
 
+class TestCaseTestOp6SchemaValidation_InvalidSchemaIdPrefix(HttpRunner):
+    """OP#6 - Reject JSON Schema identifier values that start with 'gts.'"""
+
+    config = Config(
+        "OP#6 - Schema Validation: reject plain gts prefix in id"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with plain gts prefix should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts.x.test6.invalid_id.plain_prefix.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_InvalidSchemaIdWildcard(HttpRunner):
+    """OP#6 - Reject JSON Schema identifier with wildcard after gts://"""
+
+    config = Config(
+        "OP#6 - Schema Validation: reject wildcard gts:// id"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with wildcard gts:// id should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test6.events.*.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_SchemaMissingId(HttpRunner):
+    """OP#6 - Reject JSON Schema documents missing $id"""
+
+    config = Config(
+        "OP#6 - Schema Validation: reject schema without $$id"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema without $id should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_SchemaNonGtsId(HttpRunner):
+    """OP#6 - Reject JSON Schema documents whose $id is not a GTS identifier"""
+
+    config = Config(
+        "OP#6 - Schema Validation: reject non-GTS $$id"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with non-GTS $id should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "http://globaltypesystem.org/schemas/foo",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_UnknownInstanceFormat(HttpRunner):
+    """OP#6 - Reject instances missing recognizable GTS id/type fields"""
+
+    config = Config(
+        "OP#6 - Schema Validation: reject unrecognized instance layout"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register instance without GTS fields should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "event_id": "c5a29a31-86c7-4b4e-9fa6-8a5db2d1a1c4",
+                "event_type": "gts.x.core.events.type.v1~a.b.c.d.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
 class TestCaseTestOp6ValidateInstance_NotFound(HttpRunner):
     """OP#6 - Schema Validation: Validate non-existent instance"""
     config = Config("OP#6 - Validate Instance (not found)").base_url(get_gts_base_url())
@@ -226,7 +362,7 @@ class TestCaseTestOp6Validation_FormatValidation(HttpRunner):
             RunRequest("register schema with formats")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.formats.user.v1~",
+                "$$id": "gts://gts.x.test6.formats.user.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["userId", "email", "createdAt"],
@@ -284,7 +420,7 @@ class TestCaseTestOp6Validation_NestedObjects(HttpRunner):
             RunRequest("register nested schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.nested.order.v1~",
+                "$$id": "gts://gts.x.test6.nested.order.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["orderId", "customer", "items"],
@@ -383,7 +519,7 @@ class TestCaseTestOp6Validation_EnumConstraints(HttpRunner):
             RunRequest("register schema with enum")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.enum.status.v1~",
+                "$$id": "gts://gts.x.test6.enum.status.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["statusId", "status"],
@@ -447,7 +583,7 @@ class TestCaseTestOp6Validation_ArrayConstraints(HttpRunner):
             RunRequest("register schema with array constraints")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test6.array.tags.v1~",
+                "$$id": "gts://gts.x.test6.array.tags.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["itemId", "tags"],

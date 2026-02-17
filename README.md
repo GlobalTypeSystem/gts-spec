@@ -1,4 +1,4 @@
-> **VERSION**: GTS specification draft, version 0.5
+> **VERSION**: GTS specification draft, version 0.7
 
 # Global Type System (GTS) Specification
 
@@ -58,6 +58,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
   - [3.4 Attribute selector](#34-attribute-selector)
   - [3.5 Access control with wildcards](#35-access-control-with-wildcards)
   - [3.6 Access Control Implementation Notes](#36-access-control-implementation-notes)
+  - [3.7 Well-known and Anonymous Instances](#37-well-known-and-anonymous-instances)
 - [4. GTS Identifier Versions Compatibility](#4-gts-identifier-versions-compatibility)
   - [4.1 Compatibility Modes](#41-compatibility-modes)
   - [4.2 JSON Schema Content Models](#42-json-schema-content-models)
@@ -83,14 +84,16 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 
 ## Document Version
 
-| Version | Status                                                                                        |
-|---------|-----------------------------------------------------------------------------------------------|
-| 0.1     | Initial Draft, Request for Comments                                                           |
-| 0.2     | Semantics and Capabilities refined - access control notes, query language, attribute selector |
-| 0.3     | Version compatibility rules refined; more practical examples of usage; remove Python examples |
-| 0.4     | Clarify some corner cases - tokens must not start with digit, uuid5, minor version semantic   |
-| 0.5     | Added Referece Implmenetation recommendations (section 9)                                     |
-
+| Ver | Status                                                                                             |
+|-----|----------------------------------------------------------------------------------------------------|
+| 0.1 | Initial Draft, Request for Comments                                                                |
+| 0.2 | Semantics and Capabilities refined - access control notes, query language, attribute selector      |
+| 0.3 | Version compatibility rules refined; more practical examples of usage; remove Python examples      |
+| 0.4 | Clarify some corner cases - tokens must not start with digit, uuid5, minor version semantic        |
+| 0.5 | Added Referece Implmenetation recommendations (section 9)                                          |
+| 0.6 | Introduced well-known/anonymous instance term; defined field naming implementation recommendations |
+| 0.7 | BREAKING: require $ref value to start with 'gts://'; strict rules for schema/instance distinction; prohibiting well-known instances without left-hand type segments  |
+| 0.8beta1 | Add OP#12 (schema vs schema validation), unified validation endpoint (/validate-entity), and clarify instance -> schema and schema -> schema validation semantics for chained GTS IDs |
 
 ## 1. Motivation
 
@@ -134,8 +137,9 @@ The GTS identifier is a string with total length of 1024 characters maximum.
 - A single type identifier (schema):
   - `gts.<vendor>.<package>.<namespace>.<type>.v<MAJOR>[.<MINOR>]~`
   - Note the trailing `~` to denote a type (schema) identifier.
-- A single instance identifier (object):
-  - `gts.<vendor>.<package>.<namespace>.<type>.v<MAJOR>[.<MINOR>]`
+- A single instance identifier (object of given type):
+  - `gts.<vendor>.<package>.<namespace>.<type>.v<MAJOR>[.<MINOR>]~<vendor>.<package>.<namespace>.<type>.v<MAJOR>[.<MINOR>]`
+  - Well-known instance identifiers MUST include a left-hand type segment in a chain (see 2.2 and 3.7).
   - Note: no trailing `~` for instances. The identifier ends with an integer (the last version component).
 
 The `<vendor>` refers to a string code that indicates the origin of a given schema or instance definition. This can be valuable in systems that support cross-vendor data exchange, such as events or configuration files, especially in environments with deployable applications or plugins.
@@ -199,11 +203,13 @@ The complete GTS identifier syntax in Extended Backus-Naur Form (EBNF):
 
 ```ebnf
 (* Top-level identifier *)
-gts-identifier = "gts." , gts-segment , [ chain-suffix ] ;
+gts-identifier = "gts." , gts-segment , ( chain-suffix-type | chain-suffix-instance ) ;
 
-(* Chain of type extensions *)
-chain-suffix   = { "~" , gts-segment } , [ final-tilde ] ;
-final-tilde    = "~" ;  (* present for type IDs, absent for instance IDs *)
+(* Chained type ID ends with ~ *)
+chain-suffix-type      = { "~" , gts-segment } , "~" ;
+
+(* Chained instance ID MUST have at least one tilde separator and NO trailing tilde *)
+chain-suffix-instance  = "~" , gts-segment , { "~" , gts-segment } ;
 
 (* Single GTS ID segment *)
 gts-segment    = vendor , "." , package , "." , namespace , "." , type , "." , version ;
@@ -256,6 +262,24 @@ GTS identifiers enable the following operations and use cases:
    - For an instance identifier: extract the rightmost type from the chain and validate the object against that schema
    - Chain validation: optionally verify that each type in the chain is compatible with its predecessor
 
+#### Validation semantics for GTS chained IDs (instance -> schema and schema -> schema)
+
+GTS identifiers may be chained (e.g. `gts.A~B~C`). Validation MUST respect the left-to-right inheritance model and MUST preserve the compatibility guarantee (section 3.2).
+
+- **Instance → schema validation** (validate an object instance):
+  - The system MUST resolve the **rightmost type** in the identifier chain and validate the instance payload against that JSON Schema.
+  - If the instance identifier includes a type chain (`A~B~<instance>`), validating against the rightmost type `B` MUST also imply conformance to all base types in the chain (by transitivity).
+  - Implementations MAY additionally validate that each adjacent type pair in the chain is compatible (schema→schema validation), but the primary runtime instance validation target is always the rightmost type.
+
+- **Schema → schema validation** (validate a derived schema against its predecessor schema):
+  - Given a derived type identifier chain (e.g. `A~B~` or `A~B~C~`), the system MUST validate that each derived schema is compatible with its immediate predecessor in the chain.
+  - The compatibility rule is: every valid instance of the derived schema MUST also be a valid instance of the base schema.
+  - When JSON Schema inheritance is expressed via `allOf` (recommended), the derived schema MUST be written such that it does not invalidate the compatibility guarantee.
+
+- **`additionalProperties` and adding new properties**:
+  - If a base schema (or any schema in the inheritance chain) defines an object with `additionalProperties: false`, then derived schemas MUST NOT introduce new properties at that object level that would be rejected by the base schema.
+  - Derived schemas MAY still tighten constraints of existing properties (e.g. reduce `maxLength`, narrow `enum`, increase `minimum`) and MAY further specify previously-open nested objects (e.g. base `payload: {"type":"object"}` and derived defines `payload.properties`).
+
 3. **Version Compatibility Checking**: Automatically determine if schemas with different MINOR versions are compatible (see section 4).
 
 4. **Access Control Policies**: Build fine-grained or coarse-grained authorization rules using:
@@ -301,7 +325,7 @@ A platform defines a base event schema with common fields:
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.core.events.type.v1~",
+  "$id": "gts://gts.x.core.events.type.v1~",
   "type": "object",
   "properties": {
     "id": { "type": "string" },
@@ -318,10 +342,10 @@ A third-party vendor (ABC) registers a derived event type for order placement:
 ```jsonc
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.core.events.type.v1~abc.events.order_placed.v1~", // define a new event type derived from the base event type
+  "$id": "gts://gts.x.core.events.type.v1~abc.events.order_placed.v1~", // define a new event type derived from the base event type
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.events.type.v1~" }, // inherit base event schema
+    { "$ref": "gts://gts.x.core.events.type.v1~" }, // inherit base event schema
     {
       "properties": {
         "typeId": { "const": "gts.x.core.events.type.v1~abc.orders.order_placed.v1~" },
@@ -364,7 +388,7 @@ CREATE TABLE events (
 
 ### 3.3 Query Language
 
-GTS Query Language is a compact predicate syntax, inspired by XPath/JSONPath, that lets you constrain results by attributes. Attach a square-bracket clause to a GTS identifier with space-separated name="value" pairs. Example form: <gts>[ attr="value", other="value2" ].
+GTS Query Language is a compact predicate syntax, inspired by XPath/JSONPath, that lets you constrain results by attributes. Attach a square-bracketed clause to a GTS identifier containing name="value" pairs separated by commas. Example form: <gts>[ attr="value", other="value2" ].
 
 > **Scope note:** The query language and attribute selector (section 3.4) are runtime conveniences for filtering and accessing data in GTS-aware applications. They are **not part of the core GTS identifier specification** and should not be embedded in stored identifiers or schema definitions. Use them only in runtime queries, policy evaluation, and data access operations.
 
@@ -428,9 +452,20 @@ The following guidance is provided for implementers building GTS-aware policy en
 - **Derived-type envelopes**: Grant access at the base type (e.g., `gts.x.core.events.type.v1~`) so that derived schemas remain covered if they conform by chain rules.
 
 **Matching semantics options:**
+- **Implicit derived-type coverage (recommended)**: Granting access to a base schema identifier without an explicit wildcard (e.g., `gts.a.b.c.d.v1~`) SHOULD be treated as an implicit grant to all derived types and instances under that base type (equivalent in intent to `gts.a.b.c.d.v1~*`).
+
+  Example candidate: `gts.a.b.c.d.v1~w.x.y.z.v1`
+
+  This candidate SHOULD match all of:
+  - `gts.a.b.c.d.v1~`
+  - `gts.a.b.c.d.v1~*`
+  - `gts.a.b.c.d.v1~w.*`
+
+  But it SHOULD NOT match:
+  - `gts.a.b.c.d.v1~x.*`
 - **Segment-wise prefixing**: The `*` wildcard can match any valid content of the target segment and its suffix hierarchy, enabling vendor/package/namespace/type grouping.
 - **Chain awareness**: Patterns may target the base segment, derived segments, or instance tail; evaluation should consider the entire chain when present.
-- **Attribute filters**: Optional `[name="value", ...]` predicates further constrain matches (e.g., only instances referencing a specific `screen_type`).
+- **Attribute filters**: Optional `[name="value", ...]` predicates further constrain matches (e.g., only instances referencing a specific `name`).
 - **Minor version semantics**: Patterns without minor versions (e.g., `gts.vendor.pkg.ns.type.v1~*`) match candidates with any minor version of that major version (e.g., `v1.0~`, `v1.1~`), since the minor version is optional and omitting it means "any minor version". See section 10 for detailed examples.
 
 **Evaluation guidelines:**
@@ -444,6 +479,45 @@ The following guidance is provided for implementers building GTS-aware policy en
 - **Caching**: Cache resolution results for common patterns and predicate evaluations; invalidate caches on schema or policy changes.
 - **Auditing**: Log the concrete identifier and the matched rule (pattern + predicates) for traceability and compliance.
 
+### 3.7 Well-known and Anonymous Instances
+
+In GTS, a **type/schema is always named**: it has a stable GTS **type identifier** (ends with `~`) and can be referenced from a JSON Schema `$id`.
+
+However, an **instance/object** may be represented in two common ways:
+
+- **Well-known instance (named)**: used for unique, globally-defined objects that benefit from a stable human-readable name (catalog entries, topics/streams, modules, capabilities, etc.).
+  - **Mandatory**: well-known instance identifiers MUST be expressed as a **chain** where the left segment is the type and the rightmost segment is the instance name. Single-segment instance identifiers (without a left-hand type segment) are prohibited.
+  - Example (well-known topic/stream instance):
+    - `gts.x.core.events.topic.v1~x.commerce._.orders.v1.0`
+  - Field naming: typically `id` (alternatives: `gtsId`, `gts_id`).
+
+Example:
+
+```json
+{
+  "id": "gts.x.core.events.topic.v1~x.commerce._.orders.v1.0",
+  "name": "orders",
+  "description": "Order lifecycle events topic"
+}
+```
+
+- **Anonymous instance**: used for runtime-created objects where a globally meaningful name is not required (events/messages, DB rows, audit records, etc.).
+  - Recommended: use an opaque identifier as `id` (typically a UUID) and store the associated GTS **type identifier** separately (e.g., in a `type` field).
+  - Example (anonymous event instance):
+    - `id: "7a1d2f34-5678-49ab-9012-abcdef123456"`, `type: "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~"`
+  - Field naming: `type` (alternatives: `gtsType`, `gts_type`).
+
+This split is common in event systems: **topics/streams** are often well-known instances, while individual **events** are anonymous. See `./examples/events` and the field-level recommendations in section **9.1**.
+
+Example:
+
+```json
+{
+  "id": "7a1d2f34-5678-49ab-9012-abcdef123456",
+  "type": "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~",
+  "occurredAt": "2025-09-20T18:35:00Z"
+}
+```
 
 ## 4. GTS Identifier Versions Compatibility
 
@@ -529,7 +603,7 @@ This section demonstrates how different types of schema changes affect compatibi
 **Schema v1.0** (`gts.x.core.db.connection_config.v1.0~`):
 ```json
 {
-  "$id": "gts.x.core.db.connection_config.v1.0~",
+  "$id": "gts://gts.x.core.db.connection_config.v1.0~",
   "type": "object",
   "required": ["host", "port", "database"],
   "properties": {
@@ -545,7 +619,7 @@ This section demonstrates how different types of schema changes affect compatibi
 **Schema v1.1** (adds required field):
 ```json
 {
-  "$id": "gts.x.core.db.connection_config.v1.1~",
+  "$id": "gts://gts.x.core.db.connection_config.v1.1~",
   "type": "object",
   "required": ["host", "port", "database", "timeout"],
   "properties": {
@@ -581,12 +655,12 @@ This section demonstrates how different types of schema changes affect compatibi
 **Base event schema v1** (`gts.x.core.events.type.v1~`)
 ```json
 {
-  "$id": "gts.x.core.events.type.v1~",
+  "$id": "gts://gts.x.core.events.type.v1~",
   "type": "object",
-  "required": ["gtsId", "id", "timestamp"],
+  "required": ["id", "type", "timestamp"],
   "properties": {
-    "gtsId": { "type": "string" },
     "id": { "type": "string" },
+    "type": { "type": "string" },
     "timestamp": { "type": "integer" },
     "payload": { "type": "object", "additionalProperties": true }
   },
@@ -597,10 +671,10 @@ This section demonstrates how different types of schema changes affect compatibi
 **Schema v1.0** (`gts.x.core.events.type.v1~x.api.users.create_request.v1.0~`):
 ```json
 {
-  "$id": "gts.x.core.events.type.v1~x.api.users.create_request.v1.0~",
+  "$id": "gts://gts.x.core.events.type.v1~x.api.users.create_request.v1.0~",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.events.type.v1~" },
+    { "$ref": "gts://gts.x.core.events.type.v1~" },
     {
       "properties": {
         "payload": {
@@ -621,10 +695,10 @@ This section demonstrates how different types of schema changes affect compatibi
 **Schema v1.1** (adds optional field):
 ```json
 {
-  "$id": "gts.x.core.events.type.v1~x.api.users.create_request.v1.1~",
+  "$id": "gts://gts.x.core.events.type.v1~x.api.users.create_request.v1.1~",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.events.type.v1~" },
+    { "$ref": "gts://gts.x.core.events.type.v1~" },
     {
       "properties": {
         "payload": {
@@ -664,10 +738,10 @@ This section demonstrates how different types of schema changes affect compatibi
 **Schema v1.0** (`gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~`):
 ```json
 {
-  "$id": "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~",
+  "$id": "gts://gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.events.type.v1~" },
+    { "$ref": "gts://gts.x.core.events.type.v1~" },
     {
       "properties": {
         "payload": {
@@ -689,10 +763,10 @@ This section demonstrates how different types of schema changes affect compatibi
 **Schema v1.1** (adds optional field):
 ```json
 {
-  "$id": "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.1~",
+  "$id": "gts://gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.1~",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.events.type.v1~" },
+    { "$ref": "gts://gts.x.core.events.type.v1~" },
     {
       "properties": {
         "payload": {
@@ -736,7 +810,7 @@ This section demonstrates how different types of schema changes affect compatibi
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "allOf": [
-      {"$$ref": "gts.x.core.events.type.v1~"},
+      {"$ref": "gts://gts.x.core.events.type.v1~"},
       {
           "type": "object",
           "required": ["type", "payload"],
@@ -760,7 +834,7 @@ This section demonstrates how different types of schema changes affect compatibi
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "allOf": [
-      {"$$ref": "gts.x.core.events.type.v1~"},
+      {"$ref": "gts://gts.x.core.events.type.v1~"},
       {
           "type": "object",
           "required": ["type", "payload"],
@@ -783,13 +857,13 @@ This section demonstrates how different types of schema changes affect compatibi
 
 ```json
 // Base type (always compatible with derived types)
-"$id": "gts.x.core.events.type.v1~"
+"$id": "gts://gts.x.core.events.type.v1~"
 
 // Derived type v1.0 (refines base type)
-"$id": "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~"
+"$id": "gts://gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~"
 
 // Derived type v1.1 (minor version of the derived type)
-"$id": "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.1~"
+"$id": "gts://gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.1~"
 ```
 
 **Compatibility rules**:
@@ -873,16 +947,16 @@ First, let's define the base event schema for vendor `X` event manager:
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.core.events.type.v1~",
+  "$id": "gts://gts.x.core.events.type.v1~",
   "title": "Base Event",
   "type": "object",
   "properties": {
-    "gtsId": { "type": "string", "$comment": "This field serves as the unique identifier for the event schema" },
     "id": { "type": "string", "$comment": "This field serves as the unique identifier for the event instance" },
+    "type": { "type": "string", "$comment": "This field serves as the unique identifier for the event schema" },
     "timestamp": { "type": "integer", "$comment": "timestamp in seconds since epoch" },
     "payload": { "type": "object", "additionalProperties": true, "$comment": "Event payload... can be anything" }
   },
-  "required": ["gtsId", "id", "timestamp", "payload"],
+  "required": ["id", "type", "timestamp", "payload"],
   "additionalProperties": false
 }
 ```
@@ -892,11 +966,11 @@ Now, let's define the audit event schema for vendor `X` event manager:
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.core.events.type.v1~x.core.audit.event.v1~",
+  "$id": "gts://gts.x.core.events.type.v1~x.core.audit.event.v1~",
   "title": "Audit Event, derived from Base Event",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.events.type.v1~" },
+    { "$ref": "gts://gts.x.core.events.type.v1~" },
     {
       "type": "object",
       "properties": {
@@ -923,11 +997,11 @@ Then, let's define the schema of specific audit event registered by vendor `ABC`
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.core.events.type.v1~x.core.audit.event.v1~abc.app.store.purchase_audit_event.v1.2~",
+  "$id": "gts://gts.x.core.events.type.v1~x.core.audit.event.v1~abc.app.store.purchase_audit_event.v1.2~",
   "title": "Vendor ABC Custom Purchase Audit Event from app APP",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.core.events.type.v1~x.core.audit.event.v1~" },
+    { "$ref": "gts://gts.x.core.events.type.v1~x.core.audit.event.v1~" },
     {
       "type": "object",
       "properties": {
@@ -954,12 +1028,12 @@ Then, let's define the schema of specific audit event registered by vendor `ABC`
 }
 ```
 
-Finally, when the producer (the application `APP` of vendor `ABC`) emits the event, it uses the `gtsId` to identify the event schema and provide required payload:
+Finally, when the producer (the application `APP` of vendor `ABC`) emits the event, it uses the `type` to identify the event schema and provide required payload:
 
 ```json
 {
-  "gtsId": "gts.x.core.events.type.v1~x.core.audit.event.v1~abc.app.store.purchase_audit_event.v1.2~",
   "id": "e81307e5-5ee8-4c0a-8d1f-bd98a65c517e",
+  "type": "gts.x.core.events.type.v1~x.core.audit.event.v1~abc.app.store.purchase_audit_event.v1.2~",
   "timestamp": 1743466200000000000,
   "payload": {
     "user_id": "9c905ae1-f0f3-4cfb-aa07-5d9a86219abe",
@@ -977,7 +1051,7 @@ Finally, when the producer (the application `APP` of vendor `ABC`) emits the eve
 
 When the event manager receives the event it processes it as follows:
 
-1. **Schema Resolution**: Parse the `gtsId` to identify the full chain. The event manager can see that this instance conforms to `gts.x.core.events.type.v1~`, `...~x.core.audit.event.v1~`, and finally `...~abc.app.store.purchase_audit_event.v1.2~`.
+1. **Schema Resolution**: Parse the `type` to identify the full chain. The event manager can see that this instance conforms to `gts.x.core.events.type.v1~`, `...~x.core.audit.event.v1~`, and finally `...~abc.app.store.purchase_audit_event.v1.2~`.
 
 2. **Validation**: Load the most specific JSON Schema (`...~abc.app.store.purchase_audit_event.v1.2~`) and validate the event object against it. It would automatically mean the event body is validated against any other schema in the chain (e.g., the base event and the base audit event).
 
@@ -1091,9 +1165,62 @@ For existing reference implementations, refer to the official libraries:
 - [gts-go](https://www.github.com/GlobalTypeSystem/gts-go)
 - [gts-rust](https://www.github.com/GlobalTypeSystem/gts-rust)
 
-### 9.1 - GTS operations (OP#1–OP#11):
+### 9.1 - Identifier reference in JSON and JSON Schema
 
-Implement and expose all operations OP#1–OP#11 listed above and add appropriate unit tests.
+This section provides **recommended** conventions for embedding GTS identifiers into JSON objects (instances) and JSON Schemas (types). Implementations may support additional conventions, but these provide an interoperable default.
+
+**JSON Schema (`$id`)**
+
+It is recommended to put the GTS **type identifier** into the JSON Schema `$id` field, using a URI-like form by prepending the `gts://` prefix:
+
+> **Reserved prefix note**: Do **not** place the canonical `gts.` string directly in `$id`. Always wrap the identifier with the `gts://` scheme (for example: `"$id": "gts://gts.x.core.events.type.v1~"`). The raw `gts.` prefix is reserved for canonical identifiers inside the scheme, and mixing it directly into `$id` leads to ambiguity and upload failures.
+
+```json
+{
+  "$id": "gts://gts.x.core.events.type.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Event Envelope (Common Fields)"
+}
+```
+
+Implementation note: GTS itself defines the canonical identifier string starting with `gts.`. When `$id` is expressed as `gts://...`, implementations should trim the `gts://` prefix and treat the remainder as the canonical GTS identifier for validation, comparison, and registry keys. The `gts://` prefix exists only to make `$id` URI-compatible.
+
+When `$id` starts with `gts://`, the remainder **must** be a valid, wildcard-free GTS identifier (see OP#1 rules). Asterisks and other wildcard tokens are not permitted in schema identifiers.
+
+**JSON Schema (`$ref`)**
+
+It is recommended to make GTS schema references in JSON Schema `$ref` URI-compatible the same way as `$id`, by prepending the `gts://` prefix when `$ref` points at a GTS schema identifier:
+
+> **Note:** Just like `$id`, do not embed raw `gts.` prefixes in `$ref`. Use the URI form (`gts://...`) and ensure the referenced identifier is a valid GTS ID with no wildcard characters.
+
+```json
+{
+  "allOf": [
+    { "$ref": "gts://gts.x.core.events.type.v1~" }
+  ]
+}
+```
+
+Note: local JSON Schema references (e.g. `"$ref": "#/definitions/Foo"`, `"$ref": "#/$defs/Foo"`) are JSON Schema compliant and remain valid. The `gts://` recommendation applies only when `$ref` targets a GTS schema identifier.
+
+Implementation note: When `$ref` is expressed as `gts://...`, implementations should trim the `gts://` prefix and treat the remainder as the canonical GTS identifier for resolution, validation, comparison, and registry keys. The `gts://` prefix exists only to make `$ref` URI-compatible.
+
+The post-`gts://` content must therefore parse as a valid GTS identifier with no wildcards; otherwise the schema upload should be rejected.
+
+**JSON instances (well-known vs anonymous)**
+
+- **Well-known instances (named)**: recommended to use a GTS identifier in the `id` field (alternatives: `gtsId`, `gts_id`). Prefer a chained identifier so the **left segment(s)** define the schema/type automatically, and the **rightmost** segment is the instance name.
+  - Example (well-known topic/stream instance): `gts.x.core.events.topic.v1~x.commerce._.orders.v1.0`
+- **Anonymous instances**: typically use the `id` field to store the object UUID, and store the GTS type identifier separately in a `type` field (alternatives: `gtsType`, `gts_type`).
+  - Example (anonymous event instance): `id: "7a1d2f34-5678-49ab-9012-abcdef123456"`, `type: "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~"`
+
+See working examples under `./examples/events`:
+- Well-known topics: `./examples/events/instances/gts.x.core.events.topic.v1~x.commerce.orders.orders.v1.0.json`
+- Anonymous events: `./examples/events/instances/gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1~.examples.json`
+
+### 9.2 - GTS operations (OP#1 - OP#12):
+
+Implement and expose all operations OP#1–OP#12 listed above and add appropriate unit tests.
 
 - **OP#1 - ID Validation**: Verify identifier syntax
 - **OP#2 - ID Extraction**: Extract identifiers from JSON objects or JSON Schema documents
@@ -1106,17 +1233,17 @@ Implement and expose all operations OP#1–OP#11 listed above and add appropriat
 - **OP#9 - Version Casting**: Transform instances between compatible MINOR versions
 - **OP#10 - Query Execution**: Filter identifier collections using the GTS query language
 - **OP#11 - Attribute Access**: Retrieve property values and metadata using the attribute selector (`@`)
+- **OP#12 - Schema vs Schema Validation**: Validate derived schemas against their base schemas. Derived schemas using `allOf` must conform to all constraints defined in their parent schemas throughout the inheritance hierarchy. This ensures type safety in schema extension and prevents constraint violations in multi-level schema hierarchies.
 
-
-### 9.2 - GTS entities registration
+### 9.3 - GTS entities registration
 
 Implement simple GTS instances in-memory registry with optional GTS entities validation on registration. If "validation" parameter enabled, the entity registration action must ensure that all the GTS references are valid - identitfiers must match GTS pattern, refererred entities must be registered, the x-gts-ref references must be valid (see below)
 
-### 9.3 - CLI support
+### 9.4 - CLI support
 
 Provide a CLI wrapping OPs for local use and CI: e.g., `gts validate`, `gts parse`, `gts match`, `gts uuid`, `gts compat`, `gts cast`, `gts query`, `gts get`. Use non-zero exit codes on validation/compatibility failures for pipeline integration.
 
-### 9.4 - Web server with OpenAPI
+### 9.5 - Web server with OpenAPI
 
 Implement an HTTP server that conforms to `tests/openapi.json` so it can be tested from this specification directory.
 
@@ -1126,13 +1253,13 @@ Implement an HTTP server that conforms to `tests/openapi.json` so it can be test
 pytest ./tests
 ```
 
-### 9.5 - `x-gts-ref` support
+### 9.6 - `x-gts-ref` support
 
 Use `x-gts-ref` in GTS schemas (JSON schemas) to declare that a string field is a GTS entity reference, not an arbitrary string; validators must enforce this.
 
 Allowed values:
 - `"x-gts-ref": "gts.*"` — field must be a valid GTS identifier (see OP#1); optionally resolve against a registry if available.
-- `"x-gts-ref": "/$id"` — relative self-reference; field value must equal the current schema’s `$id` ("/" refers to the JSON Schema document root, `$id` is its identifier). The referred field must be a GTS string or another `x-gts-ref` field.
+- `"x-gts-ref": "/$id"` — relative self-reference; field value must equal the current schema’s `$id` without the `gts://` prefix ("/" refers to the JSON Schema document root, `$id` is its identifier). The referred field must be a GTS string or another `x-gts-ref` field.
 
 See examples in `./examples/modules` for typical patterns.
 
@@ -1144,17 +1271,17 @@ Implementation notes:
   - For nested paths (e.g., `./properties/id`), resolve the pointer accordinly to the field path in the JSON Schema document.
 
 
-### 9.6 - YAML support
+### 9.7 - YAML support
 
 Accept and emit both JSON and YAML (`.json`, `.yaml`, `.yml`) for schemas and instances.
 Ensure conversions are lossless; preserve `$id`, `gtsId`, and custom extensions like `x-gts-ref`.
 
-### 9.7 - TypeSpec support
+### 9.8 - TypeSpec support
 
 Support generating JSON Schema and OpenAPI from TypeSpec while preserving GTS semantics.
 Ensure generated schemas use GTS identifiers as `$id` for types and keep any `x-gts-*` extensions intact.
 
-### 9.8 - UUID as object IDs
+### 9.9 - UUID as object IDs
 
 Support UUIDs (format: `uuid`) for instance `id` fields.
 
@@ -1232,13 +1359,127 @@ Result:    ❌ NO MATCH (different major versions)
 
 ## 11. JSON and JSON Schema Conventions
 
-It is advisable to include instance GTS identifiers in a top-level field, such as `gtsId`. However, the choice of the specific field name is left to the discretion of the implementation and can vary from service to service.
+### 11.1 Global rules: schema vs instance, normalization, and document categories
 
-**Example #1**: **instance definition** of an object instance (event topic) that has a `gtsId` field that encodes the object type (`gts.x.core.events.topic.v1~`) and identifies the object itself (`x.core.idp.events.v1`). In the example below it makes no sense to add an additional `id` field because the `gtsId` is already unique and there are no other event topics with the given id in the system:
+This section defines recommendations for how GTS-aware systems interpret JSON documents. The rules describe the concepts; the exact field names used for instance IDs and instance types are **implementation-defined** and may be **configuration-driven** (different systems may look for identifiers in different fields).
+
+#### Rule A — Schema vs instance discriminator
+
+**A JSON document is a schema if and only if it contains a top-level `$schema` field.**
+
+- If `$schema` is present → the document MUST be treated as a **schema**.
+- If `$schema` is absent → the document MUST be treated as an **instance**.
+
+This discriminator MUST be applied before any ID parsing heuristics.
+
+#### Rule B — GTS schema `$id` normalization
+
+For GTS schemas (documents with `$schema`), it is recommended that `$id` is URI-compatible by using:
+- `$id: "gts://<canonical-gts-id>"`
+
+Implementations MUST normalize this by stripping the `gts://` prefix when extracting/returning the canonical GTS identifier. The `gts://` prefix exists only to make `$id` URI-compatible.
+
+#### Rule C — JSON document categories
+
+Implementations MUST clearly distinguish the following **five** categories of JSON documents:
+
+1. **GTS entity schemas**
+   - Have `$schema`
+   - Have `$id` starting with `gts://` and the remainder is a valid **GTS type identifier** (ends with `~`)
+   - Example:
 
 ```json
 {
-  "gtsId": "gts.x.core.events.topic.v1~x.core.idp.events.v1",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "gts://gts.x.core.events.type.v1~",
+  "type": "object"
+}
+```
+
+2. **Non‑GTS schemas**
+   - Have `$schema`
+   - Do not have a valid GTS `$id`
+   - Handling is **implementation-defined** (ignore vs error depending on API context)
+   - Example:
+
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/schemas/order.json",
+  "type": "object"
+}
+```
+
+3. **Instances of unknown / non‑GTS schemas**
+   - No `$schema`
+   - Schema/type cannot be determined (no acceptable schema/type reference field found, or the field value is not a valid GTS ID)
+   - Handling is **implementation-defined** (ignore vs error depending on API context)
+   - Example:
+
+```json
+{
+  "id": "123",
+  "payload": { "foo": "bar" }
+}
+```
+
+4. **Well-known GTS instances (named)**
+   - No `$schema`
+   - Instance is identified by a **GTS instance identifier** (often a chain) stored in an implementation-chosen instance-ID field
+   - The schema/type is derived from the **left segment(s)** of the chain
+   - Example (well-known topic/stream instance):
+
+```json
+{
+  "id": "gts.x.core.events.topic.v1~x.commerce._.orders.v1.0",
+  "name": "orders"
+}
+```
+
+> NOTE: In this specification, an instance identifier is a GTS identifier **without** the trailing `~` (i.e., it does not name a schema/type).
+> Some systems may still accept an `id` field or it's equivalent that contains a **type/schema** identifier (ending with `~`) and treat it as a *schema reference* rather than an *instance identifier*.
+> This behavior is **not defined by the GTS spec** and is entirely **implementation-specific / configuration-driven**.
+
+5. **Anonymous GTS instances**
+   - No `$schema`
+   - Instance `id` is opaque (typically UUID)
+   - Schema/type is provided separately via an implementation-chosen schema/type field (e.g., `type`, `gtsType`, `gts_type`)
+   - Example (anonymous event instance):
+
+```json
+{
+  "id": "7a1d2f34-5678-49ab-9012-abcdef123456",
+  "type": "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~",
+  "occurredAt": "2025-09-20T18:35:00Z"
+}
+```
+
+> NOTE: In this specification, a type identifier is a GTS identifier **with** the trailing `~`.
+> Some systems may still accept a `type` field or it's equivalent that contains an **instance** identifier (not ending with `~`). This behavior is **not defined by the GTS spec** and is entirely **implementation-specific / configuration-driven**.
+
+
+#### ID and type-field heuristics (implementation-defined)
+
+For **instances** (documents without `$schema`), implementations typically apply heuristics in this order:
+
+1. **Try instance ID fields** (commonly `id`, then aliases like `gtsId`, `gts_id`):
+   - If the value is a valid GTS identifier, treat it as a **well-known instance** and derive `schema_id` from the chain (everything up to and including the last `~`).
+   - Otherwise treat it as an **anonymous instance** ID value.
+2. **For anonymous instances**, determine the schema/type from a separate field (commonly `type`, or aliases like `schema`, `gtsType`, `gts_type`).
+
+**Important**: When determining instance type, a chained GTS ID in the instance ID field ALWAYS takes priority over any explicit type field. The type is derived from the chain's type segments, not from a separate type property.
+
+Different systems may choose different field names and priority orders via configuration. The examples below (and the `./examples/*` folders) use the common defaults: `id` for instance ID and `type` for instance type.
+
+### 11.2 Examples
+
+It is advisable to include instance identifiers in a top-level field such as `id`. However, the choice of the specific field name is left to the discretion of the implementation and can vary from service to service.
+
+**Example #1**: **instance definition** of an object instance (event topic) that has an `id` field that encodes the object type (`gts.x.core.events.topic.v1~`) and identifies the object itself (`x.core.idp.events.v1`). In the example below it makes no sense to add an additional `type` field referring to the object schema because the `id` is already unique and there are no other event topics with the given id in the system:
+
+```json
+{
+  "id": "gts.x.core.events.topic.v1~x.core.idp.events.v1",
   "description": "User-related events (creation, profile changes, etc.)",
   "retention": "P30D",
   "ordering": "by-partition-key",
@@ -1249,13 +1490,13 @@ It is advisable to include instance GTS identifiers in a top-level field, such a
 
 ```json
 [{
-    "gtsId": "gts.x.core.events.type.v1~x.core.idp.events.v1~",
     "id": "123",
+    "type": "gts.x.core.events.type.v1~x.core.idp.events.v1~",
     "payload": { "foo": "123", "bar": 42 }
 },
 {
-    "gtsId": "gts.x.core.events.type.v1~x.core.idp.events.v1~",
     "id": "125",
+    "type": "gts.x.core.events.type.v1~x.core.idp.events.v1~",
     "payload": { "foo": "xyz", "bar": 123 }
 }]
 ```
@@ -1265,14 +1506,14 @@ It is advisable to include instance GTS identifiers in a top-level field, such a
 ```json
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.core.events.type.v1~",
+  "$id": "gts://gts.x.core.events.type.v1~",
   "type": "object",
   "properties": {
-    "gtsId": { "type": "string" },
+    "id": { "type": "string" },
     "timestamp": { "type": "string", "format": "date-time" },
     "payload": { "type": "object" }
   },
-  "required": ["gtsId", "payload"]
+  "required": ["id", "payload"]
 }
 ```
 

@@ -17,7 +17,7 @@ class TestCaseTestOp11AttrAccess_ExistingFields(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test11.events.type.v1~",
+                "$$id": "gts://gts.x.test11.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "type", "tenantId", "occurredAt"],
@@ -39,13 +39,13 @@ class TestCaseTestOp11AttrAccess_ExistingFields(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.test11.events.type.v1~"
+                    "gts://gts.x.test11.events.type.v1~"
                     "x.test11.nested.event.v1.0~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test11.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test11.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -83,7 +83,7 @@ class TestCaseTestOp11AttrAccess_ExistingFields(HttpRunner):
             RunRequest("register instance")
             .post("/entities")
             .with_json({
-                "gtsId": (
+                "id": (
                     "gts.x.test11.events.type.v1~"
                     "x.test11.nested.type.v1.0~"
                     "x.test11.my.event.v1.0"
@@ -160,7 +160,7 @@ class TestCaseTestOp11AttrAccess_NonExistentField(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test11.events.type.v1~",
+                "$$id": "gts://gts.x.test11.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "type", "tenantId", "occurredAt"],
@@ -181,7 +181,7 @@ class TestCaseTestOp11AttrAccess_NonExistentField(HttpRunner):
             RunRequest("register instance")
             .post("/entities")
             .with_json({
-                "gtsId": (
+                "id": (
                     "gts.x.test11.events.type.v1~"
                     "x.test11.missing.event.v1.0"
                 ),
@@ -218,7 +218,7 @@ class TestCaseTestOp11AttrAccess_NonExistentField(HttpRunner):
 
 
 class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
-    """OP#11 - Attribute Access: Missing @ symbol in path"""
+    """OP#11 - Attribute Access: Missing @ symbol in path should fail"""
     config = Config("OP#11 - Attribute Access (missing @)").base_url(
         get_gts_base_url()
     )
@@ -232,7 +232,7 @@ class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test11.events.type.v1~",
+                "$$id": "gts://gts.x.test11.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "type", "tenantId", "occurredAt"],
@@ -254,13 +254,13 @@ class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.test11.events.type.v1~"
+                    "gts://gts.x.test11.events.type.v1~"
                     "x.test11.nosymbol.event.v1.0~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test11.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test11.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -285,16 +285,17 @@ class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        # Register instance
+        # Register instance (anonymous instance with UUID id)
         Step(
             RunRequest("register instance")
             .post("/entities")
             .with_json({
+                "id": "cf6i7j89-0123-94fg-4567-fgh678901234",
                 "type": (
                     "gts.x.test11.events.type.v1~"
                     "x.test11.nosymbol.event.v1.0~"
                 ),
-                "eventId": "cf6i7j89-0123-94fg-4567-fgh678901",
+
                 "tenantId": "66666666-7777-8888-9999-000000000000",
                 "occurredAt": "2025-09-20T23:00:00Z",
                 "payload": {
@@ -338,7 +339,7 @@ class TestCaseTestOp11Attribute_ArrayElementAccess(HttpRunner):
             RunRequest("register schema with array")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test11.array_access.order.v1~",
+                "$$id": "gts://gts.x.test11.array_access.order.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {
@@ -422,7 +423,7 @@ class TestCaseTestOp11Attribute_DeepNesting(HttpRunner):
             RunRequest("register deeply nested schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test11.deep.nested.v1~",
+                "$$id": "gts://gts.x.test11.deep.nested.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {
@@ -492,7 +493,7 @@ class TestCaseTestOp11Attribute_MixedArrayAndNesting(HttpRunner):
             RunRequest("register mixed schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test11.mixed.complex.v1~",
+                "$$id": "gts://gts.x.test11.mixed.complex.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {
@@ -587,7 +588,7 @@ class TestCaseTestOp11Attribute_BooleanAndNumericValues(HttpRunner):
             RunRequest("register schema with various types")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test11.types.config.v1~",
+                "$$id": "gts://gts.x.test11.types.config.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {

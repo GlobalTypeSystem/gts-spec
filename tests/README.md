@@ -55,6 +55,9 @@ This approach provides:
 # Start your server on 8000 port
 <your-server-start-command>
 
+# Install test dependencies (recommended)
+python -m pip install -r ./tests/requirements.txt
+
 # Run all the tests
 pytest .
 

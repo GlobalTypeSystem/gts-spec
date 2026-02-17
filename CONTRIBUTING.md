@@ -96,7 +96,7 @@ Examples:
 
 ```text
 spec(versioning): clarify minor version compatibility rules
-fix(schemas): correct gtsId pattern in event schema
+fix(schemas): correct `$id` pattern in event schema
 examples(idp): add contact_created event instance
 test(validation): add schema validation tests
 ```
@@ -112,7 +112,7 @@ Best practices:
 Specification development guidelines:
 
 - Follow GTS identifier format rules strictly
-- Ensure all schemas use correct `$id` and `gtsId` values
+- Ensure all schemas use correct `$id` values
 - Validate schemas against JSON Schema Draft 7 or later
 - Include both type definitions (schemas) and instance examples
 - Document any deviations or implementation-specific choices

@@ -1,11 +1,11 @@
 // purpose: Base MCP Tool manifest schema used to register a tool in a host
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.ai.mcp.tool.v1~",
+  "$id": "gts://gts.x.ai.mcp.tool.v1~",
   "title": "MCP Tool (Base)",
   "type": "object",
   "properties": {
-    "gtsId": {
+    "id": {
       "type": "string",
       "description": "Full GTS chain for this tool manifest (type lineage + instance)."
     },
@@ -73,6 +73,6 @@
       "additionalProperties": false
     }
   },
-  "required": ["gtsId", "name", "description", "runtime", "timeout_ms", "security", "inputs", "outputs"],
+  "required": ["id", "name", "description", "runtime", "timeout_ms", "security", "inputs", "outputs"],
   "additionalProperties": false
 }

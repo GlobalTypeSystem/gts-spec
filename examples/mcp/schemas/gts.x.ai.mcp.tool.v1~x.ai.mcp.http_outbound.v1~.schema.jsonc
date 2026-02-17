@@ -1,11 +1,11 @@
 // purpose: Derived MCP Tool requiring HTTP outbound capability with domain/method constraints
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "gts.x.ai.mcp.tool.v1~x.core.mcp.http_outbound.v1~",
+  "$id": "gts://gts.x.ai.mcp.tool.v1~x.core.mcp.http_outbound.v1~",
   "title": "MCP Tool with HTTP Outbound Capability",
   "type": "object",
   "allOf": [
-    { "$ref": "gts.x.ai.mcp.tool.v1~",
+    { "$ref": "gts://gts.x.ai.mcp.tool.v1~" },
     {
       "type": "object",
       "properties": {

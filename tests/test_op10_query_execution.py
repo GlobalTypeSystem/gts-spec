@@ -9,7 +9,7 @@ def register_test_entities():
             RunRequest("register entity 1")
             .post("/entities")
             .with_json({
-                "gtsId": "gts.x.test10.query.event.v1.0~a.b.c.d.v1",
+                "id": "gts.x.test10.query.event.v1.0~a.b.c.d.v1",
                 "type": "gts.x.test10.query.event.v1.0~",
                 "eventId": "evt-001",
                 "status": "active",
@@ -22,7 +22,7 @@ def register_test_entities():
             RunRequest("register entity 2")
             .post("/entities")
             .with_json({
-                "gtsId": "gts.x.test10.query.event.v1.1~a.b.c.d.v2",
+                "id": "gts.x.test10.query.event.v1.1~a.b.c.d.v2",
                 "type": "gts.x.test10.query.event.v1.1~",
                 "eventId": "evt-002",
                 "status": "inactive",
@@ -35,7 +35,7 @@ def register_test_entities():
             RunRequest("register entity 3")
             .post("/entities")
             .with_json({
-                "gtsId": "gts.x.test10.query.event.v2.2~a.b.c.d.v1~a.b.c.d.v2",
+                "id": "gts.x.test10.query.event.v2.2~a.b.c.d.v1~a.b.c.d.v2",
                 "type": "gts.x.test10.query.event.v2.2~a.b.c.d.v1~",
                 "eventId": "evt-003",
                 "status": "active",
@@ -48,7 +48,7 @@ def register_test_entities():
             RunRequest("register entity 4")
             .post("/entities")
             .with_json({
-                "gtsId": "gts.x.test10.other_namespace.notification.v1.0~a.b.c.d.v1",
+                "id": "gts.x.test10.other_namespace.notification.v1.0~a.b.c.d.v1",
                 "type": "gts.x.test10.other_namespace.notification.v1.0~",
                 "eventId": "evt-003",
                 "status": "some",
@@ -61,7 +61,7 @@ def register_test_entities():
             RunRequest("register entity 5")
             .post("/entities")
             .with_json({
-                "gtsId": "gts.x.test10_2.commerce.order.v2.0~a.b.c.d.v1",
+                "id": "gts.x.test10_2.commerce.order.v2.0~a.b.c.d.v1",
                 "type": "gts.x.test10_2.commerce.order.v2.0~",
                 "eventId": "evt-004",
                 "status": "active",
@@ -92,7 +92,6 @@ class TestCaseTestOp10Query_ExactMatch(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.query.event.v1.0~a.b.c.d.v1"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 1)
         ),
     ]
@@ -207,7 +206,6 @@ class TestCaseTestOp10Query_WildcardPackage(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.*", "limit": 50})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 4)
             .assert_equal("body.limit", 50)
         ),
@@ -231,7 +229,6 @@ class TestCaseTestOp10Query_WildcardPackageWithLimit(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.*", "limit": 2})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 2)
             .assert_equal("body.limit", 2)
         ),
@@ -255,7 +252,6 @@ class TestCaseTestOp10Query_WildcardNamespace(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.query.*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 3)
         ),
     ]
@@ -278,7 +274,6 @@ class TestCaseTestOp10Query_WildcardType(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.query.event.*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 3)
         ),
     ]
@@ -301,7 +296,6 @@ class TestCaseTestOp10Query_WildcardMajorVersion(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.query.event.v2.*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 1)
         ),
     ]
@@ -324,7 +318,6 @@ class TestCaseTestOp10Query_WildcardMinorVersion(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.query.event.v1.1~*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 1)
         ),
     ]
@@ -349,7 +342,6 @@ class TestCaseTestOp10Query_WildcardAndFilterByAttribute(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.*[status=active]"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 2)
         ),
     ]
@@ -374,7 +366,6 @@ class TestCaseTestOp10Query_MultipleFilters(HttpRunner):
             )
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 1)
         ),
     ]
@@ -399,7 +390,6 @@ class TestCaseTestOp10Query_MultipleFiltersWithQuotes(HttpRunner):
             )
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 1)
         ),
     ]
@@ -423,7 +413,6 @@ class TestCaseTestOp10Query_MultipleFiltersWithWildcard(HttpRunner):
             )
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 2)
         ),
     ]
@@ -472,7 +461,6 @@ class TestCaseTestOp10Query_NoMatches(HttpRunner):
             .with_params(**{"expr": "gts.nonexistent.*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 0)
         ),
     ]
@@ -495,7 +483,6 @@ class TestCaseTestOp10Query_FilterNoMatches(HttpRunner):
             .with_params(**{"expr": "gts.x.test10.*[status=nonexisting, category=order]"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 0)
         ),
     ]
@@ -518,7 +505,7 @@ def register_wildcard_usecase_entities():
             .post("/entities")
             .with_json({
                 "$$schema": "http://json-schema.org/draft-07/schema#",
-                "$$id": "gts.x.test10_llm.chat.message.v1.0~",
+                "$$id": "gts://gts.x.test10_llm.chat.message.v1.0~",
                 "type": "object",
                 "description": "Base chat message v1.0"
             })
@@ -531,14 +518,14 @@ def register_wildcard_usecase_entities():
             .with_json({
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "$$id": (
-                    "gts.x.test10_llm.chat.message.v1.0~"
+                    "gts://gts.x.test10_llm.chat.message.v1.0~"
                     "x.test10_llm._.system_message.v1.0~"
                 ),
                 "type": "object",
                 "description": "System message derived from v1.0",
                 "allOf": [
                     {
-                        "$$ref": "gts.x.test10_llm.chat.message.v1.0~"
+                        "$$ref": "gts://gts.x.test10_llm.chat.message.v1.0~"
                     }
                 ]
             })
@@ -550,7 +537,7 @@ def register_wildcard_usecase_entities():
             .post("/entities")
             .with_json({
                 "$$schema": "http://json-schema.org/draft-07/schema#",
-                "$$id": "gts.x.test10_llm.chat.message.v1.1~",
+                "$$id": "gts://gts.x.test10_llm.chat.message.v1.1~",
                 "type": "object",
                 "description": "Base chat message v1.1"
             })
@@ -563,14 +550,14 @@ def register_wildcard_usecase_entities():
             .with_json({
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "$$id": (
-                    "gts.x.test10_llm.chat.message.v1.1~"
+                    "gts://gts.x.test10_llm.chat.message.v1.1~"
                     "x.test10_llm._.user_message.v1.1~"
                 ),
                 "type": "object",
                 "description": "User message derived from v1.1",
                 "allOf": [
                     {
-                        "$$ref": "gts.x.test10_llm.chat.message.v1.1~"
+                        "$$ref": "gts://gts.x.test10_llm.chat.message.v1.1~"
                     }
                 ]
             })
@@ -599,7 +586,6 @@ class TestCaseTestOp10Query_UseCase1_DerivedFromV10(HttpRunner):
             .with_params(**{"expr": "gts.x.test10_llm.chat.message.v1.0~*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 1)
         ),
     ]
@@ -624,7 +610,6 @@ class TestCaseTestOp10Query_UseCase2_AllVersions(HttpRunner):
             .with_params(**{"expr": "gts.x.test10_llm.chat.message.*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 4)
         ),
     ]
@@ -649,7 +634,6 @@ class TestCaseTestOp10Query_UseCase3_DerivedFromV1AnyMinor(HttpRunner):
             .with_params(**{"expr": "gts.x.test10_llm.chat.message.v1~*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 2)
         ),
     ]
@@ -674,7 +658,6 @@ class TestCaseTestOp10Query_UseCase4_AllV1BaseAndDerived(HttpRunner):
             .with_params(**{"expr": "gts.x.test10_llm.chat.message.v1.*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.error", "")
             .assert_length_equal("body.results", 4)
         ),
     ]

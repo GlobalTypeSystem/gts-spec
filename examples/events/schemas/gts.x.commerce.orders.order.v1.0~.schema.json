@@ -1,5 +1,5 @@
 {
-  "$id": "gts.x.commerce.orders.order.v1.0~",
+  "$id": "gts://gts.x.commerce.orders.order.v1.0~",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Order",
   "description": "Base order schema definition for e-commerce orders",

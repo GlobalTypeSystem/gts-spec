@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "gts.x.core.modules.capability.v1~",
+  "$id": "gts://gts.x.core.modules.capability.v1~",
   "description": "Base schema for any application modules capabilities",
   "required": ["description", "id"],
   "properties": {

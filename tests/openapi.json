@@ -469,6 +469,94 @@
         }
       }
     },
+    "/validate-schema": {
+      "post": {
+        "summary": "Validate derived schema against base schema",
+        "operationId": "validate_schema_validate_schema_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ValidateSchemaRequest"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Validate Schema Validate Schema Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/validate-entity": {
+      "post": {
+        "summary": "Validate entity (instance or schema) by GTS ID",
+        "operationId": "validate_entity_validate_entity_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/ValidateEntityRequest"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Validate Entity Validate Entity Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/resolve-relationships": {
       "get": {
         "summary": "Build schema/entity graph for a GTS ID",
@@ -758,6 +846,32 @@
           "instance_id"
         ],
         "title": "ValidateInstanceRequest"
+      },
+      "ValidateSchemaRequest": {
+        "properties": {
+          "schema_id": {
+            "type": "string",
+            "title": "Schema Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schema_id"
+        ],
+        "title": "ValidateSchemaRequest"
+      },
+      "ValidateEntityRequest": {
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "title": "Entity Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entity_id"
+        ],
+        "title": "ValidateEntityRequest"
       },
       "ValidationError": {
         "properties": {

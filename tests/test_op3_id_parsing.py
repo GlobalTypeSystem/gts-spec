@@ -216,3 +216,118 @@ class TestCaseTestOp3Parsing_NamespaceExtraction(HttpRunner):
             .assert_equal("body.segments[0].namespace", "events")
         ),
     ]
+
+
+class TestCaseTestOp3Parsing_WildcardInvalid(HttpRunner):
+    """OP#3 - Wildcard parsing edge cases that should be rejected"""
+    config = Config("OP#3 - Wildcard parsing (invalid)").base_url(
+        get_gts_base_url()
+    )
+
+    @pytest.mark.parametrize(
+        "param",
+        Parameters(
+            {
+                "id": [
+                    # a) '*' not at end of pattern
+                    "gts.a.b.c.d.v1~a.*~",
+                    # b) '*' not at token boundary
+                    "gts.a.b.c.d.v1~a*",
+                    # d) '*' in the middle of a type segment
+                    "gts.a.b.c.*.v1~a.*",
+                ]
+            }
+        ),
+    )
+    def test_start(self, param):
+        super().test_start(param)
+
+    teststeps = [
+        Step(
+            RunRequest("parse wildcard invalid cases")
+            .get("/parse-id")
+            .with_params(**{"gts_id": "${id}"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.id", "${id}")
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_wildcard", True)
+            .assert_not_equal("body.error", "")
+        ),
+    ]
+
+
+class TestCaseTestOp3Parsing_WildcardValid(HttpRunner):
+    """OP#3 - Wildcard parsing edge cases that should be accepted"""
+    config = Config("OP#3 - Wildcard parsing (valid)").base_url(
+        get_gts_base_url()
+    )
+
+    @pytest.mark.parametrize(
+        "param",
+        Parameters(
+            {
+                "id": [
+                    # c) wildcard at token boundary at the end
+                    "gts.a.b.c.d.v1~a.*",
+                ]
+            }
+        ),
+    )
+    def test_start(self, param):
+        super().test_start(param)
+
+    teststeps = [
+        Step(
+            RunRequest("parse wildcard valid case")
+            .get("/parse-id")
+            .with_params(**{"gts_id": "${id}"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.id", "${id}")
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_wildcard", True)
+        ),
+    ]
+
+
+class TestCaseTestOp3Parsing_IsSchemaField(HttpRunner):
+    """OP#3 - Verify is_schema field is returned correctly"""
+    config = Config("OP#3 - is_schema field verification").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("parse type (is_schema=true)")
+            .get("/parse-id")
+            .with_params(**{"gts_id": "gts.x.pkg.ns.type.v1~"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_schema", True)
+            .assert_equal("body.is_wildcard", False)
+        ),
+        Step(
+            RunRequest("parse instance (is_schema=false)")
+            .get("/parse-id")
+            .with_params(**{"gts_id": "gts.x.pkg.ns.type.v1~a.b.c.d.v1.0"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_schema", False)
+            .assert_equal("body.is_wildcard", False)
+        ),
+        Step(
+            RunRequest("parse wildcard type (is_schema=true)")
+            .get("/parse-id")
+            .with_params(**{"gts_id": "gts.x.pkg.ns.*"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_wildcard", True)
+        ),
+    ]

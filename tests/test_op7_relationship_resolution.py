@@ -17,7 +17,7 @@ class TestCaseTestOp7SchemaGraph_ValidChain(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test7.events.type.v1~",
+                "$$id": "gts://gts.x.test7.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "type", "tenantId", "occurredAt"],
@@ -38,11 +38,14 @@ class TestCaseTestOp7SchemaGraph_ValidChain(HttpRunner):
             RunRequest("register derived event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test7.events.type.v1~x.test7.graph.event.v1.0~",
+                "$$id": (
+                    "gts://gts.x.test7.events.type.v1~"
+                    "x.test7.graph.event.v1.0~"
+                ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test7.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test7.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -99,13 +102,13 @@ class TestCaseTestOp7SchemaGraph_BrokenReference(HttpRunner):
             RunRequest("register schema with broken reference")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test7.broken.schema.v1.0~",
+                "$$id": "gts://gts.x.test7.broken.schema.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
                     {
                         "$$ref": (
-                            "gts.x.nonexistent.base.type.v1~"
+                            "gts://gts.x.nonexistent.base.type.v1~"
                         )
                     },
                     {
@@ -130,6 +133,164 @@ class TestCaseTestOp7SchemaGraph_BrokenReference(HttpRunner):
     ]
 
 
+class TestCaseTestOp7SchemaGraph_RefPlainGtsPrefix(HttpRunner):
+    """OP#7 - Reject $ref that starts with 'gts.' instead of 'gts://'"""
+
+    config = Config("OP#7 - Schema Graph ($$ref plain gts prefix)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with plain gts. $ref should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test7.invalid_ref.plain_prefix.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [
+                    {
+                        "$$ref": "gts.x.test7.invalid_ref.plain_prefix.v1~"
+                    }
+                ]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseTestOp7SchemaGraph_RefWildcardGts(HttpRunner):
+    """OP#7 - Reject $ref using wildcards after gts://"""
+
+    config = Config("OP#7 - Schema Graph ($$ref wildcard gts://)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with wildcard gts:// $ref should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test7.invalid_ref.wildcard.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [
+                    {
+                        "$$ref": "gts://gts.x.test7.events.*.v1~"
+                    }
+                ]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseTestOp7SchemaGraph_LocalRefAllowed(HttpRunner):
+    """OP#7 - Relationship Resolution: Allow local JSON Schema $ref"""
+    config = Config("OP#7 - Schema Graph (local $$ref allowed)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with local $ref should succeed")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test7.local_ref.allowed.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "$$defs": {
+                    "Base": {
+                        "type": "object",
+                        "properties": {"id": {"type": "string"}},
+                        "required": ["id"],
+                        "additionalProperties": False
+                    }
+                },
+                "allOf": [
+                    {"$$ref": "#/$$defs/Base"}
+                ]
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+    ]
+
+
+class TestCaseTestOp7SchemaGraph_RefNotGtsUri(HttpRunner):
+    """OP#7 - Reject non-GTS external $ref"""
+    config = Config("OP#7 - Schema Graph ($$ref not gts://...)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with non-GTS $ref should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test7.invalid_ref.not_gts_uri.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [
+                    {
+                        "$$ref": "https://example.com/schemas/base.json"
+                    }
+                ]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseTestOp7SchemaGraph_RefMalformedGts(HttpRunner):
+    """OP#7 - Reject malformed GTS $ref"""
+    config = Config("OP#7 - Schema Graph (malformed GTS in $$ref)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with malformed GTS $ref should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test7.invalid_ref.malformed_gts.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [
+                    {
+                        # invalid segment token: hyphen is not allowed
+                        "$$ref": "gts://gts.x.bad-seg.ns.type.v1~"
+                    }
+                ]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
 class TestCaseTestOp7SchemaGraph_ComplexChain(HttpRunner):
     """OP#7 - Relationship Resolution: Multi-level inheritance chain"""
     config = Config("OP#7 - Schema Graph (complex chain)").base_url(
@@ -145,7 +306,7 @@ class TestCaseTestOp7SchemaGraph_ComplexChain(HttpRunner):
             RunRequest("register base schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test7.base.type.v1~",
+                "$$id": "gts://gts.x.test7.base.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id"],
@@ -161,11 +322,14 @@ class TestCaseTestOp7SchemaGraph_ComplexChain(HttpRunner):
             RunRequest("register level 1 derived schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test7.base.type.v1~x.test7.derived1.type.v1~",
+                "$$id": (
+                    "gts://gts.x.test7.base.type.v1~"
+                    "x.test7.derived1.type.v1~"
+                ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test7.base.type.v1~"},
+                    {"$$ref": "gts://gts.x.test7.base.type.v1~"},
                     {
                         "type": "object",
                         "required": ["field1"],
@@ -184,7 +348,7 @@ class TestCaseTestOp7SchemaGraph_ComplexChain(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.test7.base.type.v1~"
+                    "gts://gts.x.test7.base.type.v1~"
                     "x.test7.derived1.type.v1~"
                     "x.test7.derived2.type.v1~"
                 ),
@@ -193,7 +357,7 @@ class TestCaseTestOp7SchemaGraph_ComplexChain(HttpRunner):
                 "allOf": [
                     {
                         "$$ref": (
-                            "gts.x.test7.base.type.v1~"
+                            "gts://gts.x.test7.base.type.v1~"
                             "x.test7.derived1.type.v1~"
                         )
                     },
@@ -243,7 +407,7 @@ class TestCaseTestOp7Relationship_DeepInheritanceChain(HttpRunner):
             RunRequest("register base schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.base.entity.root.v1~",
+                "$$id": "gts://gts.x.base.entity.root.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id"],
@@ -259,11 +423,11 @@ class TestCaseTestOp7Relationship_DeepInheritanceChain(HttpRunner):
             RunRequest("register level 2 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.base.entity.root.v1~x.l2._.type.v1~",
+                "$$id": "gts://gts.x.base.entity.root.v1~x.l2._.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.base.entity.root.v1~"},
+                    {"$$ref": "gts://gts.x.base.entity.root.v1~"},
                     {
                         "properties": {
                             "level": {"type": "integer", "const": 2}
@@ -280,14 +444,19 @@ class TestCaseTestOp7Relationship_DeepInheritanceChain(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.base.entity.root.v1~"
+                    "gts://gts.x.base.entity.root.v1~"
                     "x.l2._.type.v1~"
                     "x.l3._.type.v1~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.base.entity.root.v1~x.l2._.type.v1~"},
+                    {
+                        "$$ref": (
+                            "gts://gts.x.base.entity.root.v1~"
+                            "x.l2._.type.v1~"
+                        )
+                    },
                     {
                         "properties": {
                             "level": {"type": "integer", "const": 3}
@@ -304,7 +473,7 @@ class TestCaseTestOp7Relationship_DeepInheritanceChain(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.base.entity.root.v1~"
+                    "gts://gts.x.base.entity.root.v1~"
                     "x.l2._.type.v1~"
                     "x.l3._.type.v1~"
                     "x.l4._.type.v1~"
@@ -314,7 +483,7 @@ class TestCaseTestOp7Relationship_DeepInheritanceChain(HttpRunner):
                 "allOf": [
                     {
                         "$$ref": (
-                            "gts.x.base.entity.root.v1~"
+                            "gts://gts.x.base.entity.root.v1~"
                             "x.l2._.type.v1~"
                             "x.l3._.type.v1~"
                         )
@@ -335,7 +504,7 @@ class TestCaseTestOp7Relationship_DeepInheritanceChain(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.base.entity.root.v1~"
+                    "gts://gts.x.base.entity.root.v1~"
                     "x.l2._.type.v1~"
                     "x.l3._.type.v1~"
                     "x.l4._.type.v1~"
@@ -346,7 +515,7 @@ class TestCaseTestOp7Relationship_DeepInheritanceChain(HttpRunner):
                 "allOf": [
                     {
                         "$$ref": (
-                            "gts.x.base.entity.root.v1~"
+                            "gts://gts.x.base.entity.root.v1~"
                             "x.l2._.type.v1~"
                             "x.l3._.type.v1~"
                             "x.l4._.type.v1~"
@@ -398,7 +567,7 @@ class TestCaseTestOp7Relationship_CrossPackageReferences(HttpRunner):
             RunRequest("register base in package A")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.package_a.core.base.v1~",
+                "$$id": "gts://gts.x.package_a.core.base.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["baseId"],
@@ -415,13 +584,13 @@ class TestCaseTestOp7Relationship_CrossPackageReferences(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.package_a.core.base.v1~"
+                    "gts://gts.x.package_a.core.base.v1~"
                     "x.package_b._.derived.v1~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.package_a.core.base.v1~"},
+                    {"$$ref": "gts://gts.x.package_a.core.base.v1~"},
                     {
                         "properties": {
                             "derivedField": {"type": "string"}
@@ -438,7 +607,7 @@ class TestCaseTestOp7Relationship_CrossPackageReferences(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.package_a.core.base.v1~"
+                    "gts://gts.x.package_a.core.base.v1~"
                     "x.package_b._.derived.v1~"
                     "x.package_c._.extended.v1~"
                 ),
@@ -447,7 +616,7 @@ class TestCaseTestOp7Relationship_CrossPackageReferences(HttpRunner):
                 "allOf": [
                     {
                         "$$ref": (
-                            "gts.x.package_a.core.base.v1~"
+                            "gts://gts.x.package_a.core.base.v1~"
                             "x.package_b._.derived.v1~"
                         )
                     },
@@ -495,7 +664,7 @@ class TestCaseTestOp7Relationship_MultiVendorChain(HttpRunner):
             RunRequest("register base by vendor X")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.platform.events.base.v1~",
+                "$$id": "gts://gts.x.platform.events.base.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "timestamp"],
@@ -513,13 +682,13 @@ class TestCaseTestOp7Relationship_MultiVendorChain(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.platform.events.base.v1~"
+                    "gts://gts.x.platform.events.base.v1~"
                     "abc.app._.custom_event.v1~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.platform.events.base.v1~"},
+                    {"$$ref": "gts://gts.x.platform.events.base.v1~"},
                     {
                         "properties": {
                             "vendorData": {"type": "object"}
@@ -536,7 +705,7 @@ class TestCaseTestOp7Relationship_MultiVendorChain(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.platform.events.base.v1~"
+                    "gts://gts.x.platform.events.base.v1~"
                     "abc.app._.custom_event.v1~"
                     "xyz.plugin._.specialized.v1~"
                 ),
@@ -545,7 +714,7 @@ class TestCaseTestOp7Relationship_MultiVendorChain(HttpRunner):
                 "allOf": [
                     {
                         "$$ref": (
-                            "gts.x.platform.events.base.v1~"
+                            "gts://gts.x.platform.events.base.v1~"
                             "abc.app._.custom_event.v1~"
                         )
                     },

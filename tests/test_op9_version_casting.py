@@ -17,7 +17,7 @@ class TestCaseTestOp9Cast_MinorVersionUpcast(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test9.events.type.v1~",
+                "$$id": "gts://gts.x.test9.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "type", "tenantId", "occurredAt"],
@@ -39,13 +39,13 @@ class TestCaseTestOp9Cast_MinorVersionUpcast(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.test9.events.type.v1~"
+                    "gts://gts.x.test9.events.type.v1~"
                     "x.commerce.orders.order_placed.v1.0~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test9.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test9.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -93,13 +93,13 @@ class TestCaseTestOp9Cast_MinorVersionUpcast(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.test9.events.type.v1~"
+                    "gts://gts.x.test9.events.type.v1~"
                     "x.commerce.orders.order_placed.v1.1~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test9.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test9.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -211,7 +211,7 @@ class TestCaseTestOp9Cast_MinorVersionDowncast(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test9.events.type.v1~",
+                "$$id": "gts://gts.x.test9.events.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "type", "tenantId", "occurredAt"],
@@ -233,13 +233,13 @@ class TestCaseTestOp9Cast_MinorVersionDowncast(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.test9.events.type.v1~"
+                    "gts://gts.x.test9.events.type.v1~"
                     "x.test9.cast.event.v1.0~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test9.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test9.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -270,13 +270,13 @@ class TestCaseTestOp9Cast_MinorVersionDowncast(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts.x.test9.events.type.v1~"
+                    "gts://gts.x.test9.events.type.v1~"
                     "x.test9.cast.event.v1.1~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts.x.test9.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test9.events.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
@@ -360,7 +360,7 @@ class TestCaseTestOp9Cast_IncompatibleMajorVersion(HttpRunner):
             RunRequest("register v1.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test9.version.type.v1.0~",
+                "$$id": "gts://gts.x.test9.version.type.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id"],
@@ -376,7 +376,7 @@ class TestCaseTestOp9Cast_IncompatibleMajorVersion(HttpRunner):
             RunRequest("register v2.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test9.version.type.v2.0~",
+                "$$id": "gts://gts.x.test9.version.type.v2.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id", "newRequiredField"],
@@ -416,7 +416,7 @@ class TestCaseTestOp9Cast_SchemaToSchemaNotAllowed(HttpRunner):
             RunRequest("register v1.0 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test9.schema2schema.type.v1.0~",
+                "$$id": "gts://gts.x.test9.schema2schema.type.v1.0~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id"],
@@ -432,7 +432,7 @@ class TestCaseTestOp9Cast_SchemaToSchemaNotAllowed(HttpRunner):
             RunRequest("register v1.1 schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts.x.test9.schema2schema.type.v1.1~",
+                "$$id": "gts://gts.x.test9.schema2schema.type.v1.1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["id"],

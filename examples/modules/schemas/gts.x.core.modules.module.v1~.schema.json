@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "gts.x.core.modules.module.v1~",
+  "$id": "gts://gts.x.core.modules.module.v1~",
   "type": "object",
   "description": "Base schema for any application modules.",
   "title": "Module metadata",
@@ -51,7 +51,7 @@
         },
         "properties": {
           "type": "object",
-          "description": "configSchema properties",
+          "description": "configSchema properties"
         },
         "required": {
           "type": "array",
