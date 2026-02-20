@@ -1,0 +1,30 @@
+{
+    "$id": "gts://gts.x.infra.compute.vm_state.v1~",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Base VM Power State Type",
+    "description": "Base type for all VM power states.",
+    "type": "object",
+    "required": [
+        "gtsId",
+        "description"
+    ],
+    "properties": {
+        "gtsId": {
+            "type": "string",
+            "description": "GTS identifier of the power state type",
+            "x-gts-ref": "/$id"
+        },
+        "description": {
+            "type": "string",
+            "description": "Human-readable description of the power state"
+        },
+        "isTransient": {
+            "type": "boolean",
+            "description": "Whether this is a transient (in-progress) state"
+        },
+        "icon": {
+            "type": "string",
+            "description": "Icon name for UI representation (optional)"
+        }
+    }
+}

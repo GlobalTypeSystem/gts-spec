@@ -1,0 +1,33 @@
+gtsId: gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~
+id: 550e8400-e29b-41d4-a716-446655440011
+type: menu_item
+label: Settings
+description: User profile and application settings
+visible: true
+enabled: true
+
+position:
+  order: 10
+
+permissions:
+  - view:settings
+  - edit:profile
+
+style:
+  color: "#666666"
+
+metadata:
+  navigation:
+    target: /settings
+    targetType: route
+    openInNewTab: false
+    params:
+      tab: profile
+  icon: settings-icon
+  badge:
+    text: "2"
+    color: warning
+  shortcut: "Ctrl+,"
+  category: user-menu
+  analyticsId: menu-settings
+  helpUrl: https://docs.example.com/settings

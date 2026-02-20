@@ -1,0 +1,26 @@
+{
+  "gtsId": "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~",
+  "id": "550e8400-e29b-41d4-a716-446655440003",
+  "name": "app-server-01",
+  "cpuCores": 2,
+  "ramMb": 4096,
+  "powerState": "gts.x.infra.compute.vm_state.v1~x.infra._.running.v1",
+  "osType": "CentOS 7",
+  "createdAt": "2024-03-10T09:45:00Z",
+  "environment": "staging",
+  "owner": "app-team",
+  "metadata": {
+    "veid": "1001",
+    "envType": "vm",
+    "nodeName": "vz-node-01.example.com",
+    "nodeUuid": "c9d8e7f6-a5b4-c3d2-e1f0-123456789abc",
+    "osTemplate": "centos-7-x86_64",
+    "storageCluster": "vstorage-cluster-01",
+    "haEnabled": true,
+    "cpuLimitMhz": 4000,
+    "cpuUnits": 1000,
+    "diskSpaceGb": 100,
+    "backupNodeName": "vz-node-02.example.com",
+    "project": "microservices-platform"
+  }
+}

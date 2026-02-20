@@ -1,0 +1,72 @@
+{
+    "$id": "gts://gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "Virtuozzo Virtual Machine Type",
+    "description": "Extends the base VM type with Virtuozzo properties.",
+    "type": "object",
+    "allOf": [
+        {
+            "$ref": "gts://gts.x.infra.compute.vm.v1~"
+        },
+        {
+            "type": "object",
+            "properties": {
+                "gtsId": {
+                    "type": "string",
+                    "const": "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~",
+                    "description": "GTS identifier of the VM type",
+                    "x-gts-ref": "/$id"
+                },
+                "metadata": {
+                    "type": "object",
+                    "description": "Virtuozzo-specific metadata",
+                    "properties": {
+                        "ctid": {
+                            "type": "string",
+                            "description": "Container ID"
+                        },
+                        "uuid": {
+                            "type": "string",
+                            "description": "Container UUID"
+                        },
+                        "veid": {
+                            "type": "string",
+                            "description": "Virtual environment ID"
+                        },
+                        "nodeName": {
+                            "type": "string",
+                            "description": "Physical node name"
+                        },
+                        "osTemplate": {
+                            "type": "string",
+                            "description": "OS template used"
+                        },
+                        "layout": {
+                            "type": "string",
+                            "description": "Filesystem layout (ploop/simfs)"
+                        },
+                        "ioLimit": {
+                            "type": "integer",
+                            "description": "I/O operations limit"
+                        },
+                        "diskSpace": {
+                            "type": "string",
+                            "description": "Disk space allocation"
+                        },
+                        "ipAddress": {
+                            "type": "array",
+                            "description": "Assigned IP addresses",
+                            "items": {
+                                "type": "string"
+                            }
+                        },
+                        "hostname": {
+                            "type": "string",
+                            "description": "Container hostname"
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

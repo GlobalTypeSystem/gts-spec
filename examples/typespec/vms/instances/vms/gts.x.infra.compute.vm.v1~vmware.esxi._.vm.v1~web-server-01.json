@@ -1,0 +1,24 @@
+{
+  "gtsId": "gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~",
+  "id": "550e8400-e29b-41d4-a716-446655440001",
+  "name": "web-server-01",
+  "cpuCores": 4,
+  "ramMb": 8192,
+  "powerState": "gts.x.infra.compute.vm_state.v1~x.infra._.running.v1",
+  "osType": "Ubuntu 22.04 LTS",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "environment": "production",
+  "owner": "web-team",
+  "metadata": {
+    "moRefId": "vm-1234",
+    "hostName": "esxi-host-01.example.com",
+    "datacenter": "DC-PROD",
+    "cluster": "Cluster-Web",
+    "toolsStatus": "running",
+    "toolsVersion": "12.3.5",
+    "hardwareVersion": "vmx-19",
+    "resourcePool": "Production",
+    "vMotionEnabled": true,
+    "costCenter": "CC-1001"
+  }
+}
