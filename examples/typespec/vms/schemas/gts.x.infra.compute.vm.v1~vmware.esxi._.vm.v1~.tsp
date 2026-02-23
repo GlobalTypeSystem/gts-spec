@@ -13,7 +13,7 @@ using TypeSpec.JsonSchema;
 @jsonSchema("/schemas/gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~.schema.json")
 model VMWareESXiVM {
   @extension("x-gts-ref", "/$id")
-  gtsId: "gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~";
+  type: "gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~";
 
   @format("uuid")
   id: string;
@@ -41,7 +41,7 @@ model VMWareESXiVM {
 
   environment?: string;
   owner?: string;
-  
+
   /** VMWare-specific metadata (strictly typed) */
   metadata?: VMWareMetadata;
 }

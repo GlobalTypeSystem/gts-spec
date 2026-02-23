@@ -3,17 +3,27 @@
   "displayName": "WebStore Product Catalog module",
   "description": "WebStore module providing Products Catalog capabilities.",
   "capabilities": [
-    "gts.x.core.modules.capability.v1~x.core.api.has_rest.v1"    
+    "gts.x.core.modules.capability.v1~x.core.api.has_rest.v1"
   ],
   "requirements": [],
   "configSchema": {
     "type": "object",
     "properties": {
-      "default_products_view": { "type": "string", "enum": ["table", "list"] },
-      "default_products_per_page": { "type": "int", "minimum": 1, "maximum": 100, "default": 20 },
-      "default_region": { "type": "string", "description": "Default region for product availability" },
+      "default_products_view": {
+        "type": "string",
+        "enum": [
+          "table",
+          "list"
+        ]
+      },
+      "default_region": {
+        "type": "string",
+        "description": "Default region for product availability"
+      }
     },
-    "required": ["default_region"],
+    "required": [
+      "default_region"
+    ],
     "additionalProperties": false
   }
 }
