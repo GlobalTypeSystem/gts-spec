@@ -15,7 +15,7 @@ These examples demonstrate:
 
 - **[gts.x.infra.compute.vm.v1~](schemas/gts.x.infra.compute.vm.v1~.tsp)** ([JSON Schema](schemas/gts.x.infra.compute.vm.v1~.schema.json))
   - Base virtual machine type with common properties
-  - Properties: `gtsId`, `id`, `name`, `cpuCores`, `ramMb`, `powerState`, `osType`, `createdAt`, `environment`, `owner`, `metadata`
+  - Properties: `type`, `id`, `name`, `cpuCores`, `ramMb`, `powerState`, `osType`, `createdAt`, `environment`, `owner`, `metadata`
   - `powerState` uses GTS reference pattern for backward-compatible extensibility
 
 ### Derived Types

@@ -1,5 +1,5 @@
 {
-  "gtsId": "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~",
+  "type": "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~",
   "id": "550e8400-e29b-41d4-a716-446655440003",
   "name": "app-server-01",
   "cpuCores": 2,

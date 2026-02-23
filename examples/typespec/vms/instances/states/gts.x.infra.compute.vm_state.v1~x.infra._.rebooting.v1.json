@@ -1,5 +1,5 @@
 {
-    "gtsId": "gts.x.infra.compute.vm_state.v1~x.infra._.rebooting.v1",
+    "id": "gts.x.infra.compute.vm_state.v1~x.infra._.rebooting.v1",
     "description": "Virtual machine is rebooting",
     "isTransient": true,
     "icon": "refresh"

@@ -9,12 +9,15 @@
     "tenantId",
     "occurredAt"
   ],
-  "x-event-type-settings": {
+  "x-gts-traits-schema": {
+    "type": "object",
     "additionalProperties": false,
-    "topicRef": {
-      "description": "ID of the topic where events of this type are stored.",
-      "type": "string",
-      "x-gts-ref":"gts.x.core.events.topic.v1~"
+    "properties": {
+      "topicRef": {
+        "description": "ID of the topic where events of this type are stored.",
+        "type": "string",
+        "x-gts-ref": "gts.x.core.events.topic.v1~"
+      }
     }
   },
   "properties": {

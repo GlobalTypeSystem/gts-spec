@@ -13,7 +13,7 @@ using TypeSpec.JsonSchema;
 @jsonSchema("/schemas/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.schema.json")
 model VirtuozzoVM {
   @extension("x-gts-ref", "/$id")
-  gtsId: "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~";
+  type: "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~";
 
   @format("uuid")
   id: string;
@@ -41,7 +41,7 @@ model VirtuozzoVM {
 
   environment?: string;
   owner?: string;
-  
+
   /** Virtuozzo-specific metadata (strictly typed) */
   metadata?: VirtuozzoMetadata;
 }

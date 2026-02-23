@@ -17,7 +17,7 @@ model BaseVM {
    * GTS identifier of the VM type
    */
   @extension("x-gts-ref", "/$id")
-  gtsId: string;
+  type: string;
 
   /**
    * Unique identifier of the VM instance

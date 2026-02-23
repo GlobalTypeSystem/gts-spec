@@ -11,7 +11,7 @@
         {
             "type": "object",
             "properties": {
-                "gtsId": {
+                "type": {
                     "type": "string",
                     "const": "gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~",
                     "description": "GTS identifier of the VM type",

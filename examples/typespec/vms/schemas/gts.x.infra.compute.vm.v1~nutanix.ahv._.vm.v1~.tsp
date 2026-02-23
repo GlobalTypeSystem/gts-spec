@@ -13,7 +13,7 @@ using TypeSpec.JsonSchema;
 @jsonSchema("/schemas/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.schema.json")
 model NutanixAHVVM {
   @extension("x-gts-ref", "/$id")
-  gtsId: "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~";
+  type: "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~";
 
   @format("uuid")
   id: string;
@@ -41,7 +41,7 @@ model NutanixAHVVM {
 
   environment?: string;
   owner?: string;
-  
+
   /** Nutanix-specific metadata (strictly typed) */
   metadata?: NutanixMetadata;
 }

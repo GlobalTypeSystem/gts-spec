@@ -5,7 +5,7 @@
     "description": "Base type for all virtual machine definitions across different virtualization platforms.",
     "type": "object",
     "required": [
-        "gtsId",
+        "type",
         "id",
         "name",
         "cpuCores",
@@ -14,7 +14,7 @@
         "createdAt"
     ],
     "properties": {
-        "gtsId": {
+        "type": {
             "type": "string",
             "description": "GTS identifier of the VM type",
             "x-gts-ref": "/$id"
@@ -45,7 +45,7 @@
         "powerState": {
             "type": "string",
             "description": "Current power state of the virtual machine. Reference to gts.x.infra.compute.vm_state.v1~ type.",
-            "x-gts-ref": "/gts.x.infra.compute.vm_state.v1~"
+            "x-gts-ref": "gts.x.infra.compute.vm_state.v1~"
         },
         "osType": {
             "type": "string",

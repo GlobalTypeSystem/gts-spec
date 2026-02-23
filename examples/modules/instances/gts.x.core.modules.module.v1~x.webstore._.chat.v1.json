@@ -5,10 +5,10 @@
   "capabilities": [
     "gts.x.core.modules.capability.v1~x.core.api.has_rest.v1",
     "gts.x.core.modules.capability.v1~x.core.api.has_ws.v1",
-    "gts.x.core.modules.capability.v1~x.core.api.has_sse.v1"         
+    "gts.x.core.modules.capability.v1~x.core.api.has_sse.v1"
   ],
   "requirements": [
-    "gts.x.core.modules.module.v1~x.webstore._.catalog.v1"        
+    "gts.x.core.modules.module.v1~x.webstore._.catalog.v1"
   ],
   "configSchema": {
     "type": "object",
@@ -18,7 +18,7 @@
         "description": "Max chat messages retention in days",
         "default": "90",
         "minimum": 0,
-        "maximum": 356,
+        "maximum": 356
       },
       "max_file_size": {
         "type": "int",
@@ -30,7 +30,9 @@
         "default": true
       }
     },
-    "required": ["max_file_size"],
+    "required": [
+      "max_file_size"
+    ],
     "additionalProperties": false
   }
 }
