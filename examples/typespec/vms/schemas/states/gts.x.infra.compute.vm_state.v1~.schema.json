@@ -1,8 +1,9 @@
 {
     "$id": "gts://gts.x.infra.compute.vm_state.v1~",
     "$schema": "http://json-schema.org/draft-07/schema#",
+    "x-gts-final": true,
     "title": "Base VM Power State Type",
-    "description": "Base type for all VM power states.",
+    "description": "Base type for all VM power states. Final: no derived types allowed.",
     "type": "object",
     "required": [
         "gtsId",
