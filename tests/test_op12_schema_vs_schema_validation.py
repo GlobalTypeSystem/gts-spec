@@ -22,8 +22,12 @@ def _register(gts_id, schema_body, label="register schema"):
     )
 
 
-def _register_derived(gts_id, base_ref, overlay, label="register derived"):
-    """Register a derived schema that uses allOf with a $$ref."""
+def _register_derived(gts_id, base_ref, overlay, label="register derived", top_level=None):
+    """Register a derived schema that uses allOf with a $$ref.
+
+    top_level: optional dict of extra keys to add at schema top level
+    (e.g. {"x-gts-final": True}) — these MUST NOT go inside allOf.
+    """
     body = {
         "$$id": gts_id,
         "$$schema": "http://json-schema.org/draft-07/schema#",
@@ -33,6 +37,8 @@ def _register_derived(gts_id, base_ref, overlay, label="register derived"):
             overlay,
         ],
     }
+    if top_level:
+        body.update(top_level)
     return Step(
         RunRequest(label)
         .post("/entities")
@@ -3566,6 +3572,180 @@ class TestCaseOp12_CyclingRef_ThreeNodeCycle(HttpRunner):
             ),
             False,
             "validate node C should fail - three-node cycle",
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# x-gts-final tests (OP#12 extension — final types cannot be inherited)
+# ---------------------------------------------------------------------------
+
+
+class TestCaseOp12_FinalBase_RejectDerived(HttpRunner):
+    """OP#12 / x-gts-final: Derived schema from a final base MUST fail validation.
+
+    Base type declares x-gts-final: true. A derived schema referencing it
+    via allOf/$ref MUST be rejected by /validate-schema.
+    """
+
+    config = Config("OP#12 x-gts-final: reject derived from final base").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.final.base.v1~",
+            {
+                "type": "object",
+                "x-gts-final": True,
+                "properties": {
+                    "name": {"type": "string"},
+                },
+            },
+            "register final base schema",
+        ),
+        _register_derived(
+            "gts://gts.x.test12.final.base.v1~x.test12._.derived.v1~",
+            "gts://gts.x.test12.final.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "extra": {"type": "string"},
+                },
+            },
+            "register derived from final base",
+        ),
+        _validate_schema(
+            "gts.x.test12.final.base.v1~x.test12._.derived.v1~",
+            False,
+            "validate derived from final base should fail",
+        ),
+    ]
+
+
+class TestCaseOp12_FinalMidChain(HttpRunner):
+    """OP#12 / x-gts-final: Mid-chain final type blocks further derivation.
+
+    Chain: A~ -> B~(final) -> C~. Validating C~ MUST fail because B~ is final.
+    """
+
+    config = Config("OP#12 x-gts-final: mid-chain final blocks derivation").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.finalmid.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                },
+            },
+            "register base A",
+        ),
+        _register_derived(
+            "gts://gts.x.test12.finalmid.base.v1~x.test12._.mid.v1~",
+            "gts://gts.x.test12.finalmid.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "midField": {"type": "string"},
+                },
+            },
+            "register mid B (final)",
+            top_level={"x-gts-final": True},
+        ),
+        _register_derived(
+            "gts://gts.x.test12.finalmid.base.v1~x.test12._.mid.v1~x.test12._.leaf.v1~",
+            "gts://gts.x.test12.finalmid.base.v1~x.test12._.mid.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "leafField": {"type": "string"},
+                },
+            },
+            "register leaf C from final B",
+        ),
+        _validate_schema(
+            "gts.x.test12.finalmid.base.v1~x.test12._.mid.v1~x.test12._.leaf.v1~",
+            False,
+            "validate C should fail - B is final",
+        ),
+    ]
+
+
+class TestCaseOp12_FinalSiblingUnaffected(HttpRunner):
+    """OP#12 / x-gts-final: Sibling of a final type can still derive from shared base.
+
+    A~ -> B~(final) and A~ -> C~. C~ is valid because A~ is not final.
+    """
+
+    config = Config("OP#12 x-gts-final: sibling of final is unaffected").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.finalsib.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                },
+            },
+            "register base A",
+        ),
+        _register_derived(
+            "gts://gts.x.test12.finalsib.base.v1~x.test12._.final_b.v1~",
+            "gts://gts.x.test12.finalsib.base.v1~",
+            {
+                "type": "object",
+            },
+            "register B (final) from A",
+            top_level={"x-gts-final": True},
+        ),
+        _register_derived(
+            "gts://gts.x.test12.finalsib.base.v1~x.test12._.sibling_c.v1~",
+            "gts://gts.x.test12.finalsib.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "extra": {"type": "string"},
+                },
+            },
+            "register C (sibling) from A",
+        ),
+        _validate_schema(
+            "gts.x.test12.finalsib.base.v1~x.test12._.sibling_c.v1~",
+            True,
+            "validate C should pass - A is not final",
+        ),
+    ]
+
+
+class TestCaseOp12_FinalBase_SelfValidationPasses(HttpRunner):
+    """OP#12 / x-gts-final: A final base type itself MUST pass /validate-schema.
+
+    The final modifier restricts derivation, not the type's own validity.
+    """
+
+    config = Config("OP#12 x-gts-final: final base self-validation passes").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.finalself.base.v1~",
+            {
+                "type": "object",
+                "x-gts-final": True,
+                "properties": {
+                    "name": {"type": "string"},
+                },
+            },
+            "register final base schema",
+        ),
+        _validate_schema(
+            "gts.x.test12.finalself.base.v1~",
+            True,
+            "validate final base itself should pass",
         ),
     ]
 
