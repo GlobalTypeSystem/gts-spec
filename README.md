@@ -1,4 +1,4 @@
-> **VERSION**: GTS specification draft, version 0.8
+> **VERSION**: GTS specification draft, version 0.9
 
 # Global Type System (GTS) Specification
 
@@ -107,6 +107,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 | 0.8beta1 | Add OP#12 (schema vs schema validation), unified validation endpoint (/validate-entity), and clarify instance -> schema and schema -> schema validation semantics for chained GTS IDs |
 | 0.8beta2 | Introduce schema traits (`x-gts-traits-schema`, `x-gts-traits`) and OP#13 (schema traits validation) |
 | 0.8 | Add alternate combined anonymous instance identifier format |
+| 0.9 | Add `x-gts-final` and `x-gts-abstract` schema modifiers; enforce final/abstract semantics in OP#6 and OP#12 |
 
 ## 1. Motivation
 
