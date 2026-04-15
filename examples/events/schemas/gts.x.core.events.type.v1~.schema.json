@@ -1,9 +1,10 @@
 {
   "$id": "gts://gts.x.core.events.type.v1~",
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-gts-abstract": true,
   "title": "Event Envelope (Common Fields)",
   "type": "object",
-  "description": "Base event type definition",
+  "description": "Abstract base event type definition. Instances must use a concrete derived type.",
   "required": [
     "id",
     "type",

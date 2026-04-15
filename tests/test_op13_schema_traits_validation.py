@@ -1,71 +1,11 @@
 from .conftest import get_gts_base_url
-from httprunner import HttpRunner, Config, Step, RunRequest
-
-
-# ---------------------------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------------------------
-
-def _register(gts_id, schema_body, label="register schema"):
-    """Register a schema via POST /entities."""
-    body = {
-        "$$id": gts_id,
-        "$$schema": "http://json-schema.org/draft-07/schema#",
-        **schema_body,
-    }
-    return Step(
-        RunRequest(label)
-        .post("/entities")
-        .with_json(body)
-        .validate()
-        .assert_equal("status_code", 200)
-    )
-
-
-def _register_derived(gts_id, base_ref, overlay, label="register derived"):
-    """Register a derived schema that uses allOf with a $$ref."""
-    body = {
-        "$$id": gts_id,
-        "$$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "allOf": [
-            {"$$ref": base_ref},
-            overlay,
-        ],
-    }
-    return Step(
-        RunRequest(label)
-        .post("/entities")
-        .with_json(body)
-        .validate()
-        .assert_equal("status_code", 200)
-    )
-
-
-def _validate_schema(schema_id, expect_ok, label="validate schema"):
-    """Validate a derived schema via POST /validate-schema."""
-    step = (
-        RunRequest(label)
-        .post("/validate-schema")
-        .with_json({"schema_id": schema_id})
-        .validate()
-        .assert_equal("status_code", 200)
-        .assert_equal("body.ok", expect_ok)
-    )
-    return Step(step)
-
-
-def _validate_entity(entity_id, expect_ok, label="validate entity"):
-    """Validate an entity via POST /validate-entity."""
-    step = (
-        RunRequest(label)
-        .post("/validate-entity")
-        .with_json({"entity_id": entity_id})
-        .validate()
-        .assert_equal("status_code", 200)
-        .assert_equal("body.ok", expect_ok)
-    )
-    return Step(step)
+from .helpers.http_run_helpers import (
+    register as _register,
+    register_derived as _register_derived,
+    validate_entity as _validate_entity,
+    validate_schema as _validate_schema,
+)
+from httprunner import HttpRunner, Config
 
 
 # ---------------------------------------------------------------------------

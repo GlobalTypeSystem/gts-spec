@@ -858,5 +858,309 @@ class TestCaseTestOp6ValidateInstance_AnonymousInstance_Invalid(HttpRunner):
     ]
 
 
+# ---------------------------------------------------------------------------
+# x-gts-abstract tests (OP#6 extension — abstract types cannot have direct instances)
+# ---------------------------------------------------------------------------
+
+
+class TestCaseOp6_AbstractType_RejectWellKnownInstance(HttpRunner):
+    """OP#6 / x-gts-abstract: Well-known instance of abstract type MUST fail validation.
+
+    Base type declares x-gts-abstract: true. Registering and validating a
+    well-known instance whose rightmost type is the abstract type MUST fail.
+    """
+
+    config = Config("OP#6 x-gts-abstract: reject well-known instance of abstract type").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        # Register abstract base schema
+        Step(
+            RunRequest("register abstract base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6.abstract.base.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "x-gts-abstract": True,
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Register well-known instance of abstract type
+        Step(
+            RunRequest("register instance of abstract type")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.test6.abstract.base.v1~x.test6._.my_item.v1",
+                "name": "My Item",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Validate instance — should fail because base is abstract
+        Step(
+            RunRequest("validate instance of abstract type should fail")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.test6.abstract.base.v1~x.test6._.my_item.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.id", "gts.x.test6.abstract.base.v1~x.test6._.my_item.v1")
+        ),
+    ]
+
+
+class TestCaseOp6_AbstractType_RejectAnonInstance(HttpRunner):
+    """OP#6 / x-gts-abstract: Anonymous instance of abstract type MUST fail validation.
+
+    Combined anonymous instance whose type prefix is abstract MUST be rejected.
+    """
+
+    config = Config("OP#6 x-gts-abstract: reject anonymous instance of abstract type").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        # Register abstract base schema
+        Step(
+            RunRequest("register abstract base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6.abstractanon.base.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "x-gts-abstract": True,
+                "type": "object",
+                "required": ["id", "type", "name"],
+                "properties": {
+                    "id": {"type": "string", "format": "uuid"},
+                    "type": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Register anonymous instance with type pointing to abstract schema
+        Step(
+            RunRequest("register anonymous instance of abstract type")
+            .post("/entities")
+            .with_json({
+                "id": "a1b2c3d4-5678-4abc-8def-111111111111",
+                "type": "gts.x.test6.abstractanon.base.v1~",
+                "name": "Anon Item",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Validate instance — should fail because type is abstract
+        Step(
+            RunRequest("validate anonymous instance of abstract type should fail")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "a1b2c3d4-5678-4abc-8def-111111111111",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.id", "a1b2c3d4-5678-4abc-8def-111111111111")
+        ),
+    ]
+
+
+class TestCaseOp6_AbstractType_AllowInstanceOfConcreteDerived(HttpRunner):
+    """OP#6 / x-gts-abstract: Instance of concrete derived type MUST pass.
+
+    Abstract base A~, concrete derived A~B~. Instance of B~ should pass
+    because B~ is not abstract.
+    """
+
+    config = Config("OP#6 x-gts-abstract: allow instance of concrete derived type").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        # Register abstract base schema
+        Step(
+            RunRequest("register abstract base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6.abstractder.base.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "x-gts-abstract": True,
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Register concrete derived schema
+        Step(
+            RunRequest("register concrete derived schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6.abstractder.base.v1~x.test6._.concrete.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test6.abstractder.base.v1~"},
+                    {
+                        "type": "object",
+                        "properties": {
+                            "extra": {"type": "string"},
+                        },
+                    },
+                ],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Register well-known instance of concrete derived type
+        Step(
+            RunRequest("register instance of concrete derived type")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.test6.abstractder.base.v1~x.test6._.concrete.v1~x.test6._.my_item.v1",
+                "name": "My Item",
+                "extra": "some value",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Validate instance — should pass because concrete.v1~ is not abstract
+        Step(
+            RunRequest("validate instance of concrete derived should pass")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.test6.abstractder.base.v1~x.test6._.concrete.v1~x.test6._.my_item.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+    ]
+
+
+class TestCaseOp6_AbstractType_ValidateEntityRejectsInstance(HttpRunner):
+    """OP#6 / x-gts-abstract: /validate-entity MUST also reject instance of abstract type.
+
+    The unified /validate-entity endpoint must enforce the abstract constraint
+    the same way /validate-instance does.
+    """
+
+    config = Config("OP#6 x-gts-abstract: validate-entity rejects instance of abstract type").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        # Register abstract base schema
+        Step(
+            RunRequest("register abstract base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6.abstractent.base.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "x-gts-abstract": True,
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Register well-known instance of abstract type
+        Step(
+            RunRequest("register instance of abstract type")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.test6.abstractent.base.v1~x.test6._.my_item.v1",
+                "name": "My Item",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Validate via /validate-entity — should fail because base is abstract
+        Step(
+            RunRequest("validate-entity instance of abstract type should fail")
+            .post("/validate-entity")
+            .with_json({
+                "entity_id": "gts.x.test6.abstractent.base.v1~x.test6._.my_item.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.entity_type", "instance")
+        ),
+    ]
+
+
+class TestCaseOp6_AbstractType_RejectCombinedAnonInstance(HttpRunner):
+    """OP#6 / x-gts-abstract: Combined anonymous instance (gts.type~UUID) of abstract type MUST fail.
+
+    Tests the combined anonymous format where the type is resolved from the
+    ID prefix (section 9.11.3.5).
+    """
+
+    config = Config("OP#6 x-gts-abstract: reject combined anonymous instance of abstract type").base_url(
+        get_gts_base_url()
+    )
+    teststeps = [
+        # Register abstract base schema
+        Step(
+            RunRequest("register abstract base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6.abstractcomb.base.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "x-gts-abstract": True,
+                "type": "object",
+                "required": ["id", "type", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "type": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Register combined anonymous instance (type prefix is abstract)
+        Step(
+            RunRequest("register combined anonymous instance of abstract type")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.test6.abstractcomb.base.v1~d2e3f4a5-6789-4abc-8def-222222222222",
+                "type": "gts.x.test6.abstractcomb.base.v1~",
+                "name": "Combined Anon Item",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Validate combined anonymous instance — should fail because type is abstract
+        Step(
+            RunRequest("validate combined anonymous instance of abstract type should fail")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.test6.abstractcomb.base.v1~d2e3f4a5-6789-4abc-8def-222222222222",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.id", "gts.x.test6.abstractcomb.base.v1~d2e3f4a5-6789-4abc-8def-222222222222")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp6ValidateInstance_ValidInstance().test_start()

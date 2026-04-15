@@ -1,4 +1,4 @@
-> **VERSION**: GTS specification draft, version 0.8
+> **VERSION**: GTS specification draft, version 0.9
 
 # Global Type System (GTS) Specification
 
@@ -75,7 +75,17 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
   - [8.1 Single-segment regex (type or instance)](#81-single-segment-regex-type-or-instance)
   - [8.2 Chained identifier regex](#82-chained-identifier-regex)
 - [9. Reference Implementation Recommendations](#9-reference-implementation-recommendations)
+  - [9.1 Identifier reference in JSON and JSON Schema](#91---identifier-reference-in-json-and-json-schema)
+  - [9.2 GTS operations (OP#1 - OP#13)](#92---gts-operations-op1---op13)
+  - [9.3 GTS entities registration](#93---gts-entities-registration)
+  - [9.4 CLI support](#94---cli-support)
+  - [9.5 Web server with OpenAPI](#95---web-server-with-openapi)
+  - [9.6 `x-gts-ref` support](#96---x-gts-ref-support)
   - [9.7 Schema Traits (`x-gts-traits-schema` / `x-gts-traits`)](#97---schema-traits-x-gts-traits-schema--x-gts-traits)
+  - [9.8 YAML support](#98---yaml-support)
+  - [9.9 TypeSpec support](#99---typespec-support)
+  - [9.10 UUID as object IDs](#910---uuid-as-object-ids)
+  - [9.11 Schema Modifiers (`x-gts-final` / `x-gts-abstract`)](#911---schema-modifiers-x-gts-final--x-gts-abstract)
 - [10. Collecting Identifiers with Wildcards](#10-collecting-identifiers-with-wildcards)
 - [11. JSON and JSON Schema Conventions](#11-json-and-json-schema-conventions)
 - [12. Notes and Best Practices](#12-notes-and-best-practices)
@@ -97,6 +107,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 | 0.8beta1 | Add OP#12 (schema vs schema validation), unified validation endpoint (/validate-entity), and clarify instance -> schema and schema -> schema validation semantics for chained GTS IDs |
 | 0.8beta2 | Introduce schema traits (`x-gts-traits-schema`, `x-gts-traits`) and OP#13 (schema traits validation) |
 | 0.8 | Add alternate combined anonymous instance identifier format |
+| 0.9 | Add `x-gts-final` and `x-gts-abstract` schema modifiers; enforce final/abstract semantics in OP#6 and OP#12 |
 
 ## 1. Motivation
 
@@ -328,6 +339,8 @@ GTS chained identifiers express type derivation through **left-to-right inherita
 
 This inheritance model enables safe extensibility: third-party vendors can extend platform base types while maintaining full compatibility with the core system.
 
+**Schema modifiers**: Schemas may optionally declare `"x-gts-final": true` to prohibit further derivation, or `"x-gts-abstract": true` to require that instances use a concrete derived type rather than the base type directly. See section 9.11 for full semantics.
+
 **Implementation pattern: Hybrid storage for extensible schemas**
 
 GTS types inheritance enables a powerful database design pattern that combines **structured storage** for base type fields with **flexible JSON storage** for derived type extensions. This approach provides:
@@ -529,6 +542,8 @@ Example:
   Some services may also support a **combined** anonymous instance representation:
   - `id: "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~7a1d2f34-5678-49ab-9012-abcdef123456"`
   - In this case, the explicit `type` field MAY be omitted, since the schema/type can be derived from the `id` prefix up to the final `~`.
+
+**Note:** A type marked with `"x-gts-abstract": true` cannot have direct instances (well-known or anonymous). Instances must reference a concrete (non-abstract) derived type as the rightmost type in the chain. See section 9.11.
 
 This split is common in event systems: **topics/streams** are often well-known instances, while individual **events** are anonymous. See `./examples/events` and the field-level recommendations in section **9.1**.
 
@@ -1256,13 +1271,13 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 - **OP#3 - ID Parsing**: Decompose identifiers into constituent parts (vendor, package, namespace, type, version, etc.)
 - **OP#4 - ID Pattern Matching**: Match identifiers against patterns containing wildcards
 - **OP#5 - ID to UUID Mapping**: Generate deterministic UUIDs from GTS identifiers
-- **OP#6 - Schema Validation**: Validate object instances against their corresponding schemas
+- **OP#6 - Schema Validation**: Validate object instances against their corresponding schemas. When validating instances, if the rightmost type in the chain is marked `x-gts-abstract: true`, validation MUST fail (see section 9.11)
 - **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
 - **OP#8 - Compatibility Checking**: Verify that schemas with different MINOR versions are compatible
 - **OP#9 - Version Casting**: Transform instances between compatible MINOR versions
 - **OP#10 - Query Execution**: Filter identifier collections using the GTS query language
 - **OP#11 - Attribute Access**: Retrieve property values and metadata using the attribute selector (`@`)
-- **OP#12 - Schema vs Schema Validation**: Validate derived schemas against their base schemas. Derived schemas using `allOf` must conform to all constraints defined in their parent schemas throughout the inheritance hierarchy. This ensures type safety in schema extension and prevents constraint violations in multi-level schema hierarchies.
+- **OP#12 - Schema vs Schema Validation**: Validate derived schemas against their base schemas. Derived schemas using `allOf` must conform to all constraints defined in their parent schemas throughout the inheritance hierarchy. This ensures type safety in schema extension and prevents constraint violations in multi-level schema hierarchies. When validating derived schemas, if any base schema in the chain is marked `x-gts-final: true`, validation MUST fail (see section 9.11)
 - **OP#13 - Schema Traits Validation**: Validate schema traits (`x-gts-traits-schema` / `x-gts-traits`). See section 9.7 for full semantics and validation rules.
 
 ### 9.3 - GTS entities registration
@@ -1499,6 +1514,95 @@ Ensure generated schemas use GTS identifiers as `$id` for types and keep any `x-
 ### 9.10 - UUID as object IDs
 
 Support UUIDs (format: `uuid`) for instance `id` fields.
+
+### 9.11 - Schema Modifiers (`x-gts-final` / `x-gts-abstract`)
+
+A **schema modifier** is a boolean annotation on a GTS schema that restricts how the type participates in the GTS type system. Modifiers can be used to control inheritance and instantiation behavior. There are two keywords for this purpose: `x-gts-final` and `x-gts-abstract`.
+
+#### 9.11.1 Keywords
+
+| Keyword | JSON type | Purpose | Typical location |
+|---------|-----------|---------|------------------|
+| **`x-gts-final`** | `boolean` | Marks the type as **not inheritable** — no derived schemas may reference it as a base | Leaf schemas; enum-like types with a fixed set of well-known instances |
+| **`x-gts-abstract`** | `boolean` | Marks the type as **not directly instantiable** — instances must conform to a concrete derived type | Base/ancestor schemas that serve purely as templates |
+
+**Schema-only keywords:** Both `x-gts-final` and `x-gts-abstract` are **schema annotation keywords** and MUST only appear in JSON Schema documents (documents with `$schema`). They MUST NOT appear in instance documents. Implementations MUST reject instances that contain these keywords.
+
+**Allowed values:** The only meaningful value is `true`. If the keyword is absent or set to `false`, it has no effect (the schema behaves normally — both inheritable and instantiable). Implementations MUST reject non-boolean values.
+
+**Mutual exclusion:** A schema MUST NOT declare both `"x-gts-final": true` and `"x-gts-abstract": true`. This combination is semantically meaningless (a type that can be neither inherited from nor instantiated serves no purpose) and MUST be rejected during schema registration or validation.
+
+| Modifier combination | Inheritance allowed? | Direct instances allowed? |
+|---|---|---|
+| *(default / neither)* | Yes | Yes |
+| `x-gts-abstract: true` | Yes | No |
+| `x-gts-final: true` | No | Yes |
+| Both `true` | **INVALID** — MUST be rejected | — |
+
+#### 9.11.2 `x-gts-final` semantics
+
+When a schema declares `"x-gts-final": true`:
+
+1. **Registration guard**: When a new schema is registered whose `allOf` / `$ref` chain references a final type as a base, the registry MUST reject the registration (when validation is enabled). Specifically, if the derived schema's `$id` is of the form `gts://gts.A~B~` and schema `A~` has `"x-gts-final": true`, then registering `A~B~` MUST fail.
+
+2. **Validation via `/validate-schema` (OP#12)**: When validating a derived schema against its base chain, if any base schema in the chain is marked `x-gts-final`, validation MUST fail with an error indicating that the base type is final and cannot be extended.
+
+3. **Instances are unaffected**: A final type MAY have well-known instances and anonymous instances. `x-gts-final` restricts only schema derivation, not instantiation.
+
+4. **No propagation**: `x-gts-final` applies only to the schema that declares it. It does NOT propagate to base types in the chain. For a chain `A~ → B~ → C~`, if `B~` is final, then `C~` is invalid. But `A~` can still be inherited by types other than `B~`'s descendants.
+
+5. **Keyword placement**: The keyword MUST appear at the **top level** of the JSON Schema document, adjacent to `$id` and `$schema`:
+
+```json
+{
+  "$id": "gts://gts.x.infra.compute.vm_state.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-gts-final": true,
+  "type": "object",
+  "properties": { "..." : {} }
+}
+```
+
+For derived schemas using `allOf`, the keyword MUST appear at the top level, NOT inside the `allOf` entries:
+
+```json
+{
+  "$id": "gts://gts.x.core.events.type.v1~x.vendor._.order_event.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-gts-final": true,
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.events.type.v1~" },
+    { "..." : {} }
+  ]
+}
+```
+
+#### 9.11.3 `x-gts-abstract` semantics
+
+When a schema declares `"x-gts-abstract": true`:
+
+1. **Instance registration guard**: When a new instance is registered whose **rightmost type** in the chain is an abstract type, the registry MUST reject the registration (when validation is enabled). For example, if `gts.x.core.events.type.v1~` is abstract, registering a well-known instance `gts.x.core.events.type.v1~x.vendor._.some_event.v1` MUST fail (the rightmost type is abstract). However, if a concrete derived schema `gts.x.core.events.type.v1~x.vendor._.order_event.v1~` exists and is not abstract, then registering instance `gts.x.core.events.type.v1~x.vendor._.order_event.v1~x.vendor._.order_placed.v1` succeeds.
+
+2. **Validation via `/validate-instance` and `/validate-entity` (OP#6)**: When validating an instance (through either the instance-specific or unified entity endpoint), the system resolves the rightmost type in the chain. If that type is abstract, validation MUST fail.
+
+3. **Schema derivation is unaffected**: An abstract type is explicitly intended to be inherited from. Registering derived schemas from an abstract type always succeeds (subject to other validation rules).
+
+4. **No propagation**: A derived type is concrete by default. If `A~` is abstract and `B~` derives from `A~`, `B~` is concrete unless it also declares `"x-gts-abstract": true`.
+
+5. **Anonymous instances**: For combined anonymous instance IDs like `gts.A~<UUID>`, the system resolves the type from the prefix. If that type is abstract, the instance MUST be rejected.
+
+#### 9.11.4 Interaction with `x-gts-traits`
+
+- **Abstract types with traits**: An abstract base type MAY declare `x-gts-traits-schema`. Since abstract types cannot have direct instances, trait values (`x-gts-traits`) do not need to be fully resolved on the abstract type itself. Trait resolution completeness is only enforced on concrete (leaf) schemas (this is already the existing behavior from section 9.7.5).
+
+- **Final types with traits**: A final type MAY declare `x-gts-traits` values. Since no derived types can exist, all trait values MUST be fully resolved on the final type itself. If the effective trait schema has required properties without defaults and the final type does not provide them via `x-gts-traits`, validation MUST fail.
+
+#### 9.11.5 Registration enforcement
+
+Enforcement follows the same pattern as existing `?validate=true` behavior: checks are performed when validation is enabled on registration, and always enforced on explicit validation endpoints (`/validate-schema`, `/validate-instance`, `/validate-entity`). This is consistent with existing patterns (e.g., `x-gts-ref` checks in section 9.6).
+
+See `./examples/typespec/vms/schemas/states/gts.x.infra.compute.vm_state.v1~.schema.json` for an example of a final type, `./examples/modules/schemas/gts.x.core.modules.capability.v1~.schema.json` for another final type, and `./examples/events/schemas/gts.x.core.events.type.v1~.schema.json` for an example of an abstract base type.
 
 
 ## 10. Collecting Identifiers with Wildcards
