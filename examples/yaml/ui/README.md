@@ -100,7 +100,7 @@ Validate YAML instances against schemas:
 ```bash
 # Using yajsv (Yet Another JSON Schema Validator with YAML support)
 go install github.com/neilpa/yajsv@latest
-yajsv -s schemas/gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~.schema.yaml \
+yajsv -s types/gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~.schema.yaml \
       instances/gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~main_dashboard.yaml
 ```
 
@@ -112,7 +112,7 @@ npm install -g ajv-cli
 
 # Convert YAML to JSON and validate
 cat instances/gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~main_dashboard.yaml | python -c "import yaml, json, sys; print(json.dumps(yaml.safe_load(sys.stdin)))" | \
-ajv validate -s schemas/gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~.schema.json -d -
+ajv validate -s types/gts.x.ui.core.item.v1~x.ui.components.menu_item.v1~.schema.json -d -
 ```
 
 ## Extending UI Components

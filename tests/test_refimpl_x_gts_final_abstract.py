@@ -15,7 +15,7 @@ from .helpers.http_run_helpers import (
     register_instance as _register_instance,
     validate_entity as _validate_entity,
     validate_instance as _validate_instance,
-    validate_schema as _validate_schema,
+    validate_type as _validate_type,
 )
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -45,7 +45,7 @@ class TestCaseFinal_RejectDerivedSchema(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register derived from final",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.final.reject.v1~x.testfa._.derived.v1~",
             False,
             "validate derived should fail",
@@ -150,7 +150,7 @@ class TestCaseFinal_MidChainFinal(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register leaf C from final B",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.finalmid.base.v1~x.testfa._.mid.v1~x.testfa._.leaf.v1~",
             False,
             "validate C should fail - B is final",
@@ -184,7 +184,7 @@ class TestCaseFinal_SiblingUnaffected(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register C (sibling) from A",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.finalsib.base.v1~x.testfa._.sibling_c.v1~",
             True,
             "validate C should pass - A is not final",
@@ -212,7 +212,7 @@ class TestCaseFinal_FalseIsNoop(HttpRunner):
             {"type": "object"},
             "register derived from final=false base",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.finalfalse.base.v1~x.testfa._.derived.v1~",
             True,
             "validate derived should pass - final=false is noop",
@@ -339,7 +339,7 @@ class TestCaseAbstract_AllowDerivedSchema(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register concrete derived",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.abs.derive.v1~x.testfa._.concrete.v1~",
             True,
             "validate derived should pass",
@@ -773,7 +773,7 @@ class TestCaseInteraction_FinalWithTraitsFullyResolved(HttpRunner):
             "register final derived with traits resolved",
             top_level={"x-gts-final": True},
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.finaltrait.base.v1~x.testfa._.leaf.v1~",
             True,
             "validate final with resolved traits should pass",
@@ -815,7 +815,7 @@ class TestCaseInteraction_FinalWithTraitsMissing(HttpRunner):
             "register final derived without resolving traits",
             top_level={"x-gts-final": True},
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.finalmiss.base.v1~x.testfa._.leaf.v1~",
             False,
             "validate final with missing required traits should fail",
@@ -849,7 +849,7 @@ class TestCaseInteraction_AbstractWithIncompleteTraitsOk(HttpRunner):
             },
             "register abstract base with required trait (no default)",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.abstrait.base.v1~",
             True,
             "validate abstract with incomplete traits should pass",
@@ -892,7 +892,7 @@ class TestCaseInteraction_AbstractBaseFinalDerived(HttpRunner):
             top_level={"x-gts-final": True},
         ),
         # B is valid as a schema
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.absfinal.base.v1~x.testfa._.concrete.v1~",
             True,
             "validate B should pass",
@@ -918,7 +918,7 @@ class TestCaseInteraction_AbstractBaseFinalDerived(HttpRunner):
             {"type": "object"},
             "attempt to derive from final B",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.testfa.absfinal.base.v1~x.testfa._.concrete.v1~x.testfa._.sub.v1~",
             False,
             "validate derived from final B should fail",

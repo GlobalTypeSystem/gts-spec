@@ -13,24 +13,24 @@ These examples demonstrate:
 
 ### Base Type
 
-- **[gts.x.infra.compute.vm.v1~](schemas/gts.x.infra.compute.vm.v1~.tsp)** ([JSON Schema](schemas/gts.x.infra.compute.vm.v1~.schema.json))
+- **[gts.x.infra.compute.vm.v1~](types/gts.x.infra.compute.vm.v1~.tsp)** ([JSON Schema](types/gts.x.infra.compute.vm.v1~.schema.json))
   - Base virtual machine type with common properties
   - Properties: `type`, `id`, `name`, `cpuCores`, `ramMb`, `powerState`, `osType`, `createdAt`, `environment`, `owner`, `metadata`
   - `powerState` uses GTS reference pattern for backward-compatible extensibility
 
 ### Derived Types
 
-- **[gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~](schemas/gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~.tsp)** ([JSON Schema](schemas/gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~.schema.json)) - VMWare ESXi
-- **[gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~](schemas/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.tsp)** ([JSON Schema](schemas/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.schema.json)) - Nutanix AHV
-- **[gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~](schemas/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.tsp)** ([JSON Schema](schemas/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.schema.json)) - Virtuozzo
+- **[gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~](types/gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~.tsp)** ([JSON Schema](types/gts.x.infra.compute.vm.v1~vmware.esxi._.vm.v1~.schema.json)) - VMWare ESXi
+- **[gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~](types/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.tsp)** ([JSON Schema](types/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.schema.json)) - Nutanix AHV
+- **[gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~](types/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.tsp)** ([JSON Schema](types/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.schema.json)) - Virtuozzo
 
 ## Power States (GTS Reference Pattern)
 
-Power states are defined as separate GTS types in `schemas/states/`:
+Power states are defined as separate GTS types in `types/states/`:
 
 ### Base State Type
 
-- **[gts.x.infra.compute.vm_state.v1~](schemas/states/gts.x.infra.compute.vm_state.v1~.tsp)** ([JSON Schema](schemas/states/gts.x.infra.compute.vm_state.v1~.schema.json)) - Base power state type
+- **[gts.x.infra.compute.vm_state.v1~](types/states/gts.x.infra.compute.vm_state.v1~.tsp)** ([JSON Schema](types/states/gts.x.infra.compute.vm_state.v1~.schema.json)) - Base power state type
 
 ### Stable States
 

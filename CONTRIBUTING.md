@@ -32,9 +32,9 @@ gts-spec/
 ├── README.md                 # Main specification document
 ├── CONTRIBUTING.md           # This file
 ├── LICENSE                   # License information
-└── examples/                 # Example schemas and instances
+└── examples/                 # Example GTS Types and instances
     ├── events/               # Event-related examples
-    │   ├── schemas/          # JSON Schema definitions
+    │   ├── types/            # GTS Type definitions (JSON Schema files inside)
     │   └── instances/        # JSON instance examples
     └── ...                   # Other domain examples
 ```
@@ -61,7 +61,7 @@ Follow the specification standards and patterns described below.
 
 ```bash
 # Validate all schemas in a directory
-ajv compile --strict=false -s "examples/events/schemas/*.schema.json"
+ajv compile --strict=false -s "examples/events/types/*.schema.json"
 
 # Run Python reference implementation tests (if available)
 python -m pytest tests/
@@ -86,7 +86,7 @@ Accepted commit types:
 | spec       | Specification changes or clarifications                     |
 | fix        | Bug fixes in schemas or examples                            |
 | docs       | Documentation updates                                       |
-| examples   | Adding or updating example schemas/instances                |
+| examples   | Adding or updating example schema representations and instances |
 | test       | Adding or modifying validation tests                        |
 | style      | Formatting changes (whitespace, JSON formatting, etc.)      |
 | chore      | Misc tasks (tooling, scripts)                               |
@@ -114,5 +114,5 @@ Specification development guidelines:
 - Follow GTS identifier format rules strictly
 - Ensure all schemas use correct `$id` values
 - Validate schemas against JSON Schema Draft 7 or later
-- Include both type definitions (schemas) and instance examples
+- Include both GTS Types (with their JSON Schema representations) and GTS Instance examples
 - Document any deviations or implementation-specific choices

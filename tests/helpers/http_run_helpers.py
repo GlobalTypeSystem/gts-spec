@@ -60,12 +60,12 @@ def register_instance(instance_body, label="register instance"):
     )
 
 
-def validate_schema(schema_id, expect_ok, label="validate schema"):
-    """Validate a derived schema via POST /validate-schema."""
+def validate_type(type_id, expect_ok, label="validate type"):
+    """Validate a derived type via POST /validate-type."""
     step = (
         RunRequest(label)
-        .post("/validate-schema")
-        .with_json({"schema_id": schema_id})
+        .post("/validate-type")
+        .with_json({"type_id": type_id})
         .validate()
         .assert_equal("status_code", 200)
         .assert_equal("body.ok", expect_ok)

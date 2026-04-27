@@ -2,10 +2,10 @@
 
 This folder contains a simple self-contained examples for a pluggable SaaS service that supports modules with custom configs, and also needs to know modules capabilities in order to define API gateway properly
 
-##  Schemas (`schemas/`)
+## Types (`types/`)
 
-- `schemas/gts.x.core.modules.capability.v1~.schema.json` - Base schema for a capability
-- `schemas/gts.x.core.modules.module.v1~.schema.json` - Base schema for a module. Fields:
+- `types/gts.x.core.modules.capability.v1~.schema.json` - Base schema for a capability
+- `types/gts.x.core.modules.module.v1~.schema.json` - Base schema for a module. Fields:
     - `capabilities`: array of capabilities this module provides
     - `requirements`: array of required modules
 
