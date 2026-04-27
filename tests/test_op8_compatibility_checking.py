@@ -79,8 +79,8 @@ class TestCaseTestOp8Compatibility_BackwardCompatible(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.compat.event.v1.0~",
-                    "new_schema_id": "gts.x.test8.compat.event.v1.1~"
+                    "old_type_id": "gts.x.test8.compat.event.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.event.v1.1~"
                 }
             )
             .validate()
@@ -141,8 +141,8 @@ class TestCaseTestOp8Compatibility_BackwardIncompatible(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.compat.breaking.v1.0~",
-                    "new_schema_id": "gts.x.test8.compat.breaking.v1.1~"
+                    "old_type_id": "gts.x.test8.compat.breaking.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.breaking.v1.1~"
                 }
             )
             .validate()
@@ -203,8 +203,8 @@ class TestCaseTestOp8Compatibility_ForwardCompatible(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.compat.forward.v1.0~",
-                    "new_schema_id": "gts.x.test8.compat.forward.v1.1~"
+                    "old_type_id": "gts.x.test8.compat.forward.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.forward.v1.1~"
                 }
             )
             .validate()
@@ -263,8 +263,8 @@ class TestCaseTestOp8Compatibility_ForwardIncompatible(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.compat.fwd_break.v1.0~",
-                    "new_schema_id": "gts.x.test8.compat.fwd_break.v1.1~"
+                    "old_type_id": "gts.x.test8.compat.fwd_break.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.fwd_break.v1.1~"
                 }
             )
             .validate()
@@ -328,8 +328,8 @@ class TestCaseTestOp8Compatibility_FullyCompatible(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.compat.full.v1.0~",
-                    "new_schema_id": "gts.x.test8.compat.full.v1.1~"
+                    "old_type_id": "gts.x.test8.compat.full.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.full.v1.1~"
                 }
             )
             .validate()
@@ -391,8 +391,8 @@ class TestCaseTestOp8Compatibility_TypeChange(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.compat.typechange.v1.0~",
-                    "new_schema_id": "gts.x.test8.compat.typechange.v1.1~"
+                    "old_type_id": "gts.x.test8.compat.typechange.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.typechange.v1.1~"
                 }
             )
             .validate()
@@ -460,8 +460,8 @@ class TestCaseTestOp8Compatibility_EnumExpansion(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.compat.enum.v1.0~",
-                    "new_schema_id": "gts.x.test8.compat.enum.v1.1~"
+                    "old_type_id": "gts.x.test8.compat.enum.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.enum.v1.1~"
                 }
             )
             .validate()
@@ -540,10 +540,10 @@ class TestCaseTestOp8Compatibility_NestedObjectChanges(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": (
+                    "old_type_id": (
                         "gts.x.test8.nested_compat.order.v1.0~"
                     ),
-                    "new_schema_id": (
+                    "new_type_id": (
                         "gts.x.test8.nested_compat.order.v1.1~"
                     )
                 }
@@ -623,10 +623,10 @@ class TestCaseTestOp8Compatibility_ConstraintRelaxation(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": (
+                    "old_type_id": (
                         "gts.x.test8.constraints.product.v1.0~"
                     ),
-                    "new_schema_id": (
+                    "new_type_id": (
                         "gts.x.test8.constraints.product.v1.1~"
                     )
                 }
@@ -696,8 +696,8 @@ class TestCaseTestOp8Compatibility_ConstraintTightening(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": "gts.x.test8.tight.item.v1.0~",
-                    "new_schema_id": "gts.x.test8.tight.item.v1.1~"
+                    "old_type_id": "gts.x.test8.tight.item.v1.0~",
+                    "new_type_id": "gts.x.test8.tight.item.v1.1~"
                 }
             )
             .validate()
@@ -778,10 +778,10 @@ class TestCaseTestOp8Compatibility_ArrayItemSchemaChange(HttpRunner):
             .get("/compatibility")
             .with_params(
                 **{
-                    "old_schema_id": (
+                    "old_type_id": (
                         "gts.x.test8.array_compat.list.v1.0~"
                     ),
-                    "new_schema_id": (
+                    "new_type_id": (
                         "gts.x.test8.array_compat.list.v1.1~"
                     )
                 }

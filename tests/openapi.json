@@ -175,17 +175,17 @@
         }
       }
     },
-    "/schemas": {
+    "/types": {
       "post": {
-        "summary": "Register schema by explicit type_id",
-        "operationId": "add_schema_schemas_post",
+        "summary": "Register a GTS Type by explicit type_id",
+        "operationId": "add_type_types_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/SchemaRegister"
+                    "$ref": "#/components/schemas/TypeRegister"
                   }
                 ],
                 "title": "Body"
@@ -258,7 +258,7 @@
     },
     "/extract-id": {
       "post": {
-        "summary": "Extract GTS ID and schema ID from JSON content",
+        "summary": "Extract GTS ID and type ID from JSON content",
         "operationId": "extract_id_extract_id_post",
         "requestBody": {
           "content": {
@@ -469,17 +469,17 @@
         }
       }
     },
-    "/validate-schema": {
+    "/validate-type": {
       "post": {
-        "summary": "Validate derived schema against base schema",
-        "operationId": "validate_schema_validate_schema_post",
+        "summary": "Validate that a derived type correctly extends its base chain",
+        "operationId": "validate_type_validate_type_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/ValidateSchemaRequest"
+                    "$ref": "#/components/schemas/ValidateTypeRequest"
                   }
                 ],
                 "title": "Body"
@@ -495,7 +495,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "title": "Response Validate Schema Validate Schema Post"
+                  "title": "Response Validate Type Validate Type Post"
                 }
               }
             }
@@ -606,18 +606,18 @@
             "required": true,
             "schema": {
               "type": "string",
-              "title": "Old Schema Id"
+              "title": "Old Type Id"
             },
-            "name": "old_schema_id",
+            "name": "old_type_id",
             "in": "query"
           },
           {
             "required": true,
             "schema": {
               "type": "string",
-              "title": "New Schema Id"
+              "title": "New Type Id"
             },
-            "name": "new_schema_id",
+            "name": "new_type_id",
             "in": "query"
           }
         ],
@@ -791,15 +791,15 @@
             "type": "string",
             "title": "Instance Id"
           },
-          "to_schema_id": {
+          "to_type_id": {
             "type": "string",
-            "title": "To Schema Id"
+            "title": "To Type Id"
           }
         },
         "type": "object",
         "required": [
           "instance_id",
-          "to_schema_id"
+          "to_type_id"
         ],
         "title": "CastRequest"
       },
@@ -816,7 +816,7 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "SchemaRegister": {
+      "TypeRegister": {
         "properties": {
           "type_id": {
             "type": "string",
@@ -832,7 +832,7 @@
           "type_id",
           "schema"
         ],
-        "title": "SchemaRegister"
+        "title": "TypeRegister"
       },
       "ValidateInstanceRequest": {
         "properties": {
@@ -847,18 +847,18 @@
         ],
         "title": "ValidateInstanceRequest"
       },
-      "ValidateSchemaRequest": {
+      "ValidateTypeRequest": {
         "properties": {
-          "schema_id": {
+          "type_id": {
             "type": "string",
-            "title": "Schema Id"
+            "title": "Type Id"
           }
         },
         "type": "object",
         "required": [
-          "schema_id"
+          "type_id"
         ],
-        "title": "ValidateSchemaRequest"
+        "title": "ValidateTypeRequest"
       },
       "ValidateEntityRequest": {
         "properties": {

@@ -184,7 +184,7 @@ class TestCaseTestOp9Cast_MinorVersionUpcast(HttpRunner):
                     "x.commerce.orders.order_placed.v1.0~"
                     "x.y.some.instance.v1.0"
                 ),
-                "to_schema_id": (
+                "to_type_id": (
                     "gts.x.test9.events.type.v1~"
                     "x.commerce.orders.order_placed.v1.1~"
                 )
@@ -334,7 +334,7 @@ class TestCaseTestOp9Cast_MinorVersionDowncast(HttpRunner):
                     "gts.x.test9.events.type.v1~"
                     "x.test9.cast.event.v1.1~"
                 ),
-                "to_schema_id": (
+                "to_type_id": (
                     "gts.x.test9.events.type.v1~"
                     "x.test9.cast.event.v1.0~"
                 )
@@ -453,7 +453,7 @@ class TestCaseTestOp9Cast_SchemaToSchemaNotAllowed(HttpRunner):
             .post("/cast")
             .with_json({
                 "instance_id": "gts.x.test9.schema2schema.type.v1.0~",
-                "to_schema_id": "gts.x.test9.schema2schema.type.v1.1~"
+                "to_type_id": "gts.x.test9.schema2schema.type.v1.1~"
             })
             .validate()
             .assert_equal("status_code", 200)

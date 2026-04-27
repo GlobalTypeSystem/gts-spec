@@ -20,10 +20,10 @@ class TestCaseTestOp2IdExtraction_Case1(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.id", "gts.x.test2.api.endpoint.v0.1")
-            .assert_equal("body.schema_id", "gts.x.test2.api.endpoint.v0~")
+            .assert_equal("body.type_id", "gts.x.test2.api.endpoint.v0~")
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "schema")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "schema")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
@@ -50,10 +50,10 @@ class TestCaseTestOp2IdExtraction_Case2(HttpRunner):
                 "body.id",
                 "gts.x.test2.events.type.v1~abc.app._.custom_event.v1.2",
             )
-            .assert_equal("body.schema_id", "gts.x.test2.events.type.v1~")
+            .assert_equal("body.type_id", "gts.x.test2.events.type.v1~")
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "id")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "id")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
@@ -78,12 +78,12 @@ class TestCaseTestOp2IdExtraction_Case3(HttpRunner):
                 "gts.x.core.events.topic.v1~x.commerce._.orders.v1.0",
             )
             .assert_equal(
-                "body.schema_id",
+                "body.type_id",
                 "gts.x.core.events.topic.v1~",
             )
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "id")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "id")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
@@ -112,15 +112,15 @@ class TestCaseTestOp2IdExtraction_Case4(HttpRunner):
                 "7a1d2f34-5678-49ab-9012-abcdef123456",
             )
             .assert_equal(
-                "body.schema_id",
+                "body.type_id",
                 (
                     "gts.x.core.events.type.v1~"
                     "x.commerce.orders.order_placed.v1.0~"
                 ),
             )
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "type")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "type")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
@@ -156,15 +156,15 @@ class TestCaseTestOp2IdExtraction_Case7_CombinedAnonymousInstance(HttpRunner):
                 ),
             )
             .assert_equal(
-                "body.schema_id",
+                "body.type_id",
                 (
                     "gts.x.core.events.type.v1~"
                     "x.commerce.orders.order_placed.v1.0~"
                 ),
             )
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "id")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "id")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
@@ -200,14 +200,14 @@ class TestCaseTestOp2IdExtraction_Case5_GtsBaseSchema(HttpRunner):
             #   we only check the server classifies the input as a schema.
             # - The real contract checks are implemented below
             #   (plain pytest + `requests`).
-            .assert_equal("body.is_schema", True)
+            .assert_equal("body.is_type", True)
         ),
     ]
 
 
 class TestCaseTestOp2IdExtraction_Case6_GtsDerivedSchema(HttpRunner):
     """
-    For derived schemas, schema_id is derived from the $id chain
+    For derived schemas, type_id is derived from the $id chain
     (not taken from $schema).
     """
     config = Config("OP#2 - Extract ID (case 6: GTS derived schema)").base_url(
@@ -239,13 +239,18 @@ class TestCaseTestOp2IdExtraction_Case6_GtsDerivedSchema(HttpRunner):
             #   we only check the server classifies the input as a schema.
             # - The real contract checks are implemented below
             #   (plain pytest + `requests`).
-            .assert_equal("body.is_schema", True)
+            .assert_equal("body.is_type", True)
         ),
     ]
 
 
 def test_op2_extract_id_gts_base_schema_normalizes_id() -> None:
-    """Schema detection uses $schema; gts:// prefix is stripped from $id."""
+    """Schema detection uses $schema; gts:// prefix is stripped from $id.
+
+    A base GTS schema has no GTS parent type, so `type_id` MUST be null.
+    The JSON Schema dialect URL ($schema) is NOT a GTS Type Identifier and
+    MUST NOT be returned via `type_id`.
+    """
     url = get_gts_base_url() + "/extract-id"
     payload = {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -255,13 +260,13 @@ def test_op2_extract_id_gts_base_schema_normalizes_id() -> None:
     r = requests.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
-    assert body["is_schema"] is True
+    assert body["is_type"] is True
     assert body["id"] == "gts.x.core.events.type.v1~"
-    assert body["schema_id"] == "http://json-schema.org/draft-07/schema#"
+    assert body.get("type_id") is None
 
 
 def test_op2_extract_id_gts_derived_schema_parent_from_chain() -> None:
-    """For derived schemas, schema_id is derived from the $id chain."""
+    """For derived schemas, type_id is derived from the $id chain."""
     url = get_gts_base_url() + "/extract-id"
     payload = {
         "$schema": "http://json-schema.org/draft-07/schema#",
@@ -274,12 +279,12 @@ def test_op2_extract_id_gts_derived_schema_parent_from_chain() -> None:
     r = requests.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
-    assert body["is_schema"] is True
+    assert body["is_type"] is True
     assert (
         body["id"]
         == "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~"
     )
-    assert body["schema_id"] == "gts.x.core.events.type.v1~"
+    assert body["type_id"] == "gts.x.core.events.type.v1~"
 
 
 def test_op2_extract_id_schema_without_id_is_non_gts_schema() -> None:
@@ -295,14 +300,15 @@ def test_op2_extract_id_schema_without_id_is_non_gts_schema() -> None:
     r = requests.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
-    assert body["is_schema"] is True
+    assert body["is_type"] is True
     # Not a GTS schema: no canonical gts.* id can be extracted.
     extracted_id = body.get("id")
     assert extracted_id in (None, "") or not str(extracted_id).startswith(
         "gts."
     )
-    # Without a GTS $id chain, schema_id falls back to $schema.
-    assert body.get("schema_id") == payload["$schema"]
+    # Non-GTS schema has no GTS parent type — `type_id` MUST be null.
+    # The JSON Schema dialect URL ($schema) is NOT a GTS Type Identifier.
+    assert body.get("type_id") is None
 
 
 def test_op2_extract_id_id_without_schema_is_not_a_gts_schema() -> None:
@@ -318,33 +324,33 @@ def test_op2_extract_id_id_without_schema_is_not_a_gts_schema() -> None:
     r = requests.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     assert body["id"] == payload["$id"].replace("gts://", "")
-    # No type field => schema_id should not be inferred from $id.
-    assert body.get("schema_id") is None
+    # No type field => type_id should not be inferred from $id.
+    assert body.get("type_id") is None
 
 
 def test_op2_extract_id_uuid_without_type_is_non_gts_instance() -> None:
     """
-    UUID id without type/schema reference is a non-GTS instance (Rule C #3).
+    UUID id without GTS Type reference is a non-GTS instance (Rule C #3).
     """
     url = get_gts_base_url() + "/extract-id"
     payload = {"id": "7a1d2f34-5678-49ab-9012-abcdef123456"}
     r = requests.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     assert body["id"] == payload["id"]
-    assert body.get("schema_id") is None
+    assert body.get("type_id") is None
 
 
 def test_op2_extract_id_non_gts_id_is_non_gts_instance() -> None:
-    """Non-GTS id value without type/schema reference is a non-GTS instance."""
+    """Non-GTS id value without GTS Type reference is a non-GTS instance."""
     url = get_gts_base_url() + "/extract-id"
     payload = {"id": "not-a-gts-id"}
     r = requests.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     assert body["id"] == payload["id"]
-    assert body.get("schema_id") is None
+    assert body.get("type_id") is None

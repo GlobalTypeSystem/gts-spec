@@ -14,12 +14,12 @@ from httprunner import HttpRunner, Config, Step, RunRequest
 # Helper functions
 # ---------------------------------------------------------------------------
 
-def _base_event_schema(schema_id, id_property=None):
-    """Build a base event envelope schema with the given GTS schema identifier."""
+def _base_event_schema(type_id, id_property=None):
+    """Build a base event envelope schema with the given GTS Type Identifier."""
     if id_property is None:
         id_property = {"type": "string"}
     return {
-        "$$id": f"gts://{schema_id}",
+        "$$id": f"gts://{type_id}",
         "$$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
         "required": ["id", "type", "tenantId", "occurredAt"],
@@ -221,8 +221,8 @@ class TestCaseTestOp6ValidateInstance_InvalidInstance(HttpRunner):
 class TestCaseTestOp6SchemaValidation_InvalidSchemaIdPrefix(HttpRunner):
     """OP#6 - Reject schema whose $id uses a raw ``gts.`` prefix.
 
-    Schema identifiers must use the ``gts://`` URI scheme.
-    Registration must return 422.
+    A schema's ``$id`` must use the ``gts://`` URI scheme to express a
+    GTS Type Identifier in URI-compatible form. Registration must return 422.
     """
 
     config = Config(
@@ -254,7 +254,7 @@ class TestCaseTestOp6SchemaValidation_InvalidSchemaIdPrefix(HttpRunner):
 class TestCaseTestOp6SchemaValidation_InvalidSchemaIdWildcard(HttpRunner):
     """OP#6 - Reject schema whose $id contains a wildcard segment.
 
-    Wildcards are not permitted in schema identifiers.
+    Wildcards are not permitted in GTS Type Identifiers.
     Registration must return 422.
     """
 
@@ -319,7 +319,7 @@ class TestCaseTestOp6SchemaValidation_SchemaMissingId(HttpRunner):
 class TestCaseTestOp6SchemaValidation_SchemaNonGtsId(HttpRunner):
     """OP#6 - Reject schema whose $id is not a GTS identifier.
 
-    Only ``gts://`` URIs are valid schema identifiers.
+    Only ``gts://`` URIs are valid ``$id`` forms for GTS Type Identifiers.
     Registration must return 422.
     """
 

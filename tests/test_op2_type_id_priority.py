@@ -1,7 +1,7 @@
 """
-OP#2 - Schema ID Priority Tests
+OP#2 - Type ID Priority Tests
 
-These tests verify that chained GTS IDs ALWAYS take priority for schema_id
+These tests verify that chained GTS IDs ALWAYS take priority for type_id
 extraction over explicit `type` fields (or gtsTid, gtsType, etc.).
 
 The chained GTS ID is the authoritative source for determining an instance's
@@ -13,17 +13,17 @@ from .conftest import get_gts_base_url
 from httprunner import HttpRunner, Config, Step, RunRequest
 
 
-class TestCaseOp2SchemaIdPriority_ChainTakesPrecedence(HttpRunner):
+class TestCaseOp2TypeIdPriority_ChainTakesPrecedence(HttpRunner):
     """
     When a well-known instance has both:
     - A chained GTS ID in `id` (implying a parent type)
     - An explicit `type` field declaring a different parent type
 
-    The chained GTS ID MUST take priority for schema_id.
+    The chained GTS ID MUST take priority for type_id.
     The explicit `type` field is ignored.
     """
     config = Config(
-        "OP#2 - Schema ID Priority: chain takes precedence over type"
+        "OP#2 - Type ID Priority: chain takes precedence over type"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -53,23 +53,23 @@ class TestCaseOp2SchemaIdPriority_ChainTakesPrecedence(HttpRunner):
             )
             # The chained ID MUST take precedence, type field is ignored
             .assert_equal(
-                "body.schema_id",
+                "body.type_id",
                 "gts.acme.core.models.user.v1~",
             )
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "id")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "id")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
 
-class TestCaseOp2SchemaIdPriority_ChainUsedAlone(HttpRunner):
+class TestCaseOp2TypeIdPriority_ChainUsedAlone(HttpRunner):
     """
     When a well-known instance has only a chained GTS ID (no explicit
-    `type` field), the schema_id MUST be derived from the chain.
+    `type` field), the type_id MUST be derived from the chain.
     """
     config = Config(
-        "OP#2 - Schema ID Priority: chain used alone"
+        "OP#2 - Type ID Priority: chain used alone"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -96,21 +96,21 @@ class TestCaseOp2SchemaIdPriority_ChainUsedAlone(HttpRunner):
                 ),
             )
             # Schema derived from chain (first segment ending with ~)
-            .assert_equal("body.schema_id", "gts.acme.core.models.user.v1~")
+            .assert_equal("body.type_id", "gts.acme.core.models.user.v1~")
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "id")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "id")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
 
-class TestCaseOp2SchemaIdPriority_TypeUsedForAnonymous(HttpRunner):
+class TestCaseOp2TypeIdPriority_TypeUsedForAnonymous(HttpRunner):
     """
     For anonymous instances (UUID id, not a GTS ID), the explicit `type`
-    field is used to determine schema_id.
+    field is used to determine type_id.
     """
     config = Config(
-        "OP#2 - Schema ID Priority: type used for anonymous instances"
+        "OP#2 - Type ID Priority: type used for anonymous instances"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -133,10 +133,10 @@ class TestCaseOp2SchemaIdPriority_TypeUsedForAnonymous(HttpRunner):
                 "7a1d2f34-5678-49ab-9012-abcdef123456",
             )
             # Type field is used for anonymous instances
-            .assert_equal("body.schema_id", "gts.acme.core.models.product.v1~")
+            .assert_equal("body.type_id", "gts.acme.core.models.product.v1~")
             .assert_equal("body.selected_entity_field", "id")
-            .assert_equal("body.selected_schema_id_field", "type")
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.selected_type_id_field", "type")
+            .assert_equal("body.is_type", False)
         ),
     ]
 
@@ -144,7 +144,7 @@ class TestCaseOp2SchemaIdPriority_TypeUsedForAnonymous(HttpRunner):
 def test_op2_chained_id_takes_priority_over_explicit_type() -> None:
     """
     When a well-known instance has both a chained GTS ID and an explicit
-    `type` field, the chained GTS ID MUST take priority for schema_id.
+    `type` field, the chained GTS ID MUST take priority for type_id.
 
     The explicit `type` field is ignored when a chained ID is present.
     """
@@ -164,24 +164,24 @@ def test_op2_chained_id_takes_priority_over_explicit_type() -> None:
 
     # Instance ID should be preserved
     assert body["id"] == payload["id"]
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
 
     # The chained ID MUST take precedence over explicit type field
-    assert body["schema_id"] == "gts.acme.core.models.user.v1~", (
-        f"Expected schema_id from chained ID "
+    assert body["type_id"] == "gts.acme.core.models.user.v1~", (
+        f"Expected type_id from chained ID "
         f"('gts.acme.core.models.user.v1~'), "
-        f"but got '{body.get('schema_id')}' (explicit type should be ignored)"
+        f"but got '{body.get('type_id')}' (explicit type should be ignored)"
     )
-    assert body["selected_schema_id_field"] == "id", (
-        f"Expected selected_schema_id_field to be 'id', "
-        f"but got '{body.get('selected_schema_id_field')}'"
+    assert body["selected_type_id_field"] == "id", (
+        f"Expected selected_type_id_field to be 'id', "
+        f"but got '{body.get('selected_type_id_field')}'"
     )
 
 
 def test_op2_chain_derivation_alone() -> None:
     """
     When a well-known instance has only a chained GTS ID (no explicit
-    `type`), the schema_id MUST be derived from the chain.
+    `type`), the type_id MUST be derived from the chain.
     """
     url = get_gts_base_url() + "/extract-id"
     payload = {
@@ -195,9 +195,9 @@ def test_op2_chain_derivation_alone() -> None:
     body = r.json()
 
     assert body["id"] == payload["id"]
-    assert body["is_schema"] is False
-    assert body["schema_id"] == "gts.acme.core.models.user.v1~"
-    assert body["selected_schema_id_field"] == "id"
+    assert body["is_type"] is False
+    assert body["type_id"] == "gts.acme.core.models.user.v1~"
+    assert body["selected_type_id_field"] == "id"
 
 
 def test_op2_type_used_for_anonymous_instance() -> None:
@@ -215,10 +215,10 @@ def test_op2_type_used_for_anonymous_instance() -> None:
     body = r.json()
 
     assert body["id"] == payload["id"]
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     # Type field is used for anonymous instances
-    assert body["schema_id"] == "gts.acme.core.models.order.v1~"
-    assert body["selected_schema_id_field"] == "type"
+    assert body["type_id"] == "gts.acme.core.models.order.v1~"
+    assert body["selected_type_id_field"] == "type"
 
 
 def test_op2_gtsTid_used_for_anonymous_instance() -> None:
@@ -236,10 +236,10 @@ def test_op2_gtsTid_used_for_anonymous_instance() -> None:
     body = r.json()
 
     assert body["id"] == payload["id"]
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     # gtsTid field is used for anonymous instances
-    assert body["schema_id"] == "gts.acme.core.models.order.v1~"
-    assert body["selected_schema_id_field"] == "gtsTid"
+    assert body["type_id"] == "gts.acme.core.models.order.v1~"
+    assert body["selected_type_id_field"] == "gtsTid"
 
 
 def test_op2_deeply_chained_id_ignores_explicit_type() -> None:
@@ -263,15 +263,15 @@ def test_op2_deeply_chained_id_ignores_explicit_type() -> None:
     body = r.json()
 
     assert body["id"] == payload["id"]
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     # Chain takes priority, explicit type is ignored
     # Schema is derived from the chain (up to last ~)
     expected_schema = (
         "gts.x.core.events.type.v1~"
         "x.core.audit.event.v1~"
     )
-    assert body["schema_id"] == expected_schema
-    assert body["selected_schema_id_field"] == "id"
+    assert body["type_id"] == expected_schema
+    assert body["selected_type_id_field"] == "id"
 
 
 def test_op2_single_segment_gts_id_uses_explicit_type() -> None:
@@ -281,7 +281,7 @@ def test_op2_single_segment_gts_id_uses_explicit_type() -> None:
     """
     url = get_gts_base_url() + "/extract-id"
     payload = {
-        # Single-segment GTS ID (no chain, looks like a schema ID)
+        # Single-segment GTS ID (no chain, looks like a type ID)
         "id": "gts.acme.core.models.user.v1.0",
         # Explicit type is used since ID has no chain
         "type": "gts.acme.core.models.base.v1~",
@@ -291,16 +291,16 @@ def test_op2_single_segment_gts_id_uses_explicit_type() -> None:
     body = r.json()
 
     assert body["id"] == payload["id"]
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     # Type field is used for single-segment IDs (no chain to derive from)
-    assert body["schema_id"] == "gts.acme.core.models.base.v1~"
-    assert body["selected_schema_id_field"] == "type"
+    assert body["type_id"] == "gts.acme.core.models.base.v1~"
+    assert body["selected_type_id_field"] == "type"
 
 
 def test_op2_combined_anonymous_id_takes_priority_over_explicit_type() -> None:
     """
     For combined anonymous instance identifiers (type-chain + UUID tail),
-    schema_id MUST be derived from the `id` prefix up to the last '~', and
+    type_id MUST be derived from the `id` prefix up to the last '~', and
     any explicit `type` field is ignored.
     """
     url = get_gts_base_url() + "/extract-id"
@@ -316,10 +316,10 @@ def test_op2_combined_anonymous_id_takes_priority_over_explicit_type() -> None:
     assert r.status_code == 200
     body = r.json()
 
-    assert body["is_schema"] is False
+    assert body["is_type"] is False
     assert body["id"] == payload["id"]
-    assert body["schema_id"] == (
+    assert body["type_id"] == (
         "gts.x.core.events.type.v1~"
         "x.commerce.orders.order_placed.v1.0~"
     )
-    assert body["selected_schema_id_field"] == "id"
+    assert body["selected_type_id_field"] == "id"

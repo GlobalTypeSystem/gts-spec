@@ -3,7 +3,7 @@ from .helpers.http_run_helpers import (
     register as _register,
     register_derived as _register_derived,
     validate_entity as _validate_entity,
-    validate_schema as _validate_schema,
+    validate_type as _validate_type,
 )
 from httprunner import HttpRunner, Config
 
@@ -65,7 +65,7 @@ class TestCaseOp13_TraitsValid_AllResolved(HttpRunner):
             },
             "register derived with all traits resolved",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.traits.event.v1~x.test13._.order_event.v1~",
             True,
             "validate derived - all traits resolved",
@@ -120,7 +120,7 @@ class TestCaseOp13_TraitsValid_DefaultsUsed(HttpRunner):
             },
             "register derived with no x-gts-traits (rely on defaults)",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.dfl.event.v1~x.test13._.simple_event.v1~",
             True,
             "validate derived - defaults fill all traits",
@@ -178,7 +178,7 @@ class TestCaseOp13_TraitsInvalid_MissingRequired(HttpRunner):
             },
             "register derived missing topicRef trait",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.miss.event.v1~x.test13._.incomplete.v1~",
             False,
             "validate should fail - topicRef not resolved",
@@ -234,7 +234,7 @@ class TestCaseOp13_TraitsInvalid_WrongType(HttpRunner):
             },
             "register derived with wrong type for maxRetries",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.wtype.event.v1~x.test13._.bad_type.v1~",
             False,
             "validate should fail - maxRetries is not integer",
@@ -288,7 +288,7 @@ class TestCaseOp13_TraitsInvalid_UnknownProperty(HttpRunner):
             },
             "register derived with unknown trait property",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.unk.event.v1~x.test13._.extra_trait.v1~",
             False,
             "validate should fail - unknownTrait not in schema",
@@ -352,7 +352,7 @@ class TestCaseOp13_TraitsValid_PartialOverride(HttpRunner):
             },
             "register derived overriding only topicRef",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.part.event.v1~x.test13._.partial.v1~",
             True,
             "validate - topicRef overridden, retention uses default",
@@ -420,7 +420,7 @@ class TestCaseOp13_TraitsValid_BothKeywordsInSameSchema(HttpRunner):
             },
             "register mid-level with both keywords",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.both.event.v1~x.test13._.audit.v1~",
             True,
             "validate mid-level - topicRef resolved, retention has default",
@@ -440,7 +440,7 @@ class TestCaseOp13_TraitsValid_BothKeywordsInSameSchema(HttpRunner):
             },
             "register leaf resolving auditRetention",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.both.event.v1~"
                 "x.test13._.audit.v1~"
@@ -517,7 +517,7 @@ class TestCaseOp13_TraitsInvalid_3Level_MissingInLeaf(HttpRunner):
             },
             "register leaf missing priority trait",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.l3miss.event.v1~"
                 "x.test13._.mid.v1~"
@@ -567,7 +567,7 @@ class TestCaseOp13_TraitsInvalid_OverrideInChain(HttpRunner):
             },
             "register mid-level setting retention=P30D",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.ovr.event.v1~x.test13._.mid_ovr.v1~",
             True,
             "validate mid-level",
@@ -587,7 +587,7 @@ class TestCaseOp13_TraitsInvalid_OverrideInChain(HttpRunner):
             },
             "register leaf overriding retention=P365D",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.ovr.event.v1~"
                 "x.test13._.mid_ovr.v1~"
@@ -656,7 +656,7 @@ class TestCaseOp13_TraitsInvalid_OverrideTopicRef3Level(HttpRunner):
             },
             "register mid-level setting topicRef=audit",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.ovt.event.v1~"
                 "x.test13._.audit_evt.v1~"
@@ -685,7 +685,7 @@ class TestCaseOp13_TraitsInvalid_OverrideTopicRef3Level(HttpRunner):
             },
             "register leaf overriding topicRef=notification",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.ovt.event.v1~"
                 "x.test13._.audit_evt.v1~"
@@ -761,7 +761,7 @@ class TestCaseOp13_TraitsInvalid_ChangeDefaultInMid(HttpRunner):
             },
             "register mid changing retention default to P90D",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.chdfl.event.v1~"
                 "x.test13._.chdfl_mid.v1~"
@@ -823,7 +823,7 @@ class TestCaseOp13_TraitsInvalid_ConstraintViolation(HttpRunner):
             },
             "register derived with invalid enum value",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.enum.event.v1~x.test13._.bad_enum.v1~",
             False,
             "validate should fail - priority not in enum",
@@ -978,7 +978,7 @@ class TestCaseOp13_TraitsValid_BaseSchemaNoTraits(HttpRunner):
             },
             "register derived without traits",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.notr.event.v1~x.test13._.plain.v1~",
             True,
             "validate - no traits to check, should pass",
@@ -1030,7 +1030,7 @@ class TestCaseOp13_TraitsInvalid_MinimumViolation(HttpRunner):
             },
             "register derived with negative maxRetries",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.minv.event.v1~x.test13._.neg_retry.v1~",
             False,
             "validate should fail - maxRetries below minimum",
@@ -1126,7 +1126,7 @@ class TestCaseOp13_TraitsValid_RefBasedTraitSchema(HttpRunner):
             },
             "register derived resolving $ref traits",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.ref.event.v1~"
                 "x.test13._.ref_leaf.v1~"
@@ -1222,7 +1222,7 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
             },
             "register derived missing topicRef from $ref trait",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.refm.event.v1~"
                 "x.test13._.ref_incomplete.v1~"
@@ -1294,7 +1294,7 @@ class TestCaseOp13_TraitsValid_NarrowingInDerived(HttpRunner):
             },
             "register mid-level narrowing priority to enum",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.narrow.event.v1~"
                 "x.test13._.mid_narrow.v1~"
@@ -1321,7 +1321,7 @@ class TestCaseOp13_TraitsValid_NarrowingInDerived(HttpRunner):
             },
             "register leaf with valid narrowed priority",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.narrow.event.v1~"
                 "x.test13._.mid_narrow.v1~"
@@ -1410,7 +1410,7 @@ class TestCaseOp13_TraitsInvalid_NarrowingViolation(HttpRunner):
             },
             "register leaf with value outside narrowed enum",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.nv.event.v1~"
                 "x.test13._.mid_nv.v1~"
@@ -1468,7 +1468,7 @@ class TestCaseOp13_TraitsValid_DefaultsFromRefSchema(HttpRunner):
             },
             "register derived with no traits (rely on $ref default)",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.refd.event.v1~"
                 "x.test13._.default_ref.v1~"
@@ -1529,7 +1529,7 @@ class TestCaseOp13_TraitsInvalid_APBlocksExtension(HttpRunner):
             },
             "register mid-level that extends trait schema with topicRef",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.ap.event.v1~x.test13._.ap_mid.v1~",
             False,
             (
@@ -1574,7 +1574,7 @@ class TestCaseOp13_TraitsInvalid_DerivedHasTraitsButNoTraitSchema(HttpRunner):
             },
             "register derived with x-gts-traits but no traits-schema",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.nt0.event.v1~x.test13._.derived_has_traits.v1~",
             False,
             "validate should fail - trait values have no trait schema",
@@ -1605,7 +1605,7 @@ class TestCaseOp13_TraitsInvalid_BaseHasTraitsButNoTraitSchema(HttpRunner):
             },
             "register base with x-gts-traits but no traits-schema",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.nt1.event.v1~",
             False,
             "validate should fail - x-gts-traits without x-gts-traits-schema",
@@ -1653,7 +1653,7 @@ class TestCaseOp13_TraitsInvalid_ConstNarrowingViolationInLeaf(HttpRunner):
             },
             "register mid-level narrowing retention to const P30D",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.const.event.v1~x.test13._.mid_const.v1~",
             True,
             "validate mid-level - const narrowing",
@@ -1671,7 +1671,7 @@ class TestCaseOp13_TraitsInvalid_ConstNarrowingViolationInLeaf(HttpRunner):
             },
             "register leaf overriding retention to P90D",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.const.event.v1~"
                 "x.test13._.mid_const.v1~"
@@ -1723,7 +1723,7 @@ class TestCaseOp13_TraitsValid_ConstNarrowingLeafMatches(HttpRunner):
             },
             "register mid-level narrowing retention to const P30D",
         ),
-        _validate_schema(
+        _validate_type(
             "gts.x.test13.constm.event.v1~x.test13._.mid_constm.v1~",
             True,
             "validate mid-level - const narrowing",
@@ -1741,7 +1741,7 @@ class TestCaseOp13_TraitsValid_ConstNarrowingLeafMatches(HttpRunner):
             },
             "register leaf with retention matching const P30D",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.constm.event.v1~"
                 "x.test13._.mid_constm.v1~"
@@ -1817,7 +1817,7 @@ class TestCaseOp13_TraitsInvalid_CyclingRef_SelfRef(HttpRunner):
             },
             "register derived with traits",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.cyc.selfevt.v1~"
                 "x.test13._.cyc_self_leaf.v1~"
@@ -1919,7 +1919,7 @@ class TestCaseOp13_TraitsInvalid_CyclingRef_TwoNode(HttpRunner):
             },
             "register derived with traits",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.cyc2.event.v1~"
                 "x.test13._.cyc2_leaf.v1~"
@@ -1967,7 +1967,7 @@ class TestCaseOp13_TraitsInvalid_TraitsSchemaNotObject(HttpRunner):
             },
             "register derived",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.tsnobj.event.v1~"
                 "x.test13._.tsnobj_leaf.v1~"
@@ -2026,7 +2026,7 @@ class TestCaseOp13_TraitsInvalid_TraitsInInstance(HttpRunner):
             },
             "register derived with traits",
         ),
-        _validate_schema(
+        _validate_type(
             (
                 "gts.x.test13.tinst.event.v1~"
                 "x.test13._.tinst_leaf.v1~"

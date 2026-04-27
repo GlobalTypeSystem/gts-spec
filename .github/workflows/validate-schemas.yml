@@ -29,7 +29,7 @@ jobs:
         # Compile all schemas together so cross-references can be resolved
         # The 0-prefixed reference schema loads first alphabetically
         set +e
-        AJV_OUT="$(ajv compile -s "examples/*/schemas/*.schema.json" --strict=false 2>&1 | grep "^error: " || true)"
+        AJV_OUT="$(ajv compile -s "examples/*/types/*.schema.json" --strict=false 2>&1 | grep "^error: " || true)"
         AJV_CODE=$?
         set -e
 

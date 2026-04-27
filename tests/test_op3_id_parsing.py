@@ -124,7 +124,7 @@ class TestCaseTestOp3IdParsing_CombinedAnonymousInstance(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.id", "${id}")
             .assert_equal("body.ok", True)
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.is_type", False)
         ),
     ]
 
@@ -327,9 +327,9 @@ class TestCaseTestOp3Parsing_WildcardValid(HttpRunner):
     ]
 
 
-class TestCaseTestOp3Parsing_IsSchemaField(HttpRunner):
-    """OP#3 - Verify is_schema field is returned correctly"""
-    config = Config("OP#3 - is_schema field verification").base_url(
+class TestCaseTestOp3Parsing_IsTypeField(HttpRunner):
+    """OP#3 - Verify is_type field is returned correctly"""
+    config = Config("OP#3 - is_type field verification").base_url(
         get_gts_base_url()
     )
 
@@ -338,27 +338,27 @@ class TestCaseTestOp3Parsing_IsSchemaField(HttpRunner):
 
     teststeps = [
         Step(
-            RunRequest("parse type (is_schema=true)")
+            RunRequest("parse type (is_type=true)")
             .get("/parse-id")
             .with_params(**{"gts_id": "gts.x.pkg.ns.type.v1~"})
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", True)
-            .assert_equal("body.is_schema", True)
+            .assert_equal("body.is_type", True)
             .assert_equal("body.is_wildcard", False)
         ),
         Step(
-            RunRequest("parse instance (is_schema=false)")
+            RunRequest("parse instance (is_type=false)")
             .get("/parse-id")
             .with_params(**{"gts_id": "gts.x.pkg.ns.type.v1~a.b.c.d.v1.0"})
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", True)
-            .assert_equal("body.is_schema", False)
+            .assert_equal("body.is_type", False)
             .assert_equal("body.is_wildcard", False)
         ),
         Step(
-            RunRequest("parse wildcard type (is_schema=true)")
+            RunRequest("parse wildcard type (is_type=true)")
             .get("/parse-id")
             .with_params(**{"gts_id": "gts.x.pkg.ns.*"})
             .validate()
