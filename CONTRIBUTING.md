@@ -34,7 +34,7 @@ gts-spec/
 ├── LICENSE                   # License information
 └── examples/                 # Example GTS Types and instances
     ├── events/               # Event-related examples
-    │   ├── types/            # GTS Type definitions (JSON Schema files inside)
+    │   ├── types/            # GTS Type Schemas (JSON Schema documents)
     │   └── instances/        # JSON instance examples
     └── ...                   # Other domain examples
 ```
@@ -114,5 +114,5 @@ Specification development guidelines:
 - Follow GTS identifier format rules strictly
 - Ensure all schemas use correct `$id` values
 - Validate schemas against JSON Schema Draft 7 or later
-- Include both GTS Types (with their JSON Schema representations) and GTS Instance examples
+- Include both GTS Type Schemas (the canonical JSON definitions of types) and GTS Instance examples
 - Document any deviations or implementation-specific choices

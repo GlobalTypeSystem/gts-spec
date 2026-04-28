@@ -2,7 +2,7 @@ from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
     register as _register,
     register_derived as _register_derived,
-    validate_type as _validate_type,
+    validate_type_schema as _validate_type_schema,
 )
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -43,7 +43,7 @@ def _make_2level_constraint_drop_steps(
             }},
             f"register derived dropping {constraint_kw}",
         ),
-        _validate_type(
+        _validate_type_schema(
             type_id, False,
             f"validate should fail - {constraint_kw} dropped",
         ),
@@ -83,7 +83,7 @@ def _make_3level_const_steps(
             }},
             f"register L2 with const {l2_const!r}",
         ),
-        _validate_type(l2_type_id, True, "validate L2"),
+        _validate_type_schema(l2_type_id, True, "validate L2"),
         _register_derived(
             l3_schema_id, l2_schema_id,
             {"type": "object", "properties": {
@@ -91,7 +91,7 @@ def _make_3level_const_steps(
             }},
             f"register L3 with const {l3_const!r}",
         ),
-        _validate_type(l3_type_id, expect_l3_ok, "validate L3"),
+        _validate_type_schema(l3_type_id, expect_l3_ok, "validate L3"),
     ]
 
 
@@ -138,7 +138,7 @@ def _make_3level_loosening_steps(
             }},
             f"register L2 tightening {keyword} to {l2_constraint}",
         ),
-        _validate_type(l2_type_id, True, "validate L2"),
+        _validate_type_schema(l2_type_id, True, "validate L2"),
         _register_derived(
             l3_schema_id, l2_schema_id,
             {"type": "object", "properties": {
@@ -146,7 +146,7 @@ def _make_3level_loosening_steps(
             }},
             f"register L3 loosening {keyword} to {l3_constraint}",
         ),
-        _validate_type(l3_type_id, expect_l3_ok, "validate L3"),
+        _validate_type_schema(l3_type_id, expect_l3_ok, "validate L3"),
     ]
 
 
@@ -209,17 +209,10 @@ class TestCaseTestOp12TypeDerivationValidation_DerivedSchemaFullyMatches(HttpRun
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate derived schema against base")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12a.base.user.v1~x.test12a._.premium_user.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12a.base.user.v1~x.test12a._.premium_user.v1~",
+            True,
+            "validate derived schema against base",
         ),
     ]
 
@@ -278,17 +271,10 @@ class TestCaseTestOp12TypeDerivationValidation_DerivedSchemaAddsNewFieldsToBaseO
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate derived schema against base")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12b.base.user.v1~x.test12b._.premium_user.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12b.base.user.v1~x.test12b._.premium_user.v1~",
+            True,
+            "validate derived schema against base",
         ),
     ]
 
@@ -352,18 +338,11 @@ class TestCaseTestOp12TypeDerivationValidation_AdditionalPropertiesFalse(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate should fail - base forbids extra properties")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.closed.account.v1~"
-                    "x.test12._.premium_account.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.closed.account.v1~"
+            "x.test12._.premium_account.v1~",
+            False,
+            "validate should fail - base forbids extra properties",
         ),
     ]
 
@@ -427,18 +406,11 @@ class TestCaseTestOp12TypeDerivationValidation_CloseOpenModel(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate derived schema should pass")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.close.user.v1~"
-                    "x.test12._.closed_user.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.close.user.v1~"
+            "x.test12._.closed_user.v1~",
+            True,
+            "validate derived schema should pass",
         ),
     ]
 
@@ -512,18 +484,11 @@ class TestCaseTestOp12TypeDerivationValidation_NestedAdditionalPropertiesFalse(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate derived schema should fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.nested.closed.v1~"
-                    "x.test12._.profile_plus.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.nested.closed.v1~"
+            "x.test12._.profile_plus.v1~",
+            False,
+            "validate derived schema should fail",
         ),
     ]
 
@@ -580,17 +545,10 @@ class TestCaseTestOp12TypeDerivationValidation_InvalidDerivedSchema(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate derived schema should fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.base.order.v1~x.test12._.bad_order.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.base.order.v1~x.test12._.bad_order.v1~",
+            False,
+            "validate derived schema should fail",
         ),
     ]
 
@@ -659,17 +617,10 @@ class TestCaseTestOp12TypeDerivationValidation_DerivedSchemaConstraintTighten(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate derived schema with tighter constraints")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.base.text.v1~x.test12._.short_text.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.base.text.v1~x.test12._.short_text.v1~",
+            True,
+            "validate derived schema with tighter constraints",
         ),
     ]
 
@@ -725,17 +676,10 @@ class TestCaseTestOp12TypeDerivationValidation_DerivedSchemaConstraintLoosen(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate schema with looser constraints should fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.base.data.v1~x.test12._.loose_data.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.base.data.v1~x.test12._.loose_data.v1~",
+            False,
+            "validate schema with looser constraints should fail",
         ),
     ]
 
@@ -803,18 +747,11 @@ class TestCaseTestOp12TypeDerivationValidation_DerivedSpecifiesObject(HttpRunner
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate derived schema specifying object")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.objspec.event.v1~"
-                    "x.test12._.order_event.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.objspec.event.v1~"
+            "x.test12._.order_event.v1~",
+            True,
+            "validate derived schema specifying object",
         ),
     ]
 
@@ -884,18 +821,11 @@ class TestCaseTestOp12TypeDerivationValidation_3Level_L2SpecifiesObject(HttpRunn
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.obj3a.resource.v1~"
-                    "x.test12._.file.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.obj3a.resource.v1~"
+            "x.test12._.file.v1~",
+            True,
+            "validate L2 schema",
         ),
         Step(
             RunRequest("register L3 schema tightening the object")
@@ -943,18 +873,11 @@ class TestCaseTestOp12TypeDerivationValidation_3Level_L2SpecifiesObject(HttpRunn
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L3 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.obj3a.resource.v1~"
-                    "x.test12._.file.v1~x.test12._.image.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.obj3a.resource.v1~"
+            "x.test12._.file.v1~x.test12._.image.v1~",
+            True,
+            "validate L3 schema",
         ),
     ]
 
@@ -1032,18 +955,11 @@ class TestCaseTestOp12TypeDerivationValidation_3Level_L2CompositionL3NestedObjec
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.obj3b.config.v1~"
-                    "x.test12._.app_config.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.obj3b.config.v1~"
+            "x.test12._.app_config.v1~",
+            True,
+            "validate L2 schema",
         ),
         Step(
             RunRequest("register L3 specifying the nested object")
@@ -1115,19 +1031,12 @@ class TestCaseTestOp12TypeDerivationValidation_3Level_L2CompositionL3NestedObjec
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L3 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.obj3b.config.v1~"
-                    "x.test12._.app_config.v1~"
-                    "x.test12._.mobile_config.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.obj3b.config.v1~"
+            "x.test12._.app_config.v1~"
+            "x.test12._.mobile_config.v1~",
+            True,
+            "validate L3 schema",
         ),
     ]
 
@@ -1188,18 +1097,11 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_Valid(HttpRunner)
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.hierarchy.entity.v1~"
-                    "x.test12._.document.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.hierarchy.entity.v1~"
+            "x.test12._.document.v1~",
+            True,
+            "validate level 2 schema",
         ),
         Step(
             RunRequest("register level 3 schema")
@@ -1239,18 +1141,11 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_Valid(HttpRunner)
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 3 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.hierarchy.entity.v1~"
-                    "x.test12._.document.v1~x.test12._.article.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.hierarchy.entity.v1~"
+            "x.test12._.document.v1~x.test12._.article.v1~",
+            True,
+            "validate level 3 schema",
         ),
     ]
 
@@ -1314,17 +1209,10 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_L3ViolatesL2(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.hier2.base.v1~x.test12._.medium.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.hier2.base.v1~x.test12._.medium.v1~",
+            True,
+            "validate level 2 schema",
         ),
         Step(
             RunRequest("register level 3 schema violating level 2")
@@ -1358,18 +1246,11 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_L3ViolatesL2(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 3 schema should fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.hier2.base.v1~"
-                    "x.test12._.medium.v1~x.test12._.bad_large.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.hier2.base.v1~"
+            "x.test12._.medium.v1~x.test12._.bad_large.v1~",
+            False,
+            "validate level 3 schema should fail",
         ),
     ]
 
@@ -1439,17 +1320,10 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_L3ViolatesL1(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.hier3.root.v1~x.test12._.branch.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.hier3.root.v1~x.test12._.branch.v1~",
+            True,
+            "validate level 2 schema",
         ),
         Step(
             RunRequest("register level 3 schema violating level 1")
@@ -1487,18 +1361,11 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_L3ViolatesL1(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 3 schema should fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.hier3.root.v1~"
-                    "x.test12._.branch.v1~x.test12._.bad_leaf.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.hier3.root.v1~"
+            "x.test12._.branch.v1~x.test12._.bad_leaf.v1~",
+            False,
+            "validate level 3 schema should fail",
         ),
     ]
 
@@ -1557,17 +1424,10 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_ConstraintCascade
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.cascade.message.v1~x.test12._.sms.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.cascade.message.v1~x.test12._.sms.v1~",
+            True,
+            "validate level 2 schema",
         ),
         Step(
             RunRequest("register level 3 schema with max 256")
@@ -1600,18 +1460,11 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_ConstraintCascade
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 3 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.cascade.message.v1~"
-                    "x.test12._.sms.v1~x.test12._.short_sms.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.cascade.message.v1~"
+            "x.test12._.sms.v1~x.test12._.short_sms.v1~",
+            True,
+            "validate level 3 schema",
         ),
     ]
 
@@ -1667,18 +1520,11 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_InvalidCascade(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.badcascade.field.v1~"
-                    "x.test12._.medium.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.badcascade.field.v1~"
+            "x.test12._.medium.v1~",
+            True,
+            "validate level 2 schema",
         ),
         Step(
             RunRequest("register level 3 schema with max 256")
@@ -1708,18 +1554,11 @@ class TestCaseTestOp12TypeDerivationValidation_3LevelHierarchy_InvalidCascade(
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate level 3 schema should fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.badcascade.field.v1~"
-                    "x.test12._.medium.v1~x.test12._.bad_large.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.badcascade.field.v1~"
+            "x.test12._.medium.v1~x.test12._.bad_large.v1~",
+            False,
+            "validate level 3 schema should fail",
         ),
         Step(
             RunRequest("validate level 3 schema should fail")
@@ -1817,18 +1656,11 @@ class TestCaseTestOp12_TypeChangeIntNumberInt(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L2 schema should fail - widens type")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.typechange.score.v1~"
-                    "x.test12._.float_score.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.typechange.score.v1~"
+            "x.test12._.float_score.v1~",
+            False,
+            "validate L2 schema should fail - widens type",
         ),
         Step(
             RunRequest("register L3 schema narrowing back to integer")
@@ -1859,19 +1691,12 @@ class TestCaseTestOp12_TypeChangeIntNumberInt(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L3 schema should also fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.typechange.score.v1~"
-                    "x.test12._.float_score.v1~"
-                    "x.test12._.int_score.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.typechange.score.v1~"
+            "x.test12._.float_score.v1~"
+            "x.test12._.int_score.v1~",
+            False,
+            "validate L3 schema should also fail",
         ),
     ]
 
@@ -1932,7 +1757,7 @@ class TestCaseTestOp12_TypeChangeStringToInt(HttpRunner):
             }},
             "register L2 changing string to integer",
         ),
-        _validate_type(
+        _validate_type_schema(
             ("gts.x.test12.typebreak.record.v1~"
              "x.test12._.bad_record.v1~"),
             False, "validate L2 should fail",
@@ -2053,7 +1878,7 @@ class TestCaseTestOp12_RequiredSubsetInOverlay(HttpRunner):
             },
             "register L2 with subset required",
         ),
-        _validate_type(
+        _validate_type_schema(
             ("gts.x.test12.reqsub.contact.v1~"
              "x.test12._.slim_contact.v1~"),
             True, "validate L2 should pass",
@@ -2087,7 +1912,7 @@ class TestCaseTestOp12_PatternConflict(HttpRunner):
             }},
             "register L2 with numeric pattern",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.pattern.code.v1~x.test12._.num_code.v1~",
             False, "validate L2 should fail",
         ),
@@ -2202,18 +2027,11 @@ class TestCaseTestOp12_ArrayTypeChange(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L2 schema")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.arrtype.tags.v1~"
-                    "x.test12._.short_tags.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
+        _validate_type_schema(
+            "gts.x.test12.arrtype.tags.v1~"
+            "x.test12._.short_tags.v1~",
+            True,
+            "validate L2 schema",
         ),
         Step(
             RunRequest("register L3 schema changing items to integer")
@@ -2249,19 +2067,12 @@ class TestCaseTestOp12_ArrayTypeChange(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate L3 schema should fail")
-            .post("/validate-type")
-            .with_json({
-                "type_id": (
-                    "gts.x.test12.arrtype.tags.v1~"
-                    "x.test12._.short_tags.v1~"
-                    "x.test12._.bad_tags.v1~"
-                )
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_type_schema(
+            "gts.x.test12.arrtype.tags.v1~"
+            "x.test12._.short_tags.v1~"
+            "x.test12._.bad_tags.v1~",
+            False,
+            "validate L3 schema should fail",
         ),
     ]
 
@@ -2401,7 +2212,7 @@ class TestCaseTestOp12_AdditionalPropertiesLoosened(HttpRunner):
             },
             "register derived setting AP true",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.ap.loose.v1~x.test12._.opened.v1~",
             False, "validate should fail - AP loosened",
         ),
@@ -2432,7 +2243,7 @@ class TestCaseTestOp12_AdditionalPropertiesOmitted(HttpRunner):
             },
             "register derived omitting AP",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.ap.omit.v1~x.test12._.no_ap.v1~",
             False, "validate should fail - AP omitted",
         ),
@@ -2468,7 +2279,7 @@ class TestCaseTestOp12_RequiredDroppedViaEmptyRequired(HttpRunner):
             },
             "register derived with empty required",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.req.drop.v1~x.test12._.empty_req.v1~",
             True, "validate should pass - empty overlay is ok",
         ),
@@ -2508,7 +2319,7 @@ class TestCaseTestOp12_RequiredFieldRemoval(HttpRunner):
             },
             "register derived removing required email",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.req.rm.v1~x.test12._.less_req.v1~",
             True, "validate should pass - allOf union keeps all",
         ),
@@ -2566,7 +2377,7 @@ class TestCaseTestOp12_EnumValueReplacement(HttpRunner):
             }},
             "register derived with enum [a, d]",
         ),
-        _validate_type(
+        _validate_type_schema(
             ("gts.x.test12.enumrepl.item.v1~"
              "x.test12._.replaced.v1~"),
             False,
@@ -2606,7 +2417,7 @@ class TestCaseTestOp12_RequiredPropertyGainsNullability(HttpRunner):
             }},
             "register derived allowing null for name",
         ),
-        _validate_type(
+        _validate_type_schema(
             ("gts.x.test12.nullable.rec.v1~"
              "x.test12._.null_name.v1~"),
             False,
@@ -2645,7 +2456,7 @@ class TestCaseTestOp12_PrimitiveTypeWidening(HttpRunner):
             }},
             "register derived widening to [string, number]",
         ),
-        _validate_type(
+        _validate_type_schema(
             ("gts.x.test12.typewiden.field.v1~"
              "x.test12._.wider.v1~"),
             False,
@@ -2690,7 +2501,7 @@ class TestCaseTestOp12_ConstViolatesMinimum(HttpRunner):
             }},
             "register derived with const 32",
         ),
-        _validate_type(
+        _validate_type_schema(
             ("gts.x.test12.constmin.val.v1~"
              "x.test12._.bad_const.v1~"),
             False,
@@ -3332,7 +3143,7 @@ class TestCaseOp12_CyclingRef_SelfReference(HttpRunner):
             },
             "register derived that refs itself",
         ),
-        _validate_type(
+        _validate_type_schema(
             (
                 "gts.x.test12.cycle.self.v1~"
                 "x.test12._.self_ref.v1~"
@@ -3400,7 +3211,7 @@ class TestCaseOp12_CyclingRef_TwoNodeCycle(HttpRunner):
             },
             "register node B referencing node A",
         ),
-        _validate_type(
+        _validate_type_schema(
             (
                 "gts.x.test12.cycle2.base.v1~"
                 "x.test12._.node_a.v1~"
@@ -3408,7 +3219,7 @@ class TestCaseOp12_CyclingRef_TwoNodeCycle(HttpRunner):
             False,
             "validate node A should fail - two-node cycle",
         ),
-        _validate_type(
+        _validate_type_schema(
             (
                 "gts.x.test12.cycle2.base.v1~"
                 "x.test12._.node_b.v1~"
@@ -3495,7 +3306,7 @@ class TestCaseOp12_CyclingRef_ThreeNodeCycle(HttpRunner):
             },
             "register node C referencing node A",
         ),
-        _validate_type(
+        _validate_type_schema(
             (
                 "gts.x.test12.cycle3.base.v1~"
                 "x.test12._.node_a.v1~"
@@ -3503,7 +3314,7 @@ class TestCaseOp12_CyclingRef_ThreeNodeCycle(HttpRunner):
             False,
             "validate node A should fail - three-node cycle",
         ),
-        _validate_type(
+        _validate_type_schema(
             (
                 "gts.x.test12.cycle3.base.v1~"
                 "x.test12._.node_b.v1~"
@@ -3511,7 +3322,7 @@ class TestCaseOp12_CyclingRef_ThreeNodeCycle(HttpRunner):
             False,
             "validate node B should fail - three-node cycle",
         ),
-        _validate_type(
+        _validate_type_schema(
             (
                 "gts.x.test12.cycle3.base.v1~"
                 "x.test12._.node_c.v1~"
@@ -3531,12 +3342,16 @@ class TestCaseOp12_FinalBase_RejectDerived(HttpRunner):
     """OP#12 / x-gts-final: Derived schema from a final base MUST fail validation.
 
     Base type declares x-gts-final: true. A derived schema referencing it
-    via allOf/$ref MUST be rejected by /validate-type.
+    via allOf/$ref MUST be rejected by /validate-type-schema.
     """
 
     config = Config("OP#12 x-gts-final: reject derived from final base").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.test12.final.base.v1~",
@@ -3560,7 +3375,7 @@ class TestCaseOp12_FinalBase_RejectDerived(HttpRunner):
             },
             "register derived from final base",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.final.base.v1~x.test12._.derived.v1~",
             False,
             "validate derived from final base should fail",
@@ -3577,6 +3392,10 @@ class TestCaseOp12_FinalMidChain(HttpRunner):
     config = Config("OP#12 x-gts-final: mid-chain final blocks derivation").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.test12.finalmid.base.v1~",
@@ -3611,7 +3430,7 @@ class TestCaseOp12_FinalMidChain(HttpRunner):
             },
             "register leaf C from final B",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.finalmid.base.v1~x.test12._.mid.v1~x.test12._.leaf.v1~",
             False,
             "validate C should fail - B is final",
@@ -3628,6 +3447,10 @@ class TestCaseOp12_FinalSiblingUnaffected(HttpRunner):
     config = Config("OP#12 x-gts-final: sibling of final is unaffected").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.test12.finalsib.base.v1~",
@@ -3659,7 +3482,7 @@ class TestCaseOp12_FinalSiblingUnaffected(HttpRunner):
             },
             "register C (sibling) from A",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.finalsib.base.v1~x.test12._.sibling_c.v1~",
             True,
             "validate C should pass - A is not final",
@@ -3668,7 +3491,7 @@ class TestCaseOp12_FinalSiblingUnaffected(HttpRunner):
 
 
 class TestCaseOp12_FinalBase_SelfValidationPasses(HttpRunner):
-    """OP#12 / x-gts-final: A final base type itself MUST pass /validate-type.
+    """OP#12 / x-gts-final: A final base type itself MUST pass /validate-type-schema.
 
     The final modifier restricts derivation, not the type's own validity.
     """
@@ -3676,6 +3499,10 @@ class TestCaseOp12_FinalBase_SelfValidationPasses(HttpRunner):
     config = Config("OP#12 x-gts-final: final base self-validation passes").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.test12.finalself.base.v1~",
@@ -3688,7 +3515,7 @@ class TestCaseOp12_FinalBase_SelfValidationPasses(HttpRunner):
             },
             "register final base schema",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.test12.finalself.base.v1~",
             True,
             "validate final base itself should pass",

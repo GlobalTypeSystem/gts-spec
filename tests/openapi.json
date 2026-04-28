@@ -175,17 +175,17 @@
         }
       }
     },
-    "/types": {
+    "/type-schemas": {
       "post": {
-        "summary": "Register a GTS Type by explicit type_id",
-        "operationId": "add_type_types_post",
+        "summary": "Register a GTS Type Schema under an explicit type_id",
+        "operationId": "add_type_schema_type_schemas_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/TypeRegister"
+                    "$ref": "#/components/schemas/TypeSchemaRegister"
                   }
                 ],
                 "title": "Body"
@@ -469,17 +469,17 @@
         }
       }
     },
-    "/validate-type": {
+    "/validate-type-schema": {
       "post": {
-        "summary": "Validate that a derived type correctly extends its base chain",
-        "operationId": "validate_type_validate_type_post",
+        "summary": "Validate that a derived GTS Type Schema correctly extends its base chain",
+        "operationId": "validate_type_schema_validate_type_schema_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "allOf": [
                   {
-                    "$ref": "#/components/schemas/ValidateTypeRequest"
+                    "$ref": "#/components/schemas/ValidateTypeSchemaRequest"
                   }
                 ],
                 "title": "Body"
@@ -495,7 +495,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "title": "Response Validate Type Validate Type Post"
+                  "title": "Response Validate Type Schema Validate Type Schema Post"
                 }
               }
             }
@@ -515,7 +515,7 @@
     },
     "/validate-entity": {
       "post": {
-        "summary": "Validate entity (instance or schema) by GTS ID",
+        "summary": "Validate entity (instance or type schema) by GTS Identifier",
         "operationId": "validate_entity_validate_entity_post",
         "requestBody": {
           "content": {
@@ -816,23 +816,23 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "TypeRegister": {
+      "TypeSchemaRegister": {
         "properties": {
           "type_id": {
             "type": "string",
             "title": "Type Id"
           },
-          "schema": {
+          "type_schema": {
             "type": "object",
-            "title": "Schema"
+            "title": "Type Schema"
           }
         },
         "type": "object",
         "required": [
           "type_id",
-          "schema"
+          "type_schema"
         ],
-        "title": "TypeRegister"
+        "title": "TypeSchemaRegister"
       },
       "ValidateInstanceRequest": {
         "properties": {
@@ -847,7 +847,7 @@
         ],
         "title": "ValidateInstanceRequest"
       },
-      "ValidateTypeRequest": {
+      "ValidateTypeSchemaRequest": {
         "properties": {
           "type_id": {
             "type": "string",
@@ -858,7 +858,7 @@
         "required": [
           "type_id"
         ],
-        "title": "ValidateTypeRequest"
+        "title": "ValidateTypeSchemaRequest"
       },
       "ValidateEntityRequest": {
         "properties": {

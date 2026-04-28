@@ -15,7 +15,7 @@ from .helpers.http_run_helpers import (
     register_instance as _register_instance,
     validate_entity as _validate_entity,
     validate_instance as _validate_instance,
-    validate_type as _validate_type,
+    validate_type_schema as _validate_type_schema,
 )
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -29,6 +29,10 @@ class TestCaseFinal_RejectDerivedSchema(HttpRunner):
     """x-gts-final: Derived schema from a final base MUST fail validation."""
 
     config = Config("final: reject derived schema").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.final.reject.v1~",
@@ -45,7 +49,7 @@ class TestCaseFinal_RejectDerivedSchema(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register derived from final",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.final.reject.v1~x.testfa._.derived.v1~",
             False,
             "validate derived should fail",
@@ -57,6 +61,10 @@ class TestCaseFinal_AllowWellKnownInstance(HttpRunner):
     """x-gts-final: Well-known instances of a final type MUST pass validation."""
 
     config = Config("final: allow well-known instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.final.inst.v1~",
@@ -93,6 +101,10 @@ class TestCaseFinal_AllowAnonymousInstance(HttpRunner):
     """
 
     config = Config("final: allow anonymous instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.final.anon.v1~",
@@ -131,6 +143,10 @@ class TestCaseFinal_MidChainFinal(HttpRunner):
     """
 
     config = Config("final: mid-chain final blocks derivation").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finalmid.base.v1~",
@@ -150,7 +166,7 @@ class TestCaseFinal_MidChainFinal(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register leaf C from final B",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.finalmid.base.v1~x.testfa._.mid.v1~x.testfa._.leaf.v1~",
             False,
             "validate C should fail - B is final",
@@ -165,6 +181,10 @@ class TestCaseFinal_SiblingUnaffected(HttpRunner):
     """
 
     config = Config("final: sibling unaffected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finalsib.base.v1~",
@@ -184,7 +204,7 @@ class TestCaseFinal_SiblingUnaffected(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register C (sibling) from A",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.finalsib.base.v1~x.testfa._.sibling_c.v1~",
             True,
             "validate C should pass - A is not final",
@@ -196,6 +216,10 @@ class TestCaseFinal_FalseIsNoop(HttpRunner):
     """x-gts-final: false behaves the same as absent — derivation allowed."""
 
     config = Config("final: false is noop").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finalfalse.base.v1~",
@@ -212,7 +236,7 @@ class TestCaseFinal_FalseIsNoop(HttpRunner):
             {"type": "object"},
             "register derived from final=false base",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.finalfalse.base.v1~x.testfa._.derived.v1~",
             True,
             "validate derived should pass - final=false is noop",
@@ -227,6 +251,10 @@ class TestCaseFinal_NonBooleanRejected(HttpRunner):
     """
 
     config = Config("final: non-boolean rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         Step(
             RunRequest("register schema with final='yes' should be rejected")
@@ -252,6 +280,10 @@ class TestCaseFinal_InInstanceRejected(HttpRunner):
     """
 
     config = Config("final: in instance rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finalininst.base.v1~",
@@ -289,6 +321,10 @@ class TestCaseAbstract_RejectDirectInstance(HttpRunner):
     """x-gts-abstract: Direct instance of abstract type MUST fail validation."""
 
     config = Config("abstract: reject direct instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.abs.reject.v1~",
@@ -323,6 +359,10 @@ class TestCaseAbstract_AllowDerivedSchema(HttpRunner):
     """x-gts-abstract: Derived schema from abstract type MUST pass validation."""
 
     config = Config("abstract: allow derived schema").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.abs.derive.v1~",
@@ -339,7 +379,7 @@ class TestCaseAbstract_AllowDerivedSchema(HttpRunner):
             {"type": "object", "properties": {"extra": {"type": "string"}}},
             "register concrete derived",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.abs.derive.v1~x.testfa._.concrete.v1~",
             True,
             "validate derived should pass",
@@ -354,6 +394,10 @@ class TestCaseAbstract_AllowInstanceOfConcreteDerived(HttpRunner):
     """
 
     config = Config("abstract: allow instance of concrete derived").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.abs.concinst.v1~",
@@ -398,6 +442,10 @@ class TestCaseAbstract_ChainOfAbstracts(HttpRunner):
     """
 
     config = Config("abstract: chain of abstracts").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.abs.chain.v1~",
@@ -454,6 +502,10 @@ class TestCaseAbstract_FalseIsNoop(HttpRunner):
     """x-gts-abstract: false behaves the same as absent — instances allowed."""
 
     config = Config("abstract: false is noop").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.absfalse.base.v1~",
@@ -481,6 +533,10 @@ class TestCaseAbstract_NonBooleanRejected(HttpRunner):
     """x-gts-abstract: Non-boolean value MUST be rejected on registration."""
 
     config = Config("abstract: non-boolean rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         Step(
             RunRequest("register schema with abstract=1 should be rejected")
@@ -503,6 +559,10 @@ class TestCaseAbstract_InInstanceRejected(HttpRunner):
     """x-gts-abstract: Schema-only keyword in an instance MUST be rejected."""
 
     config = Config("abstract: in instance rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.absininst.base.v1~",
@@ -533,6 +593,10 @@ class TestCaseAbstract_CombinedAnonInstanceRejected(HttpRunner):
     """x-gts-abstract: Combined anonymous instance of abstract type MUST fail."""
 
     config = Config("abstract: combined anon instance rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.absanon.base.v1~",
@@ -572,6 +636,10 @@ class TestCaseFinal_RegistrationGuardRejectsDerived(HttpRunner):
     """x-gts-final: Registration with ?validate=true MUST reject derived from final base."""
 
     config = Config("final: registration guard rejects derived").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finalreg.base.v1~",
@@ -605,6 +673,10 @@ class TestCaseAbstract_RegistrationGuardRejectsInstance(HttpRunner):
     """x-gts-abstract: Registration with ?validate=true MUST reject instance of abstract type."""
 
     config = Config("abstract: registration guard rejects instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.absreg.base.v1~",
@@ -646,6 +718,10 @@ class TestCaseFinal_InsideAllOfRejected(HttpRunner):
     """
 
     config = Config("final: inside allOf rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finalallof.base.v1~",
@@ -679,6 +755,10 @@ class TestCaseAbstract_InsideAllOfRejected(HttpRunner):
     """x-gts-abstract inside allOf MUST be rejected — keyword must be at top level."""
 
     config = Config("abstract: inside allOf rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.absallof.base.v1~",
@@ -717,6 +797,10 @@ class TestCaseInteraction_BothModifiersRejected(HttpRunner):
     """Both x-gts-final and x-gts-abstract on same schema MUST be rejected on registration."""
 
     config = Config("interaction: both modifiers rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         Step(
             RunRequest("register schema with both modifiers should be rejected")
@@ -744,6 +828,10 @@ class TestCaseInteraction_FinalWithTraitsFullyResolved(HttpRunner):
     """
 
     config = Config("interaction: final with traits fully resolved").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finaltrait.base.v1~",
@@ -773,7 +861,7 @@ class TestCaseInteraction_FinalWithTraitsFullyResolved(HttpRunner):
             "register final derived with traits resolved",
             top_level={"x-gts-final": True},
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.finaltrait.base.v1~x.testfa._.leaf.v1~",
             True,
             "validate final with resolved traits should pass",
@@ -789,6 +877,10 @@ class TestCaseInteraction_FinalWithTraitsMissing(HttpRunner):
     """
 
     config = Config("interaction: final with missing traits").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.finalmiss.base.v1~",
@@ -815,7 +907,7 @@ class TestCaseInteraction_FinalWithTraitsMissing(HttpRunner):
             "register final derived without resolving traits",
             top_level={"x-gts-final": True},
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.finalmiss.base.v1~x.testfa._.leaf.v1~",
             False,
             "validate final with missing required traits should fail",
@@ -831,6 +923,10 @@ class TestCaseInteraction_AbstractWithIncompleteTraitsOk(HttpRunner):
     """
 
     config = Config("interaction: abstract with incomplete traits ok").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         _register(
             "gts://gts.x.testfa.abstrait.base.v1~",
@@ -849,7 +945,7 @@ class TestCaseInteraction_AbstractWithIncompleteTraitsOk(HttpRunner):
             },
             "register abstract base with required trait (no default)",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.abstrait.base.v1~",
             True,
             "validate abstract with incomplete traits should pass",
@@ -865,6 +961,10 @@ class TestCaseInteraction_AbstractBaseFinalDerived(HttpRunner):
     """
 
     config = Config("interaction: abstract base + final derived").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         # Register abstract base
         _register(
@@ -892,7 +992,7 @@ class TestCaseInteraction_AbstractBaseFinalDerived(HttpRunner):
             top_level={"x-gts-final": True},
         ),
         # B is valid as a schema
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.absfinal.base.v1~x.testfa._.concrete.v1~",
             True,
             "validate B should pass",
@@ -918,7 +1018,7 @@ class TestCaseInteraction_AbstractBaseFinalDerived(HttpRunner):
             {"type": "object"},
             "attempt to derive from final B",
         ),
-        _validate_type(
+        _validate_type_schema(
             "gts.x.testfa.absfinal.base.v1~x.testfa._.concrete.v1~x.testfa._.sub.v1~",
             False,
             "validate derived from final B should fail",
