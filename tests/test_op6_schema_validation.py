@@ -873,6 +873,10 @@ class TestCaseOp6_AbstractType_RejectWellKnownInstance(HttpRunner):
     config = Config("OP#6 x-gts-abstract: reject well-known instance of abstract type").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         # Register abstract base schema
         Step(
@@ -927,6 +931,10 @@ class TestCaseOp6_AbstractType_RejectAnonInstance(HttpRunner):
     config = Config("OP#6 x-gts-abstract: reject anonymous instance of abstract type").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         # Register abstract base schema
         Step(
@@ -984,6 +992,10 @@ class TestCaseOp6_AbstractType_AllowInstanceOfConcreteDerived(HttpRunner):
     config = Config("OP#6 x-gts-abstract: allow instance of concrete derived type").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         # Register abstract base schema
         Step(
@@ -1060,6 +1072,10 @@ class TestCaseOp6_AbstractType_ValidateEntityRejectsInstance(HttpRunner):
     config = Config("OP#6 x-gts-abstract: validate-entity rejects instance of abstract type").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         # Register abstract base schema
         Step(
@@ -1115,6 +1131,10 @@ class TestCaseOp6_AbstractType_RejectCombinedAnonInstance(HttpRunner):
     config = Config("OP#6 x-gts-abstract: reject combined anonymous instance of abstract type").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        super().test_start()
+
     teststeps = [
         # Register abstract base schema
         Step(
