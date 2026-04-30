@@ -1138,7 +1138,7 @@ See additional GTS examples in the [examples folder](./examples/):
 
 ## 6. Implementation-defined and Non-goals
 
-This specification intentionally does not enforce several operational or governance choices. It is up to the implementation vendor to define policies and behavior for:
+This specification intentionally does not enforce lifecycle, operational or governance choices. It is up to the implementation vendor to define policies and behavior for:
 
 1. Whether a defined type is exported (published) and available for cross-vendor use via APIs or an event bus.
 2. Whether a given JSON/JSON Schema definition is mutable or immutable (e.g., handling an incompatible change without changing the minor or major version).
