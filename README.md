@@ -118,7 +118,7 @@ This specification uses the following terms with precise meanings:
 
 - **GTS Type**: a type entity identified by a GTS Type Identifier and defined by a GTS Type Schema. A GTS Type may exist as a standalone document (e.g., a `*.schema.json` file), be exchanged between systems, or be stored in a GTS Registry.
 - **GTS Type Identifier**: a canonical GTS identifier ending with `~` that identifies a GTS Type.
-- **GTS Type Schema**: the canonical definition of a GTS Type — a JSON Schema document annotated with the GTS vocabulary (`x-gts-*`), describing the type's instance shape, traits, metadata, compatibility rules, lifecycle, and relations.
+- **GTS Type Schema**: the canonical definition of a GTS Type — a JSON Schema document annotated with the GTS vocabulary (`x-gts-*`), describing the type's instance shape, traits, metadata, and relations.
 
   Implementations MAY accept alternative source forms (e.g., TypeSpec, YAML) provided they deterministically map to a canonical GTS Type Schema. The canonical form, used for interchange, validation, and registration, is the JSON Schema document.
 - **GTS Registry**: a registry that stores and resolves GTS entities — Type Schemas and well-known Instances — by GTS Identifier.
