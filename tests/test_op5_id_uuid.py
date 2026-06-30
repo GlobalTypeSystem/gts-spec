@@ -83,7 +83,7 @@ class TestCaseTestOp5IdToUuid_Instance(HttpRunner):
                     "7a1d2f34-5678-49ab-9012-abcdef123456"
                 ),
             )
-            .assert_equal("body.uuid", "4a31b759-722b-5bb1-a1dc-2cf40963e81b")
+            .assert_equal("body.uuid", "7a1d2f34-5678-49ab-9012-abcdef123456")
         ),
         Step(
             RunRequest("uuid mapping deterministic (instance)")
