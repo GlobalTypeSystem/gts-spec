@@ -92,6 +92,32 @@ class TestCaseTestOp4Wildcard_VersionWildcards(HttpRunner):
             .assert_equal("body.match", True)
         ),
         Step(
+            RunRequest("v0 minor wildcard matches only major version zero")
+            .get("/match-id-pattern")
+            .with_params(
+                **{
+                    "pattern": "gts.x.pkg.ns.type.v0.*",
+                    "candidate": "gts.x.pkg.ns.type.v0.2~",
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.match", True)
+        ),
+        Step(
+            RunRequest("v0 minor wildcard rejects a different major version")
+            .get("/match-id-pattern")
+            .with_params(
+                **{
+                    "pattern": "gts.x.pkg.ns.type.v0.*",
+                    "candidate": "gts.x.pkg.ns.type.v1.2~",
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.match", False)
+        ),
+        Step(
             RunRequest("wildcard pattern match (different major versions no match)")
             .get("/match-id-pattern")
             .with_params(
@@ -471,7 +497,7 @@ class TestCaseTestOp4WildcardMatch_Positive_2(HttpRunner):
             )
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.match", False)
+            .assert_equal("body.match", True)
         ),
         Step(
             RunRequest("wildcard match (pos 2)")
@@ -507,7 +533,7 @@ class TestCaseTestOp4WildcardMatch_Positive_3(HttpRunner):
             )
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.match", False)
+            .assert_equal("body.match", True)
         ),
         Step(
             RunRequest("wildcard match (pos 3)")
