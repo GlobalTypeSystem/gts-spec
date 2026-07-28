@@ -599,7 +599,7 @@
     },
     "/compatibility": {
       "get": {
-        "summary": "Check minor version compatibility",
+        "summary": "Check Type Schema evolution compatibility",
         "operationId": "compatibility_compatibility_get",
         "parameters": [
           {
@@ -628,6 +628,45 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "properties": {
+                    "old": {
+                      "type": "string"
+                    },
+                    "new": {
+                      "type": "string"
+                    },
+                    "backward_compatibility": {
+                      "type": "string",
+                      "enum": [
+                        "compatible",
+                        "incompatible",
+                        "unknown"
+                      ]
+                    },
+                    "forward_compatibility": {
+                      "type": "string",
+                      "enum": [
+                        "compatible",
+                        "incompatible",
+                        "unknown"
+                      ]
+                    },
+                    "full_compatibility": {
+                      "type": "string",
+                      "enum": [
+                        "compatible",
+                        "incompatible",
+                        "unknown"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "old",
+                    "new",
+                    "backward_compatibility",
+                    "forward_compatibility",
+                    "full_compatibility"
+                  ],
                   "title": "Response Compatibility Compatibility Get"
                 }
               }

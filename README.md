@@ -1,5 +1,5 @@
-<!-- gts-spec-version: 0.12 -->
-> **VERSION**: GTS specification draft, version 0.12
+<!-- gts-spec-version: 0.13 -->
+> **VERSION**: GTS specification draft, version 0.13
 
 # Global Type System (GTS) Specification
 
@@ -61,12 +61,14 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
   - [3.5 Access control with wildcards](#35-access-control-with-wildcards)
   - [3.6 Access Control Implementation Notes](#36-access-control-implementation-notes)
   - [3.7 Well-known and Anonymous Instances](#37-well-known-and-anonymous-instances)
-- [4. GTS Identifier Versions Compatibility](#4-gts-identifier-versions-compatibility)
-  - [4.1 Compatibility Modes](#41-compatibility-modes)
-  - [4.2 JSON Schema Content Models](#42-json-schema-content-models)
-  - [4.3 Compatibility Rules for GTS Type Schemas](#43-compatibility-rules-for-gts-type-schemas)
-  - [4.4 GTS Versions Compatibility Examples](#44-gts-versions-compatibility-examples)
-  - [4.5 Best Practices for GTS Type Schema Evolution](#45-best-practices-for-gts-type-schema-evolution)
+- [4. Type Derivation and Schema Evolution](#4-type-derivation-and-schema-evolution)
+  - [4.1 Type Derivation Compatibility](#41-type-derivation-compatibility)
+  - [4.2 Type Schema Evolution Compatibility](#42-type-schema-evolution-compatibility)
+  - [4.3 Compatibility Modes](#43-compatibility-modes)
+  - [4.4 JSON Schema Content Models](#44-json-schema-content-models)
+  - [4.5 Type Schema Evolution Compatibility Rules](#45-type-schema-evolution-compatibility-rules)
+  - [4.6 Compatibility Examples](#46-compatibility-examples)
+  - [4.7 Best Practices for GTS Type Schema Evolution](#47-best-practices-for-gts-type-schema-evolution)
 - [5. Typical Use-cases](#5-typical-use-cases)
   - [5.1 Practical Benefits for Service and Platform Vendors](#51-practical-benefits-for-service-and-platform-vendors)
   - [5.2 Example: Multi-vendor Event Management Platform](#52-example-multi-vendor-event-management-platform)
@@ -113,6 +115,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 | 0.10 | BREAKING: terminology unified around GTS Type / GTS Instance; rename API fields `schema_id` → `type_id` (also `old_schema_id`/`new_schema_id`/`to_schema_id`/`selected_schema_id_field`); rename API field `is_schema` → `is_type` (type-definition vs instance discriminator); `type_id` MUST be a GTS Type Identifier or `null` — no longer falls back to JSON Schema dialect URL; rename endpoints `/validate-schema` → `/validate-type`, `/schemas` → `/types`; rename OP#12 'Schema vs Schema Validation' → 'Type Derivation Validation'; rename OpenAPI components `ValidateSchemaRequest` → `ValidateTypeRequest`, `SchemaRegister` → `TypeRegister`; rename example directories `examples/**/schemas/` → `examples/**/types/` (file extensions `.schema.json` retained); add Terminology section |
 | 0.11 | Introduce term **GTS Type Schema** as the canonical definition of a GTS Type; remove the standalone `Schema` term from Terminology; rewrite `GTS Type` entry to name the abstract registered entity; rename `GTS Type Registry` → `GTS Registry` (registry now scopes both Type Schemas and well-known Instances). **Conformance tests for reference implementations** also updated: rename API endpoints `/validate-type` → `/validate-type-schema` and `/types` → `/type-schemas`; rename OpenAPI components `TypeRegister` → `TypeSchemaRegister`, `ValidateTypeRequest` → `ValidateTypeSchemaRequest`; rename request field `TypeSchemaRegister.schema` → `TypeSchemaRegister.type_schema`; rename helper `validate_type` → `validate_type_schema`. |
 | 0.12 | BREAKING: reframe GTS Type Schemas as a dialect-agnostic JSON Schema extension; the prior `$defs MUST NOT` and post-Draft-07-keyword restrictions are dropped; derivation compatibility and the finality guard use the chained `$id` alone, `allOf`+`$ref` recommended but not required (ADR-0001). `x-gts-traits-schema` becomes a JSON Schema subschema (object/`true`/`false`); the registry chain-aggregates declarations along the `$id` chain via `allOf` (ADR-0002). Trait completeness is keyed on `x-gts-abstract` and enforced on non-abstract types against the materialized effective traits object (ADR-0003). Trait-value merge follows JSON Merge Patch (RFC 7396); cross-descendant locking moves to standard JSON Schema `const` in `x-gts-traits-schema` (ADR-0004). The four document-level keywords (`x-gts-final`, `x-gts-abstract`, `x-gts-traits-schema`, `x-gts-traits`) MUST appear at the schema top level and are rejected (fail fast) when nested in a subschema (§9.7.1, §9.11). |
+| 0.13 | CORRECTION: Define compatibility through accepted-instance-set inclusion (§4.3) and separate **Type Derivation Compatibility** (§4.1, one-way) from **Type Schema Evolution Compatibility** (§4.2). This corrects OP#8 verdicts for unchanged inputs — notably for open content models, enums, and `const` identifier fields; implementations targeting 0.12 may need to update their compatibility checker. OP#8 reports the tri-state `compatible`, `incompatible`, or `unknown` for each relation, preserving an inconclusive check instead of conflating it with incompatibility. Tolerant-reader, casting, and default-materialization guarantees MUST be reported separately (§4.3). Content models are classified on the resolved effective schema, not on `additionalProperties` alone (§4.4). §4 restructured and renumbered; later sections unchanged. OP#8 conformance tests updated. |
 
 ## Terminology
 
@@ -147,7 +150,7 @@ The primary value of GTS is to provide a single, universal identifier that is im
 
 **Inheritance and Conformance Lineage**: The chained identifier system provides a robust, first-class mechanism for expressing type derivation and instance conformance. This is critical for ecosystems where third-parties must safely extend core types while guaranteeing compatibility with the base schema.
 
-**Built-in Version Compatibility**: By adopting a constrained Semantic Versioning model, GTS inherently supports automated compatibility checking across minor versions. This simplifies data casting (upcast/downcast), allowing consumers to safely process data from newer schema versions without breaking.
+**Built-in Compatibility Checking**: By adopting a constrained Semantic Versioning model, GTS supports automated schema-compatibility checking between successive definitions of a type identity. Casting and application-level processing remain separate operational contracts.
 
 ### 1.3 Simplifying Policy and Tooling
 
@@ -326,9 +329,10 @@ GTS identifiers may be chained (e.g. `gts.A~B~C`). Validation MUST respect the l
 
 - **`additionalProperties` and adding new properties**:
   - If a base schema (or any schema in the inheritance chain) defines an object with `additionalProperties: false`, then derived schemas MUST NOT introduce new properties at that object level that would be rejected by the base schema.
-  - Derived schemas MAY still tighten constraints of existing properties (e.g. reduce `maxLength`, narrow `enum`, increase `minimum`) and MAY further specify previously-open nested objects (e.g. base `payload: {"type":"object"}` and derived defines `payload.properties`).
+  - Derived schemas MAY still tighten constraints of existing properties (e.g. reduce `maxLength`, narrow `enum`, increase `minimum`) and MAY further specify previously-open nested objects (e.g. base `payload: {"type":"object"}` and derived defines `payload.properties`). They MAY also introduce a property at a partially open level when the property's name and every value allowed by its schema satisfy the base level's undeclared-property constraints.
+  - Because a closed object blocks new derived properties at that level while open and partially open models have different in-place evolution trade-offs (§4.5), the choice of content model is a deliberate authoring decision. See §4.4.1 for the trade-off and for the recommended closed-envelope/open-container shape.
 
-3. **Version Compatibility Checking**: Automatically determine if schemas with different MINOR versions are compatible (see section 4).
+3. **Type Schema Evolution Compatibility Checking**: Automatically determine whether successive definitions of one type identity are compatible (see section 4).
 
 4. **Access Control Policies**: Build fine-grained or coarse-grained authorization rules using:
    - Exact identifier matching
@@ -348,14 +352,14 @@ GTS chained identifiers express type derivation through **left-to-right inherita
 
 - Type `B` extends type `A` by adding constraints or refining field definitions
 - Type `C` further extends type `B` in the same manner
-- Each derived type MUST be **fully compatible** with its predecessor (see section 4.3)
+- Each derived type MUST satisfy **Type Derivation Compatibility** with its predecessor (§3.1, §4.1)
 
-**Compatibility guarantee**: Every valid instance of a derived type is also a valid instance of all its base types in the chain. This means:
+**Derivation compatibility guarantee**: Every valid instance of a derived type is also a valid instance of all its base types in the chain. This is a one-way relation, not version compatibility in the sense of §4.3. This means:
 - An instance conforming to `C` also conforms to `B` and `A`
 - Validation against the rightmost type automatically ensures conformance to all base types
-- Derived types can only add optional fields (in open models), tighten constraints, or provide more specific definitions—never break base type contracts
+- Derived types can declare and constrain properties the base left open, tighten existing constraints, or provide more specific definitions—never loosen what a base accepts
 
-This inheritance model enables safe extensibility: third-party vendors can extend platform base types while maintaining full compatibility with the core system.
+This inheritance model enables safe extensibility: third-party vendors can extend platform base types while preserving conformance to the core system.
 
 **Schema modifiers**: Schemas may optionally declare `"x-gts-final": true` to prohibit further derivation, or `"x-gts-abstract": true` to require that instances use a concrete derived type rather than the base type directly. See section 9.11 for full semantics.
 
@@ -521,7 +525,7 @@ The following guidance is provided for implementers building GTS-aware policy en
 **Evaluation guidelines:**
 - **Deny-over-allow (recommended)**: If your engine supports explicit denies, process them before allows to prevent privilege escalation.
 - **Most-specific wins**: Prefer the most specific matching rule (longest concrete prefix, fewest wildcards, most predicates).
-- **Version safety**: Consider pinning MAJOR and, optionally, MINOR versions in sensitive paths; otherwise rely on minor-version compatibility guarantees (see section 4).
+- **Version safety**: Consider pinning MAJOR and, optionally, MINOR versions in sensitive paths; otherwise rely on Type Schema Evolution Compatibility guarantees (see section 4).
 - **Tenant isolation**: Use vendor/package scoping to isolate tenants and applications; avoid cross-vendor wildcards unless explicitly required.
 
 **Performance guidelines:**
@@ -575,84 +579,170 @@ Example:
 }
 ```
 
-## 4. GTS Identifier Versions Compatibility
+## 4. Type Derivation and Schema Evolution
 
-GTS uses semantic versioning with MAJOR and optional MINOR components. This section covers two distinct compatibility concepts:
+GTS defines two distinct compatibility relations. They hold between different pairs of schemas, run in opposite directions, and therefore permit opposite changes. Conflating them is the most common source of error when reasoning about a GTS type.
 
-**1. Type Derivation Compatibility** (via chaining): A derived type like `gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~` must be **always fully compatible** with its base type `gts.x.core.events.type.v1~`. Derived types refine base types by adding constraints or specifying fields left open (e.g., `payload` as `object` with `additionalProperties: true`).
+Compatibility is determined by comparing which JSON instances each schema accepts. In the table below, `Valid(S)` means all JSON instances accepted by schema `S` under the JSON Schema dialect declared by that schema (§4.3).
 
-**2. Minor Version Compatibility** (same type, different versions): When evolving a single type across minor versions (e.g., `v1.0` → `v1.1` → `v1.2`), compatibility depends on the chosen strategy:
+| | Type Derivation Compatibility (§4.1) | Type Schema Evolution Compatibility (§4.2) |
+|---|---|---|
+| Holds between | a derived type and each of its base types | successive definitions of one type identity |
+| Relation | `Valid(derived) ⊆ Valid(base)` | selected mode: backward, forward, or full (§4.3) |
+| Direction | one-way, always | chosen per type identity |
+| Permits | declaring properties a base left open, tightening constraints | depends on the selected mode |
+
+§4.3 defines the backward, forward, and full modes using this notation.
+
+### 4.1 Type Derivation Compatibility
+
+A derived type such as `gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~` must satisfy **Type Derivation Compatibility** with its base type `gts.x.core.events.type.v1~`: every instance valid against the derived schema must also be valid against the base schema, that is `Valid(derived) ⊆ Valid(base)`.
+
+This relation is one-way and unconditional. It is not selected per type and is never qualified by a mode name: a derived type is not "backward" or "fully" compatible with its base, it either satisfies Type Derivation Compatibility or it does not.
+
+The normative validation rules for derivation, including which changes a derived schema may make and the `additionalProperties` restriction, are given in §3.1. §3.2 describes the resulting inheritance model.
+
+### 4.2 Type Schema Evolution Compatibility
+
+GTS uses semantic versioning with MAJOR and optional MINOR components. When a single type identity gains a new definition, the required guarantee depends on the chosen strategy.
+
+Two shapes are permitted, and §6 leaves the choice between them to the implementation:
+
+* **A new MINOR version.** The previous definition remains addressable under its own GTS Type Identifier and the successor takes the next minor, for example `v1.0` → `v1.1`. Because both definitions are addressable, OP#8 and the registry contract can check them directly.
+* **Replacement under the same identifier.** The implementation treats the definition as mutable, which §6 lists as implementation-defined, and publishes the new definition under an unchanged identifier. Where the identifier carries no minor version at all, which §2.1 permits, whether the new MINOR strategy is available instead depends on registry policy: this specification does not define the relationship between a definition published under `v1~` and definitions published under `v1.0~`, `v1.1~`, and so on.
+
+The compatibility relation is the same in both shapes. It holds between two schema definitions and does not depend on how they are addressed. What differs is addressability: where a definition is replaced in place, the two definitions are not simultaneously addressable by GTS Type Identifier, so the conformance API cannot express the check and the implementation is responsible for its own revision addressing and history semantics.
+
+Replacing a base definition in place under an unchanged identifier may also change the effective schemas of every descendant that resolves that identifier. Because definition mutability is implementation-defined (§6), an implementation that permits this must define whether it revalidates descendants, invalidates them, or prevents the replacement while dependants exist. Publishing a distinct MINOR base identifier does not retroactively alter descendants that remain bound to the previous identifier.
 
 - **MAJOR version increments** (v1 → v2): Always indicate breaking changes
-- **MINOR version increments** (v1.0 → v1.1): Must maintain compatibility according to one of three strategies: backward, forward, or full compatibility
+- **Successive definitions within one MAJOR** (a new MINOR version, or a new revision of the same identifier): Must maintain compatibility according to one of three strategies: backward, forward, or full compatibility
 
-The compatibility mode for minor version evolution is **implementation-defined** and can vary depending on system component implementing the API or DB storage, namespace or use case. For example:
+The compatibility mode for Type Schema evolution is **implementation-defined** and can vary depending on system component implementing the API or DB storage, namespace or use case. For example:
 - Event schemas might use **forward compatibility** (old consumers can read new events)
 - API request payloads might use **backward compatibility** (new servers can process old requests)
 - Configuration schemas might require **full compatibility** (any version can read any other)
 
-### 4.1 Compatibility Modes
+### 4.3 Compatibility Modes
 
-Before we dig deeper into the GTS versions compatibility, let's first define the different compatibility modes:
+`Valid(S)` means all JSON instances accepted by schema `S` under the JSON Schema dialect declared by that schema. The compatibility modes compare what the old and new schemas accept:
 
-**Backward Compatibility**: A consumer with the **new schema** can process data produced with an **old schema**.
-- **Use case**: Consumers are updated after producers (e.g., API clients updated before servers).
-- **Guarantee**: New code can read old data.
+**Backward Compatibility**: `Valid(old) ⊆ Valid(new)`. A consumer validating with the **new schema** accepts every instance valid under the **old schema**.
+- **Use case**: Consumers can be updated before producers (e.g., API servers before clients for request payloads).
+- **Validation consequence**: the new schema validates every instance that was valid under the old schema. Whether code compiled against the new schema can *process* old data is an operational property outside this relation.
 
-**Forward Compatibility**: A consumer with the **old schema** can process data produced with a **new schema**.
+**Forward Compatibility**: `Valid(new) ⊆ Valid(old)`. A consumer validating with the **old schema** accepts every instance valid under the **new schema**.
 - **Use case**: Producers are updated before consumers, or to support rollback scenarios.
-- **Guarantee**: Old code can read new data.
+- **Validation consequence**: the old schema validates every instance that is valid under the new schema. Whether code compiled against the old schema can *process* new data is an operational property outside this relation.
 
-**Full Compatibility**: Changes are both backward and forward compatible.
+**Full Compatibility**: `Valid(old) = Valid(new)`. Changes are both backward and forward compatible.
 - **Use case**: Producers and consumers can be deployed in any order.
-- **Guarantee**: Maximum safety but most restrictive evolution path.
+- **Validation consequence**: both schemas validate exactly the same instances, so no deployment order can produce a validation failure caused by the schema change. Whether application code behaves identically under both definitions is an operational property outside this relation. This is the safest but most restrictive evolution path.
 
-> **Implementation note**: The exact compatibility mode is implementation-defined and outside the scope of this specification. Systems may enforce different modes for different identifier namespaces
+JSON Schema annotation keywords such as `description`, `examples`, and `default` do not change `Valid(S)`. In particular, `default` does not insert a missing property during JSON Schema validation. An application may materialize defaults as a separate processing step, but compatibility results that rely on that behavior MUST identify it as an additional runtime contract.
 
-### 4.2 JSON Schema Content Models
+> **Implementation note**: The compatibility mode enforced for publication is implementation-defined and outside the scope of this specification. Systems may enforce different modes for different identifier namespaces. Implementations MAY additionally certify operational compatibility based on a constrained producer model, tolerant readers, casting, or default materialization, but MUST report that separately from the schema compatibility defined above.
 
-Understanding `additionalProperties` is critical for compatibility:
+### 4.4 JSON Schema Content Models
 
-- **Open content model**: `additionalProperties` is `true` or not specified. The schema accepts fields not explicitly defined.
-- **Closed content model**: `additionalProperties` is `false`. The schema rejects any fields not explicitly defined.
+Whether an object accepts undeclared properties is critical for compatibility. The content model is a property of the **fully resolved effective schema** at one object level — after `$ref` resolution and `allOf` composition — not of a single keyword in the authored document:
+
+- **Open content model**: the resolved schema accepts an undeclared property with any value.
+- **Closed content model**: the resolved schema rejects every undeclared property.
+- **Partially open content model**: the resolved schema accepts some undeclared property names or constrains their values, for example through a nontrivial constraining schema-valued `additionalProperties`, `patternProperties`, or `propertyNames`.
+
+`additionalProperties` is the usual way to set this, but it is not the only one. Because GTS is dialect-agnostic (§11), `unevaluatedProperties` can close an object whose `additionalProperties` is omitted, and a conjunctive subschema reached through `allOf` or `$ref` can close a level that looks open in isolation. A nontrivial constraining schema-valued `additionalProperties` can make the level partially open; a subschema equivalent to `true` (for example `{}`) or `false` (for example `{"not": {}}`) instead contributes a fully open or closed model, respectively, unless another constraint changes the effective result. Implementations MUST classify the level from the resolved effective schema.
+
+The rules below are stated for the open and closed cases. They apply only where no other keyword constrains undeclared properties at that level; for a partially open level, compare directly which JSON instances the old and new schemas accept under §4.3 rather than reading a verdict off the table.
 
 These models affect which changes are safe:
-- Adding a field to a **closed** model is backward compatible (old data has no extra fields; new consumers handle absence).
-- Adding/removing optional fields in an **open** model is fully compatible (open consumers accept any fields; optional fields can be absent).
+- Adding an **optional** field to a **closed** model is backward compatible (old instances carry no extra fields, and the new schema accepts the field's absence). Adding a **required** field is not backward compatible in either content model.
+- Adding an optional property schema to an **open** model is forward compatible but not necessarily backward compatible: the old schema may have accepted arbitrary values under that property name which the new property schema rejects.
+- Removing an optional property schema from an **open** model is backward compatible but not necessarily forward compatible: the new schema permits arbitrary values under that property name which the old property schema may reject.
 
-### 4.3 Compatibility Rules for GTS Type Schemas
+A producer convention such as “do not emit undeclared properties”, combined with readers that safely ignore unknown fields, can make these open-model changes operationally safe in both deployment directions. That is a tolerant-reader contract, not full JSON Schema compatibility.
 
-The table below shows which schema changes between minor versions of the same type are safe for each compatibility mode.
+#### 4.4.1 Content Model, Derivation, and Evolution
 
-> NOTE: The table below illustrates the compatibility rules for GTS Type Schemas of the same type, but different versions. The derived types are always fully compatible with the base type.
+The content model of an object level serves two different goals, and at that same level the two goals pull in opposite directions:
+
+- **Extension by derivation** (§3.1, *`additionalProperties` and adding new properties*): a closed effective content model prevents derived types from introducing new properties at that object level. A fully open model permits such additions, while a partially open model permits them when each introduced property name and every value accepted by its derived property schema are also accepted as undeclared by the base model. For example, a base with `additionalProperties: {"type": "string"}` permits a derived declaration `foo: {"type": "string", "maxLength": 5}`.
+- **Type Schema evolution** (§4.2): by the open-model rule above, adding an optional property to an open object is not necessarily backward compatible — the old schema already accepted arbitrary values under that name. Adding optional properties in place therefore works most cleanly when the object is closed.
+
+Both goals are legitimate and neither content model is wrong. The choice is an authoring decision to make per object level:
+
+| What should happen at this object level | Content model that supports it |
+|---|---|
+| Derived types introduce their own properties here | open, or partially open with compatible property names and schemas |
+| Later definitions of this type add optional properties here | closed |
+| Both | separate the levels — see the recommended pattern below |
+| Neither; the shape is stable | either, though closed states the intent more precisely |
+
+**Recommended pattern: closed envelope with designated open containers.** When a type should be both derivable and evolvable, the two goals need not be traded off against each other — they can be assigned to different object levels. The type closes its own top level and declares one or more explicitly open objects as extension points:
+
+```jsonc
+{
+  "$id": "gts://gts.x.core.events.type.v1~",
+  "type": "object",
+  "required": ["id", "type", "timestamp"],
+  "properties": {
+    "id": { "type": "string" },
+    "type": { "type": "string" },
+    "timestamp": { "type": "integer" },
+    "payload": { "type": "object", "additionalProperties": true }
+  },
+  "additionalProperties": false
+}
+```
+
+The closed top level lets later definitions add optional envelope properties backward compatibly. The open `payload` lets derived types describe their own content without being rejected by the base. The base event schema in §4.6.2 and the examples in §5.2 use this shape.
+
+A derived type MAY also declare the contents of an open container and close it: closing an open object makes the schema accept fewer instances, so it satisfies Type Derivation Compatibility, and §3.1 restricts only the *addition* of properties at a level a base has already closed. Having closed that level, the derived type regains in-place evolvability there, at the cost that its own descendants can no longer add properties there.
+
+This is a recommendation, not a requirement; other content model choices remain valid. What matters is that the interaction is decided when the type is first published, rather than discovered at the first successive definition that fails a compatibility check.
+
+### 4.5 Type Schema Evolution Compatibility Rules
+
+The table below shows which schema changes between successive definitions of the same type identity are safe for each compatibility mode. It states the typical consequences of §4.3; §4.3 remains the normative definition, and a verdict that disagrees with a direct comparison of the accepted-instance sets is resolved in favour of §4.3.
+
+The table assumes the object level in question is fully open or fully closed as defined in §4.4; for a partially open level, compare directly which JSON instances the old and new schemas accept. It further assumes that both schemas are satisfiable, that the listed change is the only semantic difference between the two definitions, that no other constraint masks it, and that it does in fact change the set of accepted instances. Where those assumptions do not hold, a `❌ No` verdict means "not guaranteed" rather than "impossible": adding an optional property whose subschema is `true` to an open object, or one whose subschema is `false` to a closed object, changes no accepted instance at all and is therefore fully compatible.
+
+> NOTE: The table below illustrates Type Schema Evolution Compatibility, between successive definitions of one type identity. Type Derivation Compatibility is a separate relation, defined in §3.1 and §4.
+
+Rows are grouped by the kind of change, so that variants of one change — open versus closed content model, optional versus required property, widening versus narrowing — sit next to each other and the difference in verdicts is visible at a glance.
 
 | Change | Backward | Forward | Full | Notes |
 |--------|----------|---------|------|-------|
-| **Adding optional property (open model)** | ✅ Yes | ✅ Yes | ✅ Yes | Old consumers ignore new fields (open model accepts any fields). New consumers handle absence of optional field. |
-| **Removing optional property (open model)** | ✅ Yes | ✅ Yes | ✅ Yes | New consumers ignore the removed field in old data (open model accepts any fields). Old consumers handle absence of optional field. |
 | **Updating description/examples** | ✅ Yes | ✅ Yes | ✅ Yes | Documentation changes don't affect validation. |
-| **Updating minor version of referenced GTS types** | ✅ Yes | ✅ Yes | ✅ Yes | Assumes referenced types follow same compatibility rules. |
-| **Adding optional property (closed model)** | ✅ Yes | ❌ No | ❌ No | Old data lacks the field; new consumers handle absence. Old consumers reject new data with extra fields. |
-| **Changing required property to optional** | ✅ Yes | ❌ No | ❌ No | New consumers handle absence. Old data always provides it. |
-| **Removing enum value** | ✅ Yes | ❌ No | ❌ No | New consumers handle remaining values. Old data may use removed value. |
-| **Widening numeric type (int → number)** | ✅ Yes | ❌ No | ❌ No | Old data (integers) is subset of new type. Old consumers may not handle floats. |
-| **Relaxing constraints (e.g., increasing max)** | ✅ Yes | ❌ No | ❌ No | Old data satisfies looser constraints. Old consumers reject values outside old limits. |
-| **Removing optional property (closed model)** | ❌ No | ✅ Yes | ❌ No | Old consumers expect the field may be absent. New data won't have it. |
-| **Changing optional property to required** | ❌ No | ✅ Yes | ❌ No | Old consumers don't expect it to be required. New data always provides it. |
-| **Adding new enum value** | ❌ No | ✅ Yes | ❌ No | Old data uses existing values. New consumers handle new values. Old consumers reject unknown values. |
-| **Narrowing numeric type (number → int)** | ❌ No | ✅ Yes | ❌ No | New consumers accept integers only. Old data may contain floats. |
-| **Tightening constraints (e.g., decreasing max)** | ❌ No | ✅ Yes | ❌ No | New consumers enforce stricter rules. Old data may violate new constraints. |
-| **Adding new required property** | ❌ No | ❌ No | ❌ No | Breaking change: old data lacks the field, new consumers require it. |
-| **Removing required property** | ❌ No | ❌ No | ❌ No | Breaking change: old data has the field, new consumers don't expect it. |
+| **Updating a referenced GTS type** | Depends | Depends | Depends | Compare the effective resolved schemas. The verdict does not follow from the compatibility of the referenced targets alone: a surrounding constraint can mask a difference between them. |
+| **Adding optional property (open model)** | ❌ No | ✅ Yes | ❌ No | The old open schema accepts every value allowed by the new property schema, but may have accepted incompatible values under the same name. |
+| **Adding optional property (closed model)** | ✅ Yes | ❌ No | ❌ No | Every old instance omits the property and the new schema accepts its absence. The old closed schema rejects a new instance that carries it. |
+| **Adding new required property (open model)** | ❌ No | ✅ Yes | ❌ No | Old instances may lack the property; every new instance includes a value accepted by the old open schema. |
+| **Adding new required property (closed model)** | ❌ No | ❌ No | ❌ No | Old instances may lack the property and the old closed schema rejects the new property. |
+| **Removing optional property (open model)** | ✅ Yes | ❌ No | ❌ No | The new open schema accepts old values, but it may now accept values for that property which the old property schema rejected. |
+| **Removing optional property (closed model)** | ❌ No | ✅ Yes | ❌ No | The new closed schema rejects an old instance that carries the property. Every new instance omits it and the old schema accepts its absence. |
+| **Removing required property definition (open model)** | ✅ Yes | ❌ No | ❌ No | The new open schema accepts old instances, but may omit the property or accept values the old definition rejected. |
+| **Removing required property definition (closed model)** | ❌ No | ❌ No | ❌ No | New closed schema rejects old instances containing the property; new instances may omit a property required by the old schema. |
+| **Closing an open object (`additionalProperties: true` → `false`)** | ❌ No | ✅ Yes | ❌ No | The new schema rejects the undeclared properties an old instance may carry. Every new instance is valid under the more permissive old schema. |
+| **Opening a closed object (`additionalProperties: false` → `true`)** | ✅ Yes | ❌ No | ❌ No | The new schema accepts every old instance. The old closed schema rejects a new instance that carries an undeclared property. |
+| **Changing required property to optional** | ✅ Yes | ❌ No | ❌ No | Every old instance provides the property and the new schema still accepts it. The old schema rejects the new instances that omit it. |
+| **Changing optional property to required** | ❌ No | ✅ Yes | ❌ No | An old instance may omit the property, which the new schema rejects. Every new instance provides it and the old schema accepts it. |
+| **Adding new enum value** | ✅ Yes | ❌ No | ❌ No | The new enum accepts every old value. The old enum rejects the added value. |
+| **Removing enum value** | ❌ No | ✅ Yes | ❌ No | Old data may contain the removed value, while every new value remains valid for the old enum. |
+| **Changing a `const` value (e.g. an identity field)** | ❌ No | ❌ No | ❌ No | The two `const` values differ, so no instance that carries the constrained property satisfies both schemas; where the property is required, the two schemas share no valid instance at all. OP#9 casting may rewrite such a field, which MUST be reported separately from schema compatibility (§4.6.3). |
+| **Widening numeric type (int → number)** | ✅ Yes | ❌ No | ❌ No | Every integer is valid under `number`. The old schema rejects the non-integer values the new schema now admits. |
+| **Narrowing numeric type (number → int)** | ❌ No | ✅ Yes | ❌ No | The old schema accepts every integer. The new schema rejects the non-integer values the old schema admitted. |
+| **Relaxing constraints (e.g., increasing max)** | ✅ Yes | ❌ No | ❌ No | Every instance valid under the tighter old constraint stays valid. The old schema rejects the values only the relaxed constraint admits. |
+| **Tightening constraints (e.g., decreasing max)** | ❌ No | ✅ Yes | ❌ No | The old schema accepts every instance valid under the tightened constraint. The new schema rejects old values outside the new limits. |
 | **Renaming property** | ❌ No | ❌ No | ❌ No | Breaking change: equivalent to remove + add. |
 | **Changing property type (incompatible)** | ❌ No | ❌ No | ❌ No | Breaking change unless using union types. |
 
 
-### 4.4 GTS Versions Compatibility Examples
+### 4.6 Compatibility Examples
 
-This section demonstrates how different types of schema changes affect compatibility between minor versions of the same GTS type. We take as example Event Management system and typical events structure, however it can be used for any other data schemas in the system
+This section demonstrates how different types of schema changes affect compatibility between successive definitions of the same GTS type. We take as example Event Management system and typical events structure, however it can be used for any other data schemas in the system
 
-#### 4.4.1 Forward Compatibility Example
+#### 4.6.1 Forward Compatibility Example
 
 **Use case**: Configuration schemas where old systems must tolerate new config options.
 
@@ -672,7 +762,7 @@ This section demonstrates how different types of schema changes affect compatibi
 }
 ```
 
-**Schema v1.1** (adds required field):
+**Schema v1.1** (promotes the optional `timeout` property to required):
 ```json
 {
   "$id": "gts://gts.x.core.db.connection_config.v1.1~",
@@ -689,7 +779,7 @@ This section demonstrates how different types of schema changes affect compatibi
 ```
 
 **Compatibility analysis**:
-- ✅ **Forward**: v1.0 consumer can read v1.1 data (`timeout` is optional in v1.0 with default value)
+- ✅ **Forward**: v1.0 accepts every v1.1 instance (`timeout` is required by v1.1 and accepted as optional by v1.0)
 - ❌ **Backward**: v1.1 consumer **rejects** v1.0 data (missing required `timeout`)
 - ❌ **Full**: Not fully compatible
 
@@ -704,7 +794,7 @@ This section demonstrates how different types of schema changes affect compatibi
 {"host": "db.example.com", "port": 5432, "database": "mydb", "timeout": 60}
 ```
 
-#### 4.4.2 Backward Compatibility Example (Closed Model)
+#### 4.6.2 Backward Compatibility Example (Closed Model)
 
 **Use case**: Event schemas where producers and consumers can be deployed independently.
 
@@ -789,7 +879,7 @@ This section demonstrates how different types of schema changes affect compatibi
 {"email": "user@example.com", "name": "John Doe", "phoneNumber": "+1234567890"}
 ```
 
-#### 4.4.3 Full Compatibility Example (Open Model)
+#### 4.6.3 Additive Evolution in an Open Model
 
 **Schema v1.0** (`gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~`):
 ```json
@@ -843,9 +933,11 @@ This section demonstrates how different types of schema changes affect compatibi
 ```
 
 **Compatibility analysis**:
-- ✅ **Backward**: v1.1 consumers can read v1.0 data (missing `currency` field is handled via default)
-- ✅ **Forward**: v1.0 consumers can read v1.1 data (open model ignores unknown `currency` field)
-- ✅ **Full**: Fully compatible—deploy in any order
+- ❌ **Backward schema compatibility**: v1.0 permits an instance such as `"currency": 123` because the property is undeclared in its open `payload`; v1.1 rejects that value because `currency` must be a string.
+- ✅ **Forward schema compatibility**: every v1.1 payload is accepted by the open v1.0 payload schema.
+- ❌ **Full schema compatibility**: the schemas do not accept exactly the same instances.
+
+The change can nevertheless be **operationally compatible in both deployment directions** when v1.0 producers never emit undeclared `currency` values and v1.0 readers safely ignore unknown fields. A registry may certify that stronger producer/tolerant-reader contract separately. The `default` annotation does not itself materialize a missing `currency` property during JSON Schema validation.
 
 **Event payload examples**:
 ```json
@@ -854,9 +946,12 @@ This section demonstrates how different types of schema changes affect compatibi
 
 // v1.1 data (valid for v1.1, readable by v1.0 due to open model)
 {"orderId": "123", "customerId": "456", "totalAmount": 99.99, "currency": "EUR"}
+
+// also valid for v1.0, but invalid for v1.1
+{"orderId": "123", "customerId": "456", "totalAmount": 99.99, "currency": 123}
 ```
 
-> **Note**: Changes to referenced GTS identifier values do not affect full compatibility. For example, the following two schemas are treated as fully compatible even though they reference different const values:
+> **Identity-field note**: Changing a version-bearing GTS identifier constrained by `const` is not schema-compatible by itself: the `const` values differ, so no instance carrying that property can satisfy both schemas; if the property is required, the schemas have no shared valid instance. OP#9 casting may deliberately rewrite such an identity field before validation. An implementation that treats this transformation as operationally compatible MUST distinguish the cast result from schema compatibility.
 
 ```jsonc
 {
@@ -907,12 +1002,12 @@ This section demonstrates how different types of schema changes affect compatibi
 ```
 
 
-#### 4.4.4 Type Derivation vs Version Evolution
+#### 4.6.4 Type Derivation vs Type Schema Evolution
 
-**Important distinction**: Type derivation (chaining) is different from version evolution:
+This example applies the contrast from §4 to one identifier family:
 
 ```json
-// Base type (always compatible with derived types)
+// Base type (every derived type must satisfy Type Derivation Compatibility with it)
 "$id": "gts://gts.x.core.events.type.v1~"
 
 // Derived type v1.0 (refines base type)
@@ -923,26 +1018,42 @@ This section demonstrates how different types of schema changes affect compatibi
 ```
 
 **Compatibility rules**:
-1. `order_placed.v1.0~` is **always fully compatible** with base `type.v1~` (derivation)
-2. `order_placed.v1.1~` is **always fully compatible** with base `type.v1~` (derivation)
-3. `order_placed.v1.1~` compatibility with `order_placed.v1.0~` depends on the changes made (version evolution—see examples above)
+1. `order_placed.v1.0~` must satisfy Type Derivation Compatibility with base `type.v1~` (derivation)
+2. `order_placed.v1.1~` must satisfy Type Derivation Compatibility with base `type.v1~` (derivation)
+3. `order_placed.v1.1~` compatibility with `order_placed.v1.0~` depends on the changes made (Type Schema evolution—see examples above)
+
+**The two checks are independent.** Suppose the base requires a numeric `amount >= 0` and `order_placed.v1.0~` narrows it to `amount >= 10`:
+
+- If `v1.1~` tightens the constraint to `amount >= 20`, it remains a valid derivation of the base, but an old instance with `"amount": 15` is rejected by it, so backward evolution compatibility does not hold.
+- If `v1.1~` relaxes the constraint to `amount >= -5`, it accepts every `v1.0~` instance and is backward compatible with it, but an instance with `"amount": -1` is rejected by the base, so it is not a valid derivation.
+
+Publishing a successive definition of a derived type may therefore require both checks:
+
+```text
+Valid(new-derived) ⊆ Valid(base)          // derivation, always
+Valid(old-derived) ⊆ Valid(new-derived)   // backward evolution, when selected
+```
+
+Neither check implies the other.
 
 See the [examples folder](./examples/events/types/) for complete schema definitions demonstrating these patterns.
 
 
-### 4.5 Best Practices for GTS Type Schema Evolution
+### 4.7 Best Practices for GTS Type Schema Evolution
 
-To maximize compatibility and minimize breaking changes between the minor versions of the same GTS type, follow these recommendations:
+To maximize compatibility and minimize breaking changes between successive definitions of the same GTS type, follow these recommendations:
 
-1. **Make new properties optional with defaults**: This is the safest way to add fields. Use `default` keyword in JSON Schema.
+1. **Decide each object level's content model when the type is first published**: a closed object can gain optional properties in later definitions; an open object can be extended by derived types, as can a partially open object when the derived properties are compatible with its constraints. When a type needs both, consider closing the envelope and declaring explicit open extension containers. See §4.4.1 for the trade-off and the recommended pattern.
 
-2. **Never remove or rename required properties**: Always a breaking change. Increment MAJOR version instead.
+2. **Make new properties optional and define absence semantics**: Optional additions avoid rejecting older instances in closed models and avoid requiring old producers to populate the field. Remember that JSON Schema `default` is an annotation; use it only when the application explicitly materializes defaults.
 
-3. **Deprecate instead of removing**: Mark fields as deprecated in documentation. Keep them in the schema for at least one MAJOR version.
+3. **Treat removal and renaming as breaking unless the table says otherwise**: renaming is always breaking, and removal is breaking in a closed model. Removal from an open model is backward compatible but not forward compatible (§4.5), so check the mode you enforce before relying on it. When in doubt, increment MAJOR.
 
-4. **Avoid changing field types**: Type changes are almost always breaking. To evolve a type, use union types: `"type": ["string", "number"]`.
+4. **Deprecate instead of removing**: Mark fields as deprecated in documentation. Keep them in the schema for at least one MAJOR version.
 
-5. **Use a GTS Registry**: Centralize GTS Type management and enforce compatibility checks before allowing new versions to be published.
+5. **Avoid changing field types**: Type changes are almost always breaking. To evolve a type, use union types: `"type": ["string", "number"]`.
+
+6. **Use a GTS Registry**: Centralize GTS Type management and enforce compatibility checks before allowing new versions to be published.
 
 
 ## 5. Typical Use-cases
@@ -952,8 +1063,8 @@ To maximize compatibility and minimize breaking changes between the minor versio
 Besides being a universal identifier, GTS provides concrete, production-ready capabilities that solve common architectural challenges for platform vendors and service providers integrating multiple third-party services under single control plane:
 
 #### Type Safety and Evolution
-- **Automated compatibility checking**: Validate schema changes against backward/forward/full compatibility rules before deployment (see section 4.3)
-- **Safe schema evolution**: Add optional fields to open models without breaking existing consumers or requiring coordinated deployments
+- **Automated compatibility checking**: Validate schema changes against backward/forward/full compatibility rules before deployment (defined in section 4.3; section 4.5 lists the typical consequences)
+- **Safe schema evolution**: Combine schema compatibility checks with explicit producer and tolerant-reader contracts for additive open-model changes
 - **Version casting**: Automatically upcast/downcast data between minor versions (e.g., process v1.2 data with v1.0 consumer)
 - **Breaking change detection**: Prevent accidental breaking changes through automated validation in CI/CD pipelines
 
@@ -1130,7 +1241,7 @@ See additional GTS examples in the [examples folder](./examples/):
 > **Critical implementation requirement:** The architectural guarantees of GTS—particularly type safety across inheritance chains and safe minor version evolution—depend entirely on a stateful **GTS Registry** component. Production systems MUST implement or integrate a registry capable of:
 >
 > 1. **Storing and indexing** all registered GTS Type Schemas by their GTS Type Identifiers
-> 2. **Validating compatibility** of new GTS Type versions against existing versions using the precise rules defined in section 4.3 before publication
+> 2. **Validating compatibility** of each successive schema definition against its preceding definition before publication — including a new revision published under an unchanged identifier, where §4.2 permits that — against the normative definition in section 4.3 (section 4.5 lists the typical consequences of that definition)
 > 3. **Enforcing inheritance constraints** to ensure derived types remain compatible with their base types
 > 4. **Rejecting incompatible changes** that violate the declared compatibility mode (backward/forward/full)
 > 5. **Providing GTS Type resolution** for validation, casting, and relationship resolution operations
@@ -1147,7 +1258,7 @@ This specification intentionally does not enforce lifecycle, operational or gove
 3. How to implement access policies and access checks based on the GTS query and attribute access languages.
 4. When to introduce a new minor version versus a new major version.
 5. GTS identifiers renaming and aliasing
-6. Exact GTS identifier minor version compatibility rules enforcement (backward, forward, full)
+6. Which Type Schema Evolution Compatibility mode or modes (backward, forward, full) a registry enforces for each type identity or namespace, and its publication policy for successive definitions. The modes themselves are defined normatively in §4.3.
 
 > **Non-goals reminder**: GTS is not an eventing framework, transport, or workflow. It standardizes identifiers and basic validation/casting semantics around JSON and JSON Schema.
 
@@ -1291,7 +1402,7 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 - **OP#5 - ID to UUID Mapping**: Generate deterministic UUIDs from GTS identifiers
 - **OP#6 - Schema Validation**: Validate object instances against their corresponding schemas. When validating instances, if the rightmost type in the chain is marked `x-gts-abstract: true`, validation MUST fail (see section 9.11)
 - **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
-- **OP#8 - Compatibility Checking**: Verify that schemas with different MINOR versions are compatible
+- **OP#8 - Type Schema Evolution Compatibility Checking**: Compare two definitions of one type identity, addressed by their distinct GTS Type Identifiers, and report a Compatibility Verdict (`compatible`, `incompatible`, or `unknown`) for the backward, forward, and full relations. `unknown` means the checker could not establish either compatibility or incompatibility; it is not itself evidence of incompatibility. The checker reports evidence, while registry publication policy decides how the verdicts affect admission.
 - **OP#9 - Version Casting**: Transform instances between compatible MINOR versions
 - **OP#10 - Query Execution**: Filter identifier collections using the GTS query language
 - **OP#11 - Attribute Access**: Retrieve property values and metadata using the attribute selector (`@`)
@@ -1644,7 +1755,7 @@ See `./examples/typespec/vms/types/states/gts.x.infra.compute.vm_state.v1~.schem
 
 **Important:** An identifier containing a wildcard (`*`) is a **pattern for matching** and may not serve as a canonical identifier for a type or instance.
 
-A single wildcard (`*`) character can be used to find all identifiers matching a given prefix. The wildcard is a greedy operator that matches any sequence of characters after it, including the `~` chain separator.
+A single wildcard (`*`) character can be used to find all identifiers matching a given prefix. The wildcard is a greedy operator that matches any sequence of characters after it, including the empty sequence and the `~` chain separator. Consequently, a bare chain-suffix wildcard such as `type.v1~*` matches `type.v1~` itself as well as identifiers derived from it.
 
 **Rules for using wildcards:**
 1. The wildcard (`*`) must be used only **once**.
