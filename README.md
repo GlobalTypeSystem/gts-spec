@@ -1259,6 +1259,7 @@ This specification intentionally does not enforce lifecycle, operational or gove
 4. When to introduce a new minor version versus a new major version.
 5. GTS identifiers renaming and aliasing
 6. Which Type Schema Evolution Compatibility mode or modes (backward, forward, full) a registry enforces for each type identity or namespace, and its publication policy for successive definitions. The modes themselves are defined normatively in §4.3.
+7. Migration of objects between type versions, including transformation, validation, and rollout strategies.
 
 > **Non-goals reminder**: GTS is not an eventing framework, transport, or workflow. It standardizes identifiers and basic validation/casting semantics around JSON and JSON Schema.
 
