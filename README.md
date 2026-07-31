@@ -1,5 +1,5 @@
-<!-- gts-spec-version: 0.13 -->
-> **VERSION**: GTS specification draft, version 0.13
+<!-- gts-spec-version: 0.14 -->
+> **VERSION**: GTS specification draft, version 0.14
 
 # Global Type System (GTS) Specification
 
@@ -115,6 +115,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 | 0.10 | BREAKING: terminology unified around GTS Type / GTS Instance; rename API fields `schema_id` → `type_id` (also `old_schema_id`/`new_schema_id`/`to_schema_id`/`selected_schema_id_field`); rename API field `is_schema` → `is_type` (type-definition vs instance discriminator); `type_id` MUST be a GTS Type Identifier or `null` — no longer falls back to JSON Schema dialect URL; rename endpoints `/validate-schema` → `/validate-type`, `/schemas` → `/types`; rename OP#12 'Schema vs Schema Validation' → 'Type Derivation Validation'; rename OpenAPI components `ValidateSchemaRequest` → `ValidateTypeRequest`, `SchemaRegister` → `TypeRegister`; rename example directories `examples/**/schemas/` → `examples/**/types/` (file extensions `.schema.json` retained); add Terminology section |
 | 0.11 | Introduce term **GTS Type Schema** as the canonical definition of a GTS Type; remove the standalone `Schema` term from Terminology; rewrite `GTS Type` entry to name the abstract registered entity; rename `GTS Type Registry` → `GTS Registry` (registry now scopes both Type Schemas and well-known Instances). **Conformance tests for reference implementations** also updated: rename API endpoints `/validate-type` → `/validate-type-schema` and `/types` → `/type-schemas`; rename OpenAPI components `TypeRegister` → `TypeSchemaRegister`, `ValidateTypeRequest` → `ValidateTypeSchemaRequest`; rename request field `TypeSchemaRegister.schema` → `TypeSchemaRegister.type_schema`; rename helper `validate_type` → `validate_type_schema`. |
 | 0.12 | BREAKING: reframe GTS Type Schemas as a dialect-agnostic JSON Schema extension; the prior `$defs MUST NOT` and post-Draft-07-keyword restrictions are dropped; derivation compatibility and the finality guard use the chained `$id` alone, `allOf`+`$ref` recommended but not required (ADR-0001). `x-gts-traits-schema` becomes a JSON Schema subschema (object/`true`/`false`); the registry chain-aggregates declarations along the `$id` chain via `allOf` (ADR-0002). Trait completeness is keyed on `x-gts-abstract` and enforced on non-abstract types against the materialized effective traits object (ADR-0003). Trait-value merge follows JSON Merge Patch (RFC 7396); cross-descendant locking moves to standard JSON Schema `const` in `x-gts-traits-schema` (ADR-0004). The four document-level keywords (`x-gts-final`, `x-gts-abstract`, `x-gts-traits-schema`, `x-gts-traits`) MUST appear at the schema top level and are rejected (fail fast) when nested in a subschema (§9.7.1, §9.11). |
+| 0.14 (draft) | Add `x-gts-closed-derivations` schema modifier: an (open) base type may require every derived schema to resolve to a closed content model at its own top level, enforced at registration and in OP#12 (§9.11.4). Motivated by extensible metadata envelopes: open abstract base + mandatory-closed derived schemas keeps payload extension possible while undeclared properties are still rejected at instance validation. |
 | 0.13 | CORRECTION: Define compatibility through accepted-instance-set inclusion (§4.3) and separate **Type Derivation Compatibility** (§4.1, one-way) from **Type Schema Evolution Compatibility** (§4.2). This corrects OP#8 verdicts for unchanged inputs — notably for open content models, enums, and `const` identifier fields; implementations targeting 0.12 may need to update their compatibility checker. OP#8 reports the tri-state `compatible`, `incompatible`, or `unknown` for each relation, preserving an inconclusive check instead of conflating it with incompatibility. Tolerant-reader, casting, and default-materialization guarantees MUST be reported separately (§4.3). Content models are classified on the resolved effective schema, not on `additionalProperties` alone (§4.4). §4 restructured and renumbered; later sections unchanged. OP#8 conformance tests updated. |
 
 ## Terminology
@@ -699,7 +700,7 @@ The closed top level lets later definitions add optional envelope properties bac
 
 A derived type MAY also declare the contents of an open container and close it: closing an open object makes the schema accept fewer instances, so it satisfies Type Derivation Compatibility, and §3.1 restricts only the *addition* of properties at a level a base has already closed. Having closed that level, the derived type regains in-place evolvability there, at the cost that its own descendants can no longer add properties there.
 
-This is a recommendation, not a requirement; other content model choices remain valid. What matters is that the interaction is decided when the type is first published, rather than discovered at the first successive definition that fails a compatibility check.
+This is a recommendation, not a requirement; other content model choices remain valid. Where a platform instead keeps the *base itself* open as a derivation anchor (an abstract envelope whose payload shape belongs entirely to derived types), the `x-gts-closed-derivations` modifier (§9.11.4) lets that base require every derived schema to close its own level, so instance validation stays strict even though the anchor is open. What matters is that the interaction is decided when the type is first published, rather than discovered at the first successive definition that fails a compatibility check.
 
 ### 4.5 Type Schema Evolution Compatibility Rules
 
@@ -1627,7 +1628,7 @@ Given an inheritance chain `S₀ → S₁ → … → Sₙ`:
   - See [`adr/0004-x-gts-traits-merge-strategy.md`](adr/0004-x-gts-traits-merge-strategy.md) for the rationale.
 
 - **Validation**
-  - **Completeness check** (OP#13, type-level): For types whose `x-gts-abstract` is not `true`, the registry MUST verify that the *materialized* effective traits object validates against the effective trait-schema using standard JSON Schema validation. "Materialized" means: defaults declared in the effective trait-schema for properties not present in the chain-merged effective traits object are substituted in before validation. If validation fails — in particular, if a `required` property of the effective trait-schema has no chain-assigned value and no default — the type fails OP#13 validation. Completeness is a property of the **type** itself, not of any instance: it is always enforced on the explicit validation endpoints (`/validate-type-schema`, `/validate-entity`), and is additionally enforced at registration **when validation is enabled** (`?validate=true`), per the common pattern described in §9.11.5. For types with `x-gts-abstract: true`, this completeness check is skipped; descendants are expected to close any unresolved required traits. See [`adr/0003-x-gts-traits-completeness.md`](adr/0003-x-gts-traits-completeness.md) for the rationale.
+  - **Completeness check** (OP#13, type-level): For types whose `x-gts-abstract` is not `true`, the registry MUST verify that the *materialized* effective traits object validates against the effective trait-schema using standard JSON Schema validation. "Materialized" means: defaults declared in the effective trait-schema for properties not present in the chain-merged effective traits object are substituted in before validation. If validation fails — in particular, if a `required` property of the effective trait-schema has no chain-assigned value and no default — the type fails OP#13 validation. Completeness is a property of the **type** itself, not of any instance: it is always enforced on the explicit validation endpoints (`/validate-type-schema`, `/validate-entity`), and is additionally enforced at registration **when validation is enabled** (`?validate=true`), per the common pattern described in §9.11.6. For types with `x-gts-abstract: true`, this completeness check is skipped; descendants are expected to close any unresolved required traits. See [`adr/0003-x-gts-traits-completeness.md`](adr/0003-x-gts-traits-completeness.md) for the rationale.
   - If the effective trait schema cannot be satisfied (e.g., contradictory constraints introduced across the chain), schema validation MUST fail.
 
 **Example — descendant override and `const` lock:**
@@ -1658,9 +1659,9 @@ Ensure generated schemas use GTS identifiers as `$id` for types and keep any `x-
 
 Support UUIDs (format: `uuid`) for instance `id` fields.
 
-### 9.11 - GTS Type Schema Modifiers (`x-gts-final` / `x-gts-abstract`)
+### 9.11 - GTS Type Schema Modifiers (`x-gts-final` / `x-gts-abstract` / `x-gts-closed-derivations`)
 
-A **schema modifier** is a boolean annotation on a GTS Type Schema that restricts how the type participates in the GTS type system. Modifiers can be used to control inheritance and instantiation behavior. There are two keywords for this purpose: `x-gts-final` and `x-gts-abstract`.
+A **schema modifier** is a boolean annotation on a GTS Type Schema that restricts how the type participates in the GTS type system. Modifiers can be used to control inheritance and instantiation behavior. There are three keywords for this purpose: `x-gts-final`, `x-gts-abstract`, and `x-gts-closed-derivations`.
 
 #### 9.11.1 Keywords
 
@@ -1668,19 +1669,23 @@ A **schema modifier** is a boolean annotation on a GTS Type Schema that restrict
 |---------|-----------|---------|------------------|
 | **`x-gts-final`** | `boolean` | Marks the type as **not inheritable** — no derived schemas may reference it as a base | Leaf schemas; enum-like types with a fixed set of well-known instances |
 | **`x-gts-abstract`** | `boolean` | Marks the type as **not directly instantiable** — instances must conform to a concrete derived type | Base/ancestor schemas that serve purely as templates |
+| **`x-gts-closed-derivations`** | `boolean` | Requires every **derived** schema to resolve to a **closed content model** (§4.4) at its own top level | Open abstract envelope bases (extensible metadata / plugin payloads) |
 
-**Schema annotation keywords:** Both `x-gts-final` and `x-gts-abstract` have GTS meaning only in JSON Schema documents (documents with `$schema`). In instance documents, fields with these names are ordinary data and have no GTS modifier semantics unless the instance's own JSON Schema assigns constraints to them.
+**Schema annotation keywords:** All three modifiers have GTS meaning only in JSON Schema documents (documents with `$schema`). In instance documents, fields with these names are ordinary data and have no GTS modifier semantics unless the instance's own JSON Schema assigns constraints to them.
 
 **Allowed values:** The only meaningful value is `true`. If the keyword is absent or set to `false`, it has no effect (the schema behaves normally — both inheritable and instantiable). Implementations MUST reject non-boolean values.
 
-**Mutual exclusion:** A schema MUST NOT declare both `"x-gts-final": true` and `"x-gts-abstract": true`. This combination is semantically meaningless (a type that can be neither inherited from nor instantiated serves no purpose) and MUST be rejected during schema registration or validation.
+**Mutual exclusion:** A schema MUST NOT declare both `"x-gts-final": true` and `"x-gts-abstract": true`. This combination is semantically meaningless (a type that can be neither inherited from nor instantiated serves no purpose) and MUST be rejected during schema registration or validation. Likewise, a schema MUST NOT declare both `"x-gts-final": true` and `"x-gts-closed-derivations": true` — a final type has no derivations to constrain. `x-gts-abstract` + `x-gts-closed-derivations` is the expected pairing for extensible envelope bases.
 
 | Modifier combination | Inheritance allowed? | Direct instances allowed? |
 |---|---|---|
-| *(default / neither)* | Yes | Yes |
+| *(default / none)* | Yes | Yes |
 | `x-gts-abstract: true` | Yes | No |
 | `x-gts-final: true` | No | Yes |
-| Both `true` | **INVALID** — MUST be rejected | — |
+| `x-gts-closed-derivations: true` | Yes — derived schemas must be closed | Yes |
+| `x-gts-abstract` + `x-gts-closed-derivations` | Yes — derived schemas must be closed | No |
+| `x-gts-final` + `x-gts-abstract` | **INVALID** — MUST be rejected | — |
+| `x-gts-final` + `x-gts-closed-derivations` | **INVALID** — MUST be rejected | — |
 
 #### 9.11.2 `x-gts-final` semantics
 
@@ -1737,7 +1742,25 @@ When a schema declares `"x-gts-abstract": true`:
 
 6. **Keyword placement**: Like `x-gts-final` (§9.11.2 item 5), `x-gts-abstract` is a type-level modifier and MUST appear at the **top level** of the JSON Schema document, adjacent to `$id` and `$schema` — NOT inside an `allOf` entry (or any other subschema). A subschema is not "the type"; placing the modifier there is a misplacement and MUST be rejected during schema registration or validation.
 
-#### 9.11.4 Interaction with `x-gts-traits`
+#### 9.11.4 `x-gts-closed-derivations` semantics
+
+When a schema declares `"x-gts-closed-derivations": true`:
+
+1. **Derivation guard**: Every schema whose `$id` chain references this type as its **immediate base** MUST resolve to a **closed content model** (§4.4) at its top level: the effective schema — after `$ref` resolution and `allOf` composition — rejects undeclared properties (effective `additionalProperties: false` or an equivalent constraint). Registration (when validation is enabled) and OP#12 validation MUST fail otherwise.
+
+2. **Typical use — open envelope, closed extensions**: This modifier exists for extensible envelope bases (per-tenant metadata, plugin payloads) that stay **open** — often together with `x-gts-abstract: true` — so that derived schemas may declare their own payload properties (§3.1). Without the modifier, a derived schema that is itself open would accept a mistyped property name (`automation_levl` next to a declared `automation_level`) and validation would silently pass; the modifier guarantees every registered extension rejects undeclared properties, keeping server-side validation meaningful. It is the enforcement companion of the trade-off discussion in §4.4.1: the base's openness is a derivation-time affordance that never reaches instances, because instances always validate against a closed derived type.
+
+3. **Deeper levels need no extra checks**: A grandchild deriving from a (now closed) derived schema is already prevented from adding properties by §3.1, and one attempting to re-open the level would accept instances its closed parent rejects — failing Type Derivation Compatibility (§4.1). Implementations therefore only check schemas whose immediate base declares the modifier.
+
+4. **Instances are unaffected**: The modifier constrains the *form of derived schemas*, not instantiation. (Bases using this pattern are typically abstract anyway.)
+
+5. **No propagation**: Like `x-gts-final`, the modifier applies only to the schema that declares it; a closed derived schema does not implicitly carry it further.
+
+6. **Evolution note**: A base declaring this modifier SHOULD keep its own payload level property-free (an *envelope*). In an open content model, adding a base payload property later is not a compatible change (§4.5) — it is a new MAJOR version.
+
+7. **Keyword placement**: Top level of the schema document only, like the other modifiers (§9.11.2 item 5); a nested occurrence MUST be rejected.
+
+#### 9.11.5 Interaction with `x-gts-traits`
 
 - **Completeness keyed on `x-gts-abstract`**: A type whose `x-gts-abstract` is not `true` MUST satisfy trait completeness at registration (see §9.7.5). A type with `x-gts-abstract: true` is exempt — abstract types may have unresolved required traits; descendants are expected to close them. See [`adr/0003-x-gts-traits-completeness.md`](adr/0003-x-gts-traits-completeness.md).
 
@@ -1745,7 +1768,7 @@ When a schema declares `"x-gts-abstract": true`:
 
 - **Abstract types may declare `x-gts-traits-schema`**: Doing so contributes to the effective trait-schema of descendants; the abstract type itself is not required to provide values.
 
-#### 9.11.5 Registration enforcement
+#### 9.11.6 Registration enforcement
 
 Enforcement follows the same pattern as existing `?validate=true` behavior: checks are performed when validation is enabled on registration, and always enforced on explicit validation endpoints (`/validate-type-schema`, `/validate-instance`, `/validate-entity`). This is consistent with existing patterns (e.g., `x-gts-ref` checks in section 9.6).
 
