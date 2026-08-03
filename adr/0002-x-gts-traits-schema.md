@@ -41,7 +41,12 @@ ADR-0001 commits GTS to being an **extension of JSON Schema** (dialect-agnostic;
 
 ## Considered Options
 
-Two options. Option 2 has two sub-variants (2A and 2B) which we evaluate inside Option 2.
+- Option 1 — Trait-type as a separately-registered GTS Type (URI value)
+- Option 2 — `x-gts-traits-schema` is a JSON Schema subschema, in two sub-variants:
+  - Option 2A — Subschema + implicit chain aggregation *(chosen)*
+  - Option 2B — Subschema + explicit composition by the author
+
+Option 2's sub-variants share the keyword's value space and differ only in who composes the declarations along the chain; they are evaluated inside Option 2 below.
 
 ### Option 1 — Trait-type as a separately-registered GTS Type (URI value)
 
@@ -229,7 +234,7 @@ By construction, any value satisfying the effective trait-schema also satisfies 
 
 ## Decision Outcome
 
-Chosen: **Option 2A — `x-gts-traits-schema` is a JSON Schema subschema (object OR boolean); the registry composes declarations along the `$id` chain via `allOf`.**
+Chosen option: **Option 2A — `x-gts-traits-schema` is a JSON Schema subschema (object OR boolean); the registry composes declarations along the `$id` chain via `allOf`.**
 
 Normative consequences:
 

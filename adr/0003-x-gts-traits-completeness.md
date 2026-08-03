@@ -92,6 +92,10 @@ ADR-0001 commits GTS to being an extension of JSON Schema (dialect-agnostic); AD
 
 ## Considered Options
 
+- Option 1 — No spec-level enforcement (author's responsibility)
+- Option 2 — Validate at instance creation time
+- Option 3 — Validate at type registration (fail fast) *(chosen)*
+
 Three top-level options on **when (or whether) to enforce completeness**.
 
 ### Option 1 — No spec-level enforcement (author's responsibility)
@@ -223,7 +227,7 @@ Three ways to make the registration succeed:
 
 ## Decision Outcome
 
-Chosen: **Option 3 — validate at type registration; non-abstract types MUST be complete.**
+Chosen option: **Option 3 — validate at type registration; non-abstract types MUST be complete.**
 
 ### Definition of "complete"
 
@@ -254,7 +258,7 @@ At the registration of type T:
 - **Non-abstract type with required-no-default and no explicit value.** Registration fails. Author resolves by (a) providing `x-gts-traits` value, (b) declaring a `default` in the schema, or (c) marking the type abstract.
 - **Final non-abstract type.** Same rule as any non-abstract — must be complete. No special bullet needed.
 
-## Implications
+### Implications
 
 - **OP#13 (Schema Traits Validation)** includes this rule; the operation explicitly conditions the completeness step on `x-gts-abstract != true`.
 - **§9.7.5** carries the normative wording of the completeness check in the "Validation" bullet block, expressed in terms of "non-abstract types."
