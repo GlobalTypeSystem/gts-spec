@@ -3391,6 +3391,56 @@ class TestCaseOp13_Merge_ConstLock_DescendantOverrideFails(HttpRunner):
     ]
 
 
+class TestCaseOp13_Merge_ConstLock_NullDeleteFails(HttpRunner):
+    """ADR-0004 §"Conformance test suite" (g): null cannot delete a required lock.
+
+    RFC 7396 removes `indexed` from the merged traits object, but the effective
+    trait-schema also requires the property. The materialized object therefore
+    fails OP#13 instead of bypassing the const constraint.
+    """
+
+    config = Config("OP#13 ADR-0004: const lock rejects null delete").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.mconstdel.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "indexed": {"type": "boolean", "const": True},
+                    },
+                    "required": ["indexed"],
+                },
+                "x-gts-traits": {"indexed": True},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base with const-and-required locked indexed=true",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.mconstdel.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.mconstdel.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"indexed": None},
+            },
+            "register descendant trying to delete indexed",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mconstdel.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate descendant - required prevents const-lock deletion",
+        ),
+    ]
+
+
 class TestCaseOp13_Merge_ConstLock_IdempotentRestatementOk(HttpRunner):
     """ADR-0004: descendant restates const-locked value. Passes."""
 
