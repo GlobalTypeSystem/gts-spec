@@ -71,6 +71,12 @@ The ADR commits to one of these choices.
 
 ## Considered Options
 
+- Option 1 — No merge (each type self-contained)
+- Option 2a — Shallow merge, descendant-last-wins
+- Option 2b — Shallow merge, immutable-once-set (the rule in spec versions up to 0.11)
+- Option 2c — RFC 7396 (JSON Merge Patch), descendant-last-wins *(chosen)*
+- Option 3 — Per-property author-controlled merge
+
 ### Option 1 — No merge (each type self-contained)
 
 Every type's `x-gts-traits` is read as the whole truth for that type alone. Ancestor declarations are ignored when computing the descendant's effective traits. (Defaults from the effective trait-schema still materialize per ADR-0003, since defaults live in the schema, not in `x-gts-traits`.)
@@ -145,6 +151,8 @@ Effective traits object for `audit.v1~` under Option 2a: `{ "retention": "P90D",
 ### Option 2b — Shallow merge, immutable-once-set
 
 The effective traits object is computed by walking the chain root → leaf; once a key has been set by any layer, later layers MUST either omit it or repeat the same value. Conflicting redeclaration causes registration to fail.
+
+**This was the normative rule in spec versions up to 0.11** (§9.7.5 "Immutable-once-set", together with "Immutable defaults" on the schema side). Rejecting it here is therefore a breaking change, not a newly filled gap — see the Backward compatibility note under Implications.
 
 *Example.* Using the same base as Option 2a (`retention: "P30D"` declared on the base):
 
@@ -283,7 +291,7 @@ Registration of the derived type fails at `retention` (locked). To succeed, the 
 
 ## Decision Outcome
 
-Chosen: **Option 2c — RFC 7396 (JSON Merge Patch) along the `$id` chain, descendant-last-wins at the leaf, with `const` in `x-gts-traits-schema` as the publisher's lock mechanism.**
+Chosen option: **Option 2c — RFC 7396 (JSON Merge Patch) along the `$id` chain, descendant-last-wins at the leaf, with `const` in `x-gts-traits-schema` as the publisher's lock mechanism.**
 
 ### Normative consequences
 
@@ -426,6 +434,13 @@ Effective traits after merge: `{ "indexed": false }` (descendant's value wins th
 - `"default": <value>` — the value is a **soft default**; descendants who don't set the property inherit it, descendants who do set it can override freely (last-wins).
 - neither — the property is open; descendants set or inherit values as they wish.
 
+`const` locks the **value**, not the presence: JSON Schema asserts nothing about an absent property, so a descendant can still drop a `const`-constrained trait with an RFC 7396 `null` patch. This is the general presence rule for traits, not a `const`-specific gap — any optional inherited trait without a `default` is removable the same way. A publisher who wants presence guaranteed too picks one of:
+
+- add the property to the containing object schema's `required` array — the deletion then fails the ADR-0003 completeness check for non-abstract types (loud failure);
+- declare a `default` equal to the `const` value — the deletion becomes a no-op, since materialization restores the value before validation (self-healing).
+
+**For nested traits this is path-recursive.** A `properties` subschema — and the `required` declared inside it — applies only while its object is present, so a lock on `routing.indexed` survives only as long as `routing` itself does. One `null` patch on the outermost key removes the whole subtree together with every nested `required` and `const` in it. So the publisher requires *each* segment of the path in its own containing schema, or puts a `default` on the outermost key that restores the whole subtree; requiring only the leaf locks nothing. This ADR deliberately does not add a registry-side "reject deletion of a parent that contains a locked property" guard — that would be exactly the bespoke merge machinery Option 3 was rejected for, and it would make the effective traits object depend on where constraints happen to sit rather than on the merge alone.
+
 ### Worked example D — `null` to fall back to the trait-schema default
 
 The main motivation for the `null`-as-delete semantic from RFC 7396 is its clean interaction with ADR-0003 *materialization*: after the chain-merge produces the effective traits object, defaults declared in the effective trait-schema are applied for properties **not present** in that object. A descendant that writes `"<key>": null` therefore removes the chain-merged value for that key, and the materialization step then fills it back in from the schema's `default` (if any).
@@ -468,18 +483,21 @@ Effective traits: `{ "retention": "P7D" }`. The descendant successfully reverted
 - **Object-valued trait, descendant overrides one nested field.** Per Worked example B: ancestor's other nested fields are preserved; only the field the descendant restates is overridden. No need for descendants to restate the whole nested object.
 - **Array-valued trait, descendant declares a different array.** Arrays replace wholesale (per RFC 7396). If publishers need per-element composability, they should model the data as a keyed object rather than an array.
 - **`null` in `x-gts-traits` deletes the key.** Per RFC 7396, a leaf value of `null` removes that key from the effective object. The primary use case is letting ADR-0003 materialization re-apply the trait-schema's `default` for that key (see Worked example D). If the deleted key is `required` and has no `default`, the completeness check (ADR-0003) fails registration for non-abstract types. Authors who want `null` as an actual trait *value* cannot express it via this merge — they would need a sentinel (e.g., `"unset"`) and document it as part of the trait shape.
+- **A `const`-constrained property is deleted with `null`.** If the property is also `required`, the completeness check fails and the lock holds. If it has a `default` equal to the `const` value, materialization restores it and the deletion is a no-op. If it is neither, its absence satisfies the schema — `const` asserts nothing about an absent property.
+- **The object *containing* a locked nested property is deleted with `null`.** The whole subtree goes, and the nested `required` / `const` inside it never apply. The lock holds only if every segment of the path is required in its own containing schema (or the outermost key carries a restoring `default`). Deleting an optional parent is a legal merge, not a lock violation.
 - **Ancestor sets a value; descendant repeats the same value.** Permitted; both layers agree.
 - **No `x-gts-traits` anywhere in the chain.** Effective traits object is empty; ADR-0003's materialization fills in any defaults declared in the effective trait-schema; the completeness check (for non-abstract types) then validates the materialized object.
 - **`x-gts-traits` on an abstract base.** Carried forward into descendants exactly like any other layer; abstract status affects only completeness checking per ADR-0003, not merge.
 
-## Implications
+### Implications
 
 - **§9.7.5 ("Trait merge and validation semantics")** carries the normative wording of RFC 7396 merge along the `$id` chain and the `const`-based lock mechanism.
 - **ADR-0003** stays correct as written; the "chain-merged effective traits object" referenced there is now formally defined as the result of applying each layer's `x-gts-traits` as a JSON Merge Patch (RFC 7396) to the chain-merged object so far, root → leaf.
 - **OP#13 description (§9.7)** is unaffected; it speaks generically of "chain-merged" values.
 - **§9.11.4 (modifiers ↔ traits)** is unaffected; completeness keying on `x-gts-abstract` is independent of merge policy.
 - **Reference implementations (gts-go, gts-rust)** must implement RFC 7396 merge along the chain. Available implementations exist in both ecosystems. The registry MUST NOT enforce a "different value MUST fail" rule on its own — it relies on standard JSON Schema validation against the effective trait-schema (which catches `const` violations naturally).
-- **Conformance test suite** should exercise: (a) descendant overrides a top-level scalar — succeeds (last-wins); (b) descendant overrides one field of a nested-object trait — other nested fields preserved; (c) descendant overrides an array-valued trait — array replaces wholesale; (d) descendant writes `null` at a leaf — the key is removed; (e) descendant repeats the same value — succeeds (idempotent); (f) publisher locks via `const`, descendant attempts override — fails JSON Schema validation; (g) chain with three layers; middle layer overrides base; leaf overrides middle.
+- **Conformance test suite** should exercise: (a) descendant overrides a top-level scalar — succeeds (last-wins); (b) descendant overrides one field of a nested-object trait — other nested fields preserved; (c) descendant overrides an array-valued trait — array replaces wholesale; (d) descendant writes `null` at a leaf — the key is removed; (e) descendant repeats the same value — succeeds (idempotent); (f) publisher locks via `const`, descendant attempts override — fails JSON Schema validation; (g) publisher locks via `const` and `required`, descendant attempts to delete the property with `null` — fails the completeness check; (h) nested lock with every path segment required, descendant deletes the parent — fails; (i) same nested lock but with an optional parent, descendant deletes the parent — succeeds, since requiring only the leaf is not a lock and no path-aware guard exists; (j) chain with three layers; middle layer overrides base; leaf overrides middle.
+- **Backward compatibility: breaking** (reflected in the README changelog entry for 0.12). This decision does not fill a gap — it reverses a prior normative rule. Spec versions up to 0.11 required "immutable-once-set" for trait values (a descendant supplying a different value for a key already set by an ancestor MUST fail validation) plus "immutable defaults" (a descendant MUST NOT redeclare an ancestor's `default`) — that is, Option 2b above, which this ADR rejects. Under RFC 7396 last-wins, a chain that MUST have been rejected now registers successfully, and locking becomes opt-in for the publisher via `const` instead of implicit. Implementations MUST remove the immutable-once-set and immutable-defaults checks; conformance tests asserting the old rejection MUST be rewritten. Registries that relied on the implicit guarantee SHOULD audit published base types and add `const` where a fixed trait value was intended.
 
 ## Pros and Cons of the Options
 

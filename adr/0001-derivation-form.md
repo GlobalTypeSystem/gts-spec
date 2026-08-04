@@ -56,6 +56,9 @@ This ADR does **not** make GTS a [JSON Schema Dialect](https://json-schema.org/l
 
 ## Considered Options
 
+- Option 1 — Strict canonical form
+- Option 2 — GTS Type Schema as a JSON Schema Extension (dialect-agnostic) *(chosen)*
+
 Both options use the same running example.
 
 ### Running example used in this section
@@ -207,7 +210,7 @@ P-OK validates; P-BAD fails. Syntactically valid and semantically compatible —
 
 ## Decision Outcome
 
-Chosen: **Option 2 — GTS Type Schema as a JSON Schema Extension (dialect-agnostic).**
+Chosen option: **Option 2 — GTS Type Schema as a JSON Schema Extension (dialect-agnostic).**
 
 Key normative consequences:
 

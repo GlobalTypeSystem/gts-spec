@@ -3391,6 +3391,169 @@ class TestCaseOp13_Merge_ConstLock_DescendantOverrideFails(HttpRunner):
     ]
 
 
+class TestCaseOp13_Merge_ConstLock_NullDeleteFails(HttpRunner):
+    """ADR-0004 §"Conformance test suite" (g): null cannot delete a required lock.
+
+    RFC 7396 removes `indexed` from the merged traits object, but the effective
+    trait-schema also requires the property. The materialized object therefore
+    fails OP#13 instead of bypassing the const constraint.
+    """
+
+    config = Config("OP#13 ADR-0004: const lock rejects null delete").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.mconstdel.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "indexed": {"type": "boolean", "const": True},
+                    },
+                    "required": ["indexed"],
+                },
+                "x-gts-traits": {"indexed": True},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base with const-and-required locked indexed=true",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.mconstdel.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.mconstdel.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"indexed": None},
+            },
+            "register descendant trying to delete indexed",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mconstdel.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate descendant - required prevents const-lock deletion",
+        ),
+    ]
+
+
+class TestCaseOp13_Merge_NestedConstLock_ParentRequired_NullDeleteFails(HttpRunner):
+    """ADR-0004: a nested lock holds when every path segment is required.
+
+    `routing.indexed` is const-locked and required inside `routing`, and
+    `routing` is required at the root. Deleting the parent with a single `null`
+    patch removes the whole subtree, so the materialized object fails the root
+    `required` — the lock survives because the path is required end to end.
+    """
+
+    config = Config("OP#13 ADR-0004: nested lock holds on required path").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.mnestlock.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "required": ["routing"],
+                    "properties": {
+                        "routing": {
+                            "type": "object",
+                            "required": ["indexed"],
+                            "properties": {
+                                "indexed": {"type": "boolean", "const": True},
+                            },
+                        },
+                    },
+                },
+                "x-gts-traits": {"routing": {"indexed": True}},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base - routing required, routing.indexed const-locked",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.mnestlock.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.mnestlock.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"routing": None},
+            },
+            "register descendant deleting the whole routing subtree",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mnestlock.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate descendant - root required blocks parent deletion",
+        ),
+    ]
+
+
+class TestCaseOp13_Merge_NestedConstLock_ParentOptional_NullDeleteOk(HttpRunner):
+    """ADR-0004: requiring only the leaf is not a lock.
+
+    Same nested `const` + `required` on `routing.indexed`, but `routing` itself
+    is optional. Deleting the parent removes the subtree, and the nested
+    constraints never apply because their object is gone. The registry MUST NOT
+    add a path-aware guard: this is a legal merge, so OP#13 passes.
+    """
+
+    config = Config("OP#13 ADR-0004: optional parent defeats nested lock").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.mnestopt.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "routing": {
+                            "type": "object",
+                            "required": ["indexed"],
+                            "properties": {
+                                "indexed": {"type": "boolean", "const": True},
+                            },
+                        },
+                    },
+                },
+                "x-gts-traits": {"routing": {"indexed": True}},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base - routing optional, routing.indexed const-locked",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.mnestopt.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.mnestopt.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"routing": None},
+            },
+            "register descendant deleting the optional routing parent",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mnestopt.event.v1~x.test13._.kid.v1~",
+            True,
+            "validate descendant - nested constraints vanish with their parent",
+        ),
+    ]
+
+
 class TestCaseOp13_Merge_ConstLock_IdempotentRestatementOk(HttpRunner):
     """ADR-0004: descendant restates const-locked value. Passes."""
 

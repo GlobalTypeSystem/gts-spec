@@ -7,36 +7,36 @@ Thank you for your interest in contributing to the Global Type System (GTS) Spec
 ### Prerequisites
 
 - **Git** for version control
-- **JSON Schema validator** (optional, for testing schema examples)
-- **Python 3.8+** (optional, for running reference implementations)
+- **Node.js 20+ and `ajv-cli`** (optional, for validating JSON Schema examples as CI does)
+- **Python 3.9–3.14** (optional, for working on the conformance test suite)
+- **Docker** (optional, and recommended for running the conformance test suite)
 - **Your favorite editor** (VS Code with JSON Schema support recommended)
 
 ### Development Setup
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/GlobalTypeSystem/gts-spec.git
 cd gts-spec
 
-# Optional: Install Python dependencies for reference implementations
-pip install jsonschema
-
-# Optional: Install JSON Schema validator
+# Optional: install the JSON Schema validator used by CI
 npm install -g ajv-cli
 ```
+
+The conformance tests run against an external GTS implementation over HTTP; this repository does not contain a reference implementation. See [`tests/README.md`](tests/README.md) for Docker and local Python setup.
 
 ### Repository Layout
 
 ```
 gts-spec/
-├── README.md                 # Main specification document
+├── README.md                 # Normative specification
 ├── CONTRIBUTING.md           # This file
-├── LICENSE                   # License information
-└── examples/                 # Example GTS Types and instances
-    ├── events/               # Event-related examples
-    │   ├── types/            # GTS Type Schemas (JSON Schema documents)
-    │   └── instances/        # JSON instance examples
-    └── ...                   # Other domain examples
+├── LICENSE                   # License
+├── NOTICE                    # Attribution notices
+├── adr/                      # Architecture Decision Records (+ template.md)
+├── examples/                 # GTS Types and Instances in JSON, YAML, and TypeSpec
+├── tests/                    # Implementation-independent HTTP conformance tests
+└── .github/workflows/        # CI and release workflows
 ```
 
 ## Development Workflow
@@ -57,15 +57,25 @@ Use descriptive branch names:
 
 Follow the specification standards and patterns described below.
 
+#### Specification changes require an ADR
+
+Any proposal that adds normative behavior to the specification or intentionally changes existing normative behavior **MUST go through the Architecture Decision Record (ADR) process**. Start by copying the project-adapted MADR [`ADR template`](adr/template.md) to the next sequentially numbered file under [`adr/`](adr/) and fill in all applicable sections. The specification, tests, and examples must reference or implement the decision where applicable.
+
+Open the pull request with the ADR already at **`Status: Accepted`** — the decision is what is under review, so accepting the ADR *is* merging the pull request. There is no separate approval step and no `Proposed` state in the repository: an ADR on `main` is accepted by definition. A decision that is later replaced keeps its file and moves to `Status: Superseded`, with `Superseded by` pointing at the ADR that replaces it (and that ADR's `Supersedes` pointing back). The ADR may be reviewed in its own pull request or together with the resulting specification change; either way it must not be merged before the reviewers agree on the decision itself.
+
+A confirmed bug fix does not require a new ADR when it only restores behavior already established by the specification or an accepted ADR. If fixing the issue requires choosing new semantics, it is a specification change and therefore requires an ADR.
+
 ### 3. Validate Your Changes
 
 ```bash
-# Validate all schemas in a directory
-ajv compile --strict=false -s "examples/events/types/*.schema.json"
+# Validate the JSON Schema examples covered by CI
+ajv compile -s "examples/*/types/*.schema.json" --strict=false
 
-# Run Python reference implementation tests (if available)
-python -m pytest tests/
+# Run the conformance tests against a GTS server already listening on port 8000
+python -m pytest tests/ --gts-base-url http://127.0.0.1:8000
 ```
+
+Run the checks relevant to the files you changed. JSONC, YAML, TypeSpec, nested example directories, and unresolved `gts://` references may require their own format-aware validation in addition to the CI command above. For test-suite setup and targeted test invocations, follow [`tests/README.md`](tests/README.md).
 
 ### 4. Commit Changes
 
@@ -113,8 +123,9 @@ Specification development guidelines:
 
 - Follow GTS identifier format rules strictly
 - Ensure all schemas use correct `$id` values
-- Validate schemas against JSON Schema Draft 7 or later
+- Declare the intended JSON Schema dialect with `$schema` and use keywords valid for that dialect; GTS is dialect-agnostic, while repository examples generally use Draft-07 for interoperability
 - Include both GTS Type Schemas (the canonical JSON definitions of types) and GTS Instance examples
+- Keep normative specification changes, conformance tests, and examples aligned
 - Document any deviations or implementation-specific choices
 
 ## Releases
@@ -139,8 +150,8 @@ When the specification moves to the next minor version (e.g. `0.11` → `0.12`),
 Releases are produced from `github.com/GlobalTypeSystem/gts-spec`. The workflow is restricted to that repository; pushing a tag from a fork has no effect.
 
 ```bash
-git tag v0.11.3
-git push origin v0.11.3
+git tag vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 The [`Release Tests Image`](.github/workflows/release-tests-image.yml) workflow:
