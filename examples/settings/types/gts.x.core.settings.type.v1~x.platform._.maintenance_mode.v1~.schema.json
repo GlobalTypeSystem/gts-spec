@@ -30,6 +30,7 @@
   ],
   "x-gts-traits": {
     "scope_class": "global",
+    "data_classification": "public",
     "mode": "standard",
     "tenant_visible": true,
     "tenant_overridable": false,
