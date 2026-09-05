@@ -1,0 +1,42 @@
+[
+  // Platform-scope default: new dashboard is disabled platform-wide.
+  {
+    "type": "gts.x.core.settings.type.v1~x.platform._.feature_new_dashboard.v1~",
+    "tenant_id": "00000000-0000-0000-0000-000000000000",
+    "data_classification": "public",
+    "value": {
+      "enabled": false
+    }
+  },
+  // Platform-scope override: platform administrator has enabled the new dashboard globally.
+  {
+    "type": "gts.x.core.settings.type.v1~x.platform._.feature_new_dashboard.v1~",
+    "tenant_id": "00000000-0000-0000-0000-000000000000",
+    "data_classification": "public",
+    "value": {
+      "enabled": true
+    }
+  },
+  // Tenant-scope override: tenant 'acme-corp' has opted out while the platform default is true.
+  // Cascading — this tenant and its non-overriding descendants see enabled=false.
+  {
+    "type": "gts.x.core.settings.type.v1~x.platform._.feature_new_dashboard.v1~",
+    "tenant_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "data_classification": "public",
+    "value": {
+      "enabled": false
+    }
+  },
+  // Subject-scoped override: setting attached to a specific user within tenant 'acme-corp'.
+  // subject_type is a GTS type reference; subject_id identifies the user.
+  {
+    "type": "gts.x.core.settings.type.v1~x.platform._.feature_new_dashboard.v1~",
+    "tenant_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "data_classification": "public",
+    "subject_type": "gts.x.core.idp.user.v1~",
+    "subject_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef",
+    "value": {
+      "enabled": true
+    }
+  }
+]

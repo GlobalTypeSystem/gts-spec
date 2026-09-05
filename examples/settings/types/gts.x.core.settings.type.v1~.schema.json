@@ -1,0 +1,77 @@
+{
+  "$id": "gts://gts.x.core.settings.type.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-gts-abstract": true,
+  "title": "Setting Envelope (Base)",
+  "description": "Abstract base type for all settings in the platform Settings Service. Defines the common envelope fields (type, tenant, subject, data classification) and an open 'value' container that derived types constrain to the concrete shape required by each setting.",
+  "type": "object",
+  "required": ["type", "tenant_id", "data_classification", "value"],
+  "properties": {
+    "type": {
+      "description": "GTS Type Identifier of this setting.",
+      "type": "string",
+      "x-gts-ref": "/$id"
+    },
+    "tenant_id": {
+      "description": "UUID of the tenant scope this setting value belongs to.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "data_classification": {
+      "description": "Data-sensitivity classification of this setting value. 'public': no special handling. 'pii': visible unmasked only to callers authorized for PII; masked otherwise. 'secret': encrypted at rest, masked on all administrative/human paths, plaintext only via the machine-only runtime SDK.",
+      "type": "string",
+      "enum": ["public", "pii", "secret"]
+    },
+    "subject_type": {
+      "description": "GTS type of the object the setting belongs to (e.g. tenant, user, integration, host). When absent the subject is the tenant itself and subject_id is implied to equal tenant_id.",
+      "type": "string",
+      "x-gts-ref": "gts.*"
+    },
+    "subject_id": {
+      "description": "UUID of the object the setting belongs to. MUST NOT be null when subject_type is set.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "value": {
+      "description": "The setting value object. Shape is defined by derived types.",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "x-gts-traits-schema": {
+    "type": "object",
+    "required": ["scope_class"],
+    "properties": {
+      "scope_class": {
+        "description": "Determines override and cascade behaviour. 'global': value lives only at platform scope, never tenant-overridable or inherited. 'cascading': value inherits down the tenant scope hierarchy with overrides at permitted scopes. 'local': value applies only at the scope where set, never inherited by descendants.",
+        "type": "string",
+        "enum": ["global", "cascading", "local"]
+      },
+      "mode": {
+        "description": "Visibility/complexity level for progressive disclosure. 'standard': shown by default. 'advanced': hidden unless the administrator opts in to Advanced mode.",
+        "type": "string",
+        "enum": ["standard", "advanced"],
+        "default": "standard"
+      },
+      "tenant_visible": {
+        "description": "Whether a tenant administrator may see this setting. When false the setting is excluded from every tenant-facing read path.",
+        "type": "boolean",
+        "default": false
+      },
+      "tenant_overridable": {
+        "description": "Whether a tenant administrator may set their own override for this setting. Has no effect when scope_class is 'global' (global settings are never tenant-overridable).",
+        "type": "boolean",
+        "default": false
+      },
+      "domain_affinity": {
+        "description": "Optional administrative domain binding (e.g. 'infrastructure', 'commercial'). When set, the settings hub filters by the administrator's current domain.",
+        "type": "string"
+      },
+      "barrier_traversable": {
+        "description": "Whether this setting's default may traverse hierarchy barriers to reach isolated/unmanaged tenants via the downstream-only barrier seam. Never applies to secret-classified values.",
+        "type": "boolean",
+        "default": false
+      }
+    }
+  }
+}

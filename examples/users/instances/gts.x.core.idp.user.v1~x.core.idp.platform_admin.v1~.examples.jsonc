@@ -1,0 +1,30 @@
+[
+  // Active platform administrator with MFA enabled.
+  {
+    "id": "f0e1d2c3-b4a5-6789-0123-456789abcdef",
+    "type": "gts.x.core.idp.user.v1~x.core.idp.platform_admin.v1~",
+    "tenant_id": "00000000-0000-0000-0000-000000000000",
+    "email": "admin@example.com",
+    "display_name": "Alice Admin",
+    "status": "active",
+    "created_at": "2025-01-15T09:00:00Z",
+    "updated_at": "2025-06-01T14:30:00Z",
+    "properties": {
+      "mfa_enabled": true,
+      "admin_notes": "Primary infrastructure admin — on-call rotation lead."
+    }
+  },
+  // Newly created admin, MFA not yet configured, still in pending status.
+  {
+    "id": "a1b2c3d4-e5f6-7890-abcd-000000000001",
+    "type": "gts.x.core.idp.user.v1~x.core.idp.platform_admin.v1~",
+    "tenant_id": "00000000-0000-0000-0000-000000000000",
+    "email": "bob@example.com",
+    "display_name": "Bob Builder",
+    "status": "pending",
+    "created_at": "2025-09-01T10:00:00Z",
+    "properties": {
+      "mfa_enabled": false
+    }
+  }
+]

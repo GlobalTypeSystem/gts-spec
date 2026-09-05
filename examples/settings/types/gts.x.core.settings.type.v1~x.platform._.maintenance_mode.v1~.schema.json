@@ -1,0 +1,38 @@
+{
+  "$id": "gts://gts.x.core.settings.type.v1~x.platform._.maintenance_mode.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Maintenance Mode Flag",
+  "description": "Global boolean flag that puts the platform into maintenance mode. Tenant-visible (read-only) so tenants can see the platform state, but never tenant-overridable.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.settings.type.v1~" },
+    {
+      "type": "object",
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "const": "gts.x.core.settings.type.v1~x.platform._.maintenance_mode.v1~"
+        },
+        "value": {
+          "type": "object",
+          "required": ["enabled"],
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "When true the platform is in maintenance mode.",
+              "default": false
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ],
+  "x-gts-traits": {
+    "scope_class": "global",
+    "mode": "standard",
+    "tenant_visible": true,
+    "tenant_overridable": false,
+    "domain_affinity": "infrastructure"
+  }
+}

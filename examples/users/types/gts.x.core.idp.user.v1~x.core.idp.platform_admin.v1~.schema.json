@@ -1,0 +1,35 @@
+{
+  "$id": "gts://gts.x.core.idp.user.v1~x.core.idp.platform_admin.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Platform Administrator",
+  "description": "Concrete user type for platform administrators. Adds MFA requirement and an optional admin notes field.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.idp.user.v1~" },
+    {
+      "type": "object",
+      "required": ["type", "properties"],
+      "properties": {
+        "type": {
+          "const": "gts.x.core.idp.user.v1~x.core.idp.platform_admin.v1~"
+        },
+        "properties": {
+          "type": "object",
+          "required": ["mfa_enabled"],
+          "properties": {
+            "mfa_enabled": {
+              "type": "boolean",
+              "description": "Whether multi-factor authentication is enabled for this admin."
+            },
+            "admin_notes": {
+              "type": "string",
+              "description": "Internal notes visible only to other platform administrators.",
+              "maxLength": 1000
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "$id": "gts://gts.x.core.idp.user.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-gts-abstract": true,
+  "title": "User (Base)",
+  "description": "Abstract base type for platform user identities. Derived types add vendor- or role-specific fields via the open 'properties' container.",
+  "type": "object",
+  "required": ["id", "type", "tenant_id", "email", "display_name", "status"],
+  "properties": {
+    "id": {
+      "description": "Unique user identifier.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "description": "GTS Type Identifier of this user.",
+      "type": "string",
+      "x-gts-ref": "/$id"
+    },
+    "tenant_id": {
+      "description": "UUID of the tenant this user belongs to.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "email": {
+      "description": "Primary email address.",
+      "type": "string",
+      "format": "email"
+    },
+    "display_name": {
+      "description": "Human-readable display name.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "status": {
+      "description": "Account lifecycle status.",
+      "type": "string",
+      "enum": ["active", "inactive", "suspended", "pending"]
+    },
+    "created_at": {
+      "description": "Timestamp when the user was created.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "description": "Timestamp of the last update.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "properties": {
+      "description": "Extension point for derived types. Vendor- or role-specific fields go here.",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
