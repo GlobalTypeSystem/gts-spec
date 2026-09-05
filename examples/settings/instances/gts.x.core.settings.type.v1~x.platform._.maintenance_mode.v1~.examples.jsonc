@@ -4,7 +4,6 @@
   {
     "type": "gts.x.core.settings.type.v1~x.platform._.maintenance_mode.v1~",
     "tenant_id": "00000000-0000-0000-0000-000000000000",
-    "data_classification": "public",
     "value": {
       "enabled": false
     }
@@ -13,7 +12,6 @@
   {
     "type": "gts.x.core.settings.type.v1~x.platform._.maintenance_mode.v1~",
     "tenant_id": "00000000-0000-0000-0000-000000000000",
-    "data_classification": "public",
     "value": {
       "enabled": true
     }

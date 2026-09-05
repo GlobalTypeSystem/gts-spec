@@ -30,6 +30,7 @@
   ],
   "x-gts-traits": {
     "scope_class": "cascading",
+    "data_classification": "public",
     "mode": "standard",
     "tenant_visible": true,
     "tenant_overridable": true,
