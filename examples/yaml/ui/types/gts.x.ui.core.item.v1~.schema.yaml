@@ -9,13 +9,13 @@ description: |
 type: object
 
 required:
-  - gtsId
+  - gtsType
   - id
   - type
   - label
 
 properties:
-  gtsId:
+  gtsType:
     type: string
     description: GTS identifier of the UI item type
     x-gts-ref: /$id

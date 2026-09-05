@@ -32,7 +32,7 @@
     }
   ],
   "x-gts-traits": {
-    "topicRef": "gts.x.core.events.topic.v1~x.commerce._.orders.v1",
+    "topicRef": "gts.x.core.events.topic.v1~x.commerce._.orders.v1.0",
     "retention": "P90D"
   }
 }
