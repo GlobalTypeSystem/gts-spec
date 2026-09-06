@@ -8,10 +8,14 @@
     { "$ref": "gts://gts.x.core.settings.type.v1~" },
     {
       "type": "object",
-      "required": ["type", "value"],
+      "required": ["type", "subject_type", "subject_id", "value"],
       "properties": {
         "type": {
           "const": "gts.x.core.settings.type.v1~x.platform._.feature_new_dashboard.v1~"
+        },
+        "subject_type": {
+          "type": "string",
+          "x-gts-ref": "gts.x.core.idp.user.v1~"
         },
         "value": {
           "type": "object",

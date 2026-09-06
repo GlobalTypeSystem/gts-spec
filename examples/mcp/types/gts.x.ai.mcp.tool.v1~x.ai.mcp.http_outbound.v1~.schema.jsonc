@@ -46,8 +46,7 @@
           "additionalProperties": false
         }
       },
-      "required": ["security", "capabilities"],
-      "additionalProperties": false
+      "required": ["security", "capabilities"]
     }
   ]
 }

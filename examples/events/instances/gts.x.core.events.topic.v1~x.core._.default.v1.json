@@ -1,0 +1,10 @@
+{
+  "id": "gts.x.core.events.topic.v1~x.core._.default.v1",
+  "name": "default",
+  "description": "Default platform event topic. Used when an event type does not declare a specific topicRef trait.",
+  "retention": "P30D",
+  "ordering": "global",
+  "partitions": 1,
+  "dedup": { "strategy": "none" },
+  "storage": { "kind": "db", "config": { "table": "events_default" } }
+}

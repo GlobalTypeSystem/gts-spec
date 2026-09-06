@@ -6,11 +6,11 @@
     "description": "Base type for all VM power states. Final: no derived types allowed.",
     "type": "object",
     "required": [
-        "gtsId",
+        "id",
         "description"
     ],
     "properties": {
-        "gtsId": {
+        "id": {
             "type": "string",
             "description": "GTS identifier of the power state type",
             "x-gts-ref": "/$id"
