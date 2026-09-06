@@ -349,6 +349,44 @@ class TestCaseTestOp6SchemaValidation_SchemaNonGtsId(HttpRunner):
     ]
 
 
+class TestCaseTestOp6SchemaValidation_SchemaGtsUriWithInvalidBody(HttpRunner):
+    """OP#6 - Reject schema whose $id uses gts:// URI but has invalid body.
+
+    A schema's ``$id`` must use the ``gts://`` URI scheme followed by a valid
+    GTS Type Identifier starting with ``gts.``.  A value like
+    ``gts://gtx.vendor.pkg.ns.type.v1~`` uses the correct URI scheme but has
+    a malformed body (``gtx.`` instead of ``gts.``).  Registration must return
+    422.
+    """
+
+    config = Config(
+        "OP#6 - Schema Validation: reject gts:// with invalid body"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest(
+                "register schema with gts:// URI but non-gts body should fail"
+            )
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gtx.x.test6.invalid_uri_body.bad_prefix.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
 class TestCaseTestOp6SchemaValidation_UnknownInstanceFormat(HttpRunner):
     """OP#6 - Reject instance with no recognizable GTS id/type fields.
 
