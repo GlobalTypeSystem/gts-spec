@@ -4646,3 +4646,39 @@ class TestCaseOp13_Merge_DeleteThenReadd_AcrossLayers(HttpRunner):
             "validate leaf - retention re-added after mid deleted it",
         ),
     ]
+
+
+class TestCaseOp13_NullDefault(HttpRunner):
+    """OP#13: JSON null is a materializable trait default."""
+
+    config = Config("OP#13 - null trait default").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.nulldefault.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "value": {
+                            "type": ["string", "null"],
+                            "default": None,
+                        },
+                    },
+                    "required": ["value"],
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base with a null trait default",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.nulldefault.event.v1~",
+            True,
+            "validate schema - null default resolves required trait",
+        ),
+    ]

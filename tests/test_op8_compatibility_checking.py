@@ -1565,5 +1565,57 @@ class TestCaseTestOp8Compatibility_ReferencedTypeWidened(HttpRunner):
     ]
 
 
+class TestCaseOp8_EnumTypeIntersection(HttpRunner):
+    """OP#8: enum and type assertions must be compared as an intersection."""
+
+    config = Config("OP#8 - enum/type intersection").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register mixed enum schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.enumtype.sample.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["code"],
+                "properties": {"code": {"enum": ["x", 1]}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register narrowed enum schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.enumtype.sample.v1.1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["code"],
+                "properties": {"code": {"enum": ["x", 1], "type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check enum type narrowing compatibility")
+            .get("/compatibility")
+            .with_params(
+                **{
+                    "old_type_id": "gts.x.test8.enumtype.sample.v1.0~",
+                    "new_type_id": "gts.x.test8.enumtype.sample.v1.1~",
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "incompatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()

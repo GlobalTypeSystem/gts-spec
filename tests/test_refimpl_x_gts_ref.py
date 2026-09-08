@@ -1013,6 +1013,106 @@ class TestCaseXGtsRef_NestedCombinators(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_StandardJsonSchemaRegression(HttpRunner):
+    """Standard combinators and modern GTS refs retain JSON Schema semantics."""
+
+    config = Config("x-gts-ref: standard JSON Schema regressions").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with ordinary oneOf")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_reg._.plain_oneof.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["value"],
+                "properties": {
+                    "value": {
+                        "oneOf": [{"type": "string"}, {"type": "integer"}],
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register valid ordinary oneOf instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_reg._.plain_oneof.v1~x.testref_reg._.item.v1",
+                "value": "valid",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate ordinary oneOf instance")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_reg._.plain_oneof.v1~x.testref_reg._.item.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest("register modern reference target")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_reg._.target.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register modern schema with GTS ref sibling")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_reg._.ref_sibling.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["value"],
+                "properties": {
+                    "value": {
+                        "$$ref": "gts://gts.x.testref_reg._.target.v1~",
+                        "minLength": 3,
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register too-short modern reference instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_reg._.ref_sibling.v1~x.testref_reg._.item.v1",
+                "value": "x",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate too-short modern reference instance")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_reg._.ref_sibling.v1~x.testref_reg._.item.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_JsonPointer().test_start()
@@ -1021,3 +1121,4 @@ if __name__ == "__main__":
     TestCaseXGtsRef_AnyOf().test_start()
     TestCaseXGtsRef_AllOf().test_start()
     TestCaseXGtsRef_NestedCombinators().test_start()
+    TestCaseXGtsRef_StandardJsonSchemaRegression().test_start()
