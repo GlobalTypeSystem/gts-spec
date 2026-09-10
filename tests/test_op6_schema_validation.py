@@ -7,7 +7,11 @@ extended JSON Schema constraints (formats, nesting, enums, arrays).
 """
 
 from .conftest import get_gts_base_url
-from .helpers.http_run_helpers import register as _register
+from .helpers.http_run_helpers import (
+    register as _register,
+    register_instance as _register_instance,
+    validate_instance as _validate_instance,
+)
 from httprunner import HttpRunner, Config, Step, RunRequest
 
 
@@ -831,6 +835,91 @@ class TestCaseTestOp6Validation_FormatValidation(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", True)
         ),
+    ]
+
+
+_STANDARD_FORMAT_TYPE_ID = "gts.x.test6.formats.standard.v1~"
+_STANDARD_FORMATS = (
+    ("uuidValue", "uuid", "550e8400-e29b-41d4-a716-446655440000", "not-a-uuid"),
+    ("emailValue", "email", "user@example.com", "not-an-email"),
+    ("dateTimeValue", "date-time", "2025-01-15T10:30:00Z", "not-date-time"),
+    ("dateValue", "date", "2025-01-15", "2025-13-40"),
+    ("timeValue", "time", "10:30:00Z", "25:99:99Z"),
+    ("uriValue", "uri", "https://example.com/resource", "://not-a-uri"),
+    ("hostnameValue", "hostname", "example.com", "not a hostname"),
+    ("ipv4Value", "ipv4", "192.168.1.1", "999.999.999.999"),
+    ("ipv6Value", "ipv6", "2001:db8::1", "not-an-ipv6-address"),
+)
+_STANDARD_FORMAT_VALUES = {
+    field: valid for field, _, valid, _ in _STANDARD_FORMATS
+}
+_STANDARD_FORMAT_SCHEMA = {
+    "type": "object",
+    "required": [field for field, _, _, _ in _STANDARD_FORMATS],
+    "properties": {
+        field: {"type": "string", "format": format_name}
+        for field, format_name, _, _ in _STANDARD_FORMATS
+    },
+}
+
+
+class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
+    """OP#6 - Enforce standard JSON Schema formats on instance properties.
+
+    ``url`` is not a standard JSON Schema format; HTTPS URL values are covered
+    by the standard ``uri`` format instead.
+    """
+    config = Config("OP#6 Extended - Standard Format Validation").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            f"gts://{_STANDARD_FORMAT_TYPE_ID}",
+            _STANDARD_FORMAT_SCHEMA,
+            "register schema with standard formats",
+        ),
+        _register_instance(
+            {
+                "type": _STANDARD_FORMAT_TYPE_ID,
+                "id": f"{_STANDARD_FORMAT_TYPE_ID}x.test6._.valid_formats.v1.0",
+                **_STANDARD_FORMAT_VALUES,
+            },
+            "register instance with valid standard formats",
+        ),
+        _validate_instance(
+            f"{_STANDARD_FORMAT_TYPE_ID}x.test6._.valid_formats.v1.0",
+            True,
+            "validate instance with valid standard formats",
+        ),
+        *[
+            _register_instance(
+                {
+                    "type": _STANDARD_FORMAT_TYPE_ID,
+                    "id": (
+                        f"{_STANDARD_FORMAT_TYPE_ID}"
+                        f"x.test6._.invalid_{field}.v1.0"
+                    ),
+                    **{**_STANDARD_FORMAT_VALUES, field: invalid},
+                },
+                f"register instance with invalid {format_name}",
+            )
+            for field, format_name, _, invalid in _STANDARD_FORMATS
+        ],
+        *[
+            _validate_instance(
+                (
+                    f"{_STANDARD_FORMAT_TYPE_ID}"
+                    f"x.test6._.invalid_{field}.v1.0"
+                ),
+                False,
+                f"reject instance with invalid {format_name}",
+            )
+            for field, format_name, _, _ in _STANDARD_FORMATS
+        ],
     ]
 
 
