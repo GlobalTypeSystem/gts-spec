@@ -1913,6 +1913,481 @@ class TestCaseUnknown_RefTypoRejected(HttpRunner):
         ),
     ]
 
+# ---------------------------------------------------------------------------
+# /validate-json tests
+# ---------------------------------------------------------------------------
+
+def _raw_json_schema(type_id, required_field="name"):
+    return {
+        "$$id": f"gts://{type_id}",
+        "$$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "required": [required_field],
+        "properties": {required_field: {"type": "string"}},
+        "additionalProperties": False,
+    }
+
+
+def _assert_not_stored(gts_id):
+    return Step(
+        RunRequest("transient entity must not be stored")
+        .get(f"/entities/{gts_id}")
+        .validate()
+        .assert_equal("status_code", 200)
+        .assert_equal("body.ok", False)
+    )
+
+
+class TestCaseOp6ValidateJson_AutoBaseSchema(HttpRunner):
+    config = Config("OP#6 validate-json: transient base schema").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("validate a base schema without registration")
+            .post("/validate-json")
+            .with_json(_raw_json_schema("gts.x.test6json.auto_base.v1~"))
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_type_schema", True)
+        ),
+        _assert_not_stored("gts.x.test6json.auto_base.v1~"),
+    ]
+
+
+class TestCaseOp6ValidateJson_AutoInvalidSchema(HttpRunner):
+    config = Config("OP#6 validate-json: invalid transient schema").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject an invalid transient schema")
+            .post("/validate-json")
+            .with_json({
+                "$$id": "gts://gts.x.test6json.invalid_schema.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": 1,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", True)
+            .assert_contains("body.error", "JSON Schema validation failed")
+        ),
+        _assert_not_stored("gts.x.test6json.invalid_schema.v1~"),
+    ]
+
+
+class TestCaseOp6ValidateJson_AutoDerivedSchema(HttpRunner):
+    config = Config("OP#6 validate-json: transient derived schema").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.derived_base.v1~", {
+            "type": "object",
+            "properties": {"base": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("validate a derived schema without registration")
+            .post("/validate-json")
+            .with_json({
+                "$$id": "gts://gts.x.test6json.derived_base.v1~x.test6json._.derived.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$ref": "gts://gts.x.test6json.derived_base.v1~"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_type_schema", True)
+        ),
+        _assert_not_stored("gts.x.test6json.derived_base.v1~x.test6json._.derived.v1~"),
+    ]
+
+
+class TestCaseOp6ValidateJson_AutoDerivedSchemaMissingParent(HttpRunner):
+    config = Config("OP#6 validate-json: derived schema missing parent").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject a derived schema whose parent is not registered")
+            .post("/validate-json")
+            .with_json({
+                "$$id": "gts://gts.x.test6json.missing_base.v1~x.test6json._.derived.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", True)
+            .assert_contains("body.error", "Parent GTS Type Schema not found")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_AutoInstance(HttpRunner):
+    config = Config("OP#6 validate-json: transient instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.auto_instance.v1~", {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("validate a transient instance using its declared type")
+            .post("/validate-json")
+            .with_json({
+                "id": "gts.x.test6json.auto_instance.v1~x.test6json._.item.v1",
+                "type": "gts.x.test6json.auto_instance.v1~",
+                "name": "valid",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_type_schema", False)
+        ),
+        _assert_not_stored("gts.x.test6json.auto_instance.v1~x.test6json._.item.v1"),
+    ]
+
+
+class TestCaseOp6ValidateJson_AutoInvalidInstance(HttpRunner):
+    config = Config("OP#6 validate-json: invalid transient instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.auto_invalid.v1~", {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("reject an invalid transient instance")
+            .post("/validate-json")
+            .with_json({
+                "id": "gts.x.test6json.auto_invalid.v1~x.test6json._.item.v1",
+                "type": "gts.x.test6json.auto_invalid.v1~",
+                "name": 1,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", False)
+            .assert_contains("body.error", "is not of type 'string'")
+        ),
+        _assert_not_stored("gts.x.test6json.auto_invalid.v1~x.test6json._.item.v1"),
+    ]
+
+
+class TestCaseOp6ValidateJson_AutoIdlessInstance(HttpRunner):
+    config = Config("OP#6 validate-json: idless transient instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.idless.v1~", {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("validate an idless transient instance")
+            .post("/validate-json")
+            .with_json({"type": "gts.x.test6json.idless.v1~", "name": "valid"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_type_schema", False)
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_AutoInstanceMissingType(HttpRunner):
+    config = Config("OP#6 validate-json: instance without type").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject a transient instance without a type")
+            .post("/validate-json")
+            .with_json({"id": "gts.x.test6json.no_type.v1"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", False)
+            .assert_contains("body.error", "Unable to determine instance type")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_ExplicitType(HttpRunner):
+    config = Config("OP#6 validate-json: explicit base type").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.explicit.v1~", {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("validate a transient object against an explicit type")
+            .post("/validate-json/gts.x.test6json.explicit.v1~")
+            .with_json({
+                "id": "gts.x.test6json.explicit.v1~x.test6json._.item.v1",
+                "name": "valid",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_type_schema", False)
+            .assert_equal("body.type_id", "gts.x.test6json.explicit.v1~")
+        ),
+        _assert_not_stored("gts.x.test6json.explicit.v1~x.test6json._.item.v1"),
+    ]
+
+
+class TestCaseOp6ValidateJson_ExplicitTypeInvalidInstance(HttpRunner):
+    config = Config("OP#6 validate-json: invalid explicit type instance").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.explicit_invalid.v1~", {
+            "type": "object",
+            "required": ["name"],
+            "properties": {"name": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("reject an invalid transient object against an explicit type")
+            .post("/validate-json/gts.x.test6json.explicit_invalid.v1~")
+            .with_json({"name": 1})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", False)
+            .assert_contains("body.error", "is not of type 'string'")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_ExplicitDerivedType(HttpRunner):
+    config = Config("OP#6 validate-json: explicit derived type").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.explicit_derived.v1~", {
+            "type": "object",
+            "required": ["base"],
+            "properties": {"base": {"type": "string"}},
+        }),
+        _register("gts://gts.x.test6json.explicit_derived.v1~x.test6json._.child.v1~", {
+            "type": "object",
+            "allOf": [{"$$ref": "gts://gts.x.test6json.explicit_derived.v1~"}],
+            "required": ["child"],
+            "properties": {"child": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("validate an object against an explicit derived type")
+            .post("/validate-json/gts.x.test6json.explicit_derived.v1~x.test6json._.child.v1~")
+            .with_json({"base": "base", "child": "child"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.type_id", "gts.x.test6json.explicit_derived.v1~x.test6json._.child.v1~")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_ExplicitSchemaWithoutEmbeddedIdentity(HttpRunner):
+    config = Config("OP#6 validate-json: explicit schema without embedded identity").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register an explicit schema without $id or root type")
+            .post("/type-schemas")
+            .with_json({
+                "type_id": "gts.x.test6json.external_identity.v1~",
+                "type_schema": {
+                    "properties": {"prop": {"type": "string"}},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest("validate an object against the explicit schema")
+            .post("/validate-json/gts.x.test6json.external_identity.v1~")
+            .with_json({"prop": "valid"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.type_id", "gts.x.test6json.external_identity.v1~")
+        ),
+        Step(
+            RunRequest("reject a non-matching object against the explicit schema")
+            .post("/validate-json/gts.x.test6json.external_identity.v1~")
+            .with_json({"prop": 1})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "is not of type 'string'")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_MalformedExplicitType(HttpRunner):
+    config = Config("OP#6 validate-json: malformed explicit type").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject a malformed explicit type")
+            .post("/validate-json/not-a-gts-type")
+            .with_json({"name": "valid"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "Invalid GTS Type Schema ID")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_UnknownExplicitType(HttpRunner):
+    config = Config("OP#6 validate-json: unknown explicit type").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject an explicit type that is not registered")
+            .post("/validate-json/gts.x.test6json.unknown.v1~")
+            .with_json({"name": "valid"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "GTS Type Schema not found")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_ExplicitNonSchemaType(HttpRunner):
+    config = Config("OP#6 validate-json: explicit non-schema type").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject an explicit GTS instance ID as a type")
+            .post("/validate-json/gts.x.test6json.not_schema.v1")
+            .with_json({"name": "valid"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "must be GTS Type schema")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_ExplicitTypeMismatch(HttpRunner):
+    config = Config("OP#6 validate-json: explicit type mismatch").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.expected.v1~", {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+        }),
+        _register("gts://gts.x.test6json.declared.v1~", {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("reject a body whose declared type conflicts with the path type")
+            .post("/validate-json/gts.x.test6json.expected.v1~")
+            .with_json({"type": "gts.x.test6json.declared.v1~", "name": "valid"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "does not match path type")
+        ),
+    ]
+
+
+class TestCaseOp6ValidateJson_ExplicitTypeRejectsSchema(HttpRunner):
+    config = Config("OP#6 validate-json: schema with explicit type").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register("gts://gts.x.test6json.schema_path.v1~", {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+        }),
+        Step(
+            RunRequest("reject a schema body on the explicit type route")
+            .post("/validate-json/gts.x.test6json.schema_path.v1~")
+            .with_json(_raw_json_schema("gts.x.test6json.rejected_schema.v1~"))
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "only accepts instance JSON")
+        ),
+        _assert_not_stored("gts.x.test6json.rejected_schema.v1~"),
+    ]
+
+
+class TestCaseOp6ValidateJson_NonObjectBody(HttpRunner):
+    config = Config("OP#6 validate-json: non-object request body").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject a non-object JSON validation body")
+            .post("/validate-json")
+            .with_json(["not", "an", "object"])
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
 
 if __name__ == "__main__":
     TestCaseTestOp6ValidateInstance_ValidInstance().test_start()
