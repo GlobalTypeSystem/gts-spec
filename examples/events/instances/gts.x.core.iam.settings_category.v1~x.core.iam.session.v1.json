@@ -1,0 +1,5 @@
+{
+  "id": "gts.x.core.iam.settings_category.v1~x.core.iam.session.v1",
+  "name": "Session",
+  "description": "Session timeout, idle expiry, and concurrent session rules."
+}

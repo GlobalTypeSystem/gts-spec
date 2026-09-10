@@ -1,0 +1,34 @@
+{
+  "$id": "gts://gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~x.core.iam.mfa_policy.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "MFA Policy Setting",
+  "description": "Concrete security policy type for multi-factor authentication enforcement.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~" },
+    {
+      "type": "object",
+      "properties": {
+        "properties": {
+          "type": "object",
+          "required": ["required", "allowedMethods", "gracePeriodDays"],
+          "properties": {
+            "required": {
+              "description": "Whether MFA is mandatory.",
+              "type": "boolean"
+            },
+            "allowedMethods": {
+              "description": "Permitted MFA methods.",
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "gracePeriodDays": {
+              "description": "Number of days before MFA becomes mandatory after enablement.",
+              "type": "integer"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

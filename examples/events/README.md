@@ -29,6 +29,23 @@ Alternative combined anonymous instance id form (type chain + UUID tail embedded
 - Derived schema: `./types/gts.x.core.events.type_combined.v1~x.commerce.orders.order_placed.v1.0~.schema.json`
 - Instance: `./instances/gts.x.core.events.type_combined.v1~x.commerce.orders.order_placed.v1.0~.examples.json`
 
+### 3-level type derivation (base → abstract → concrete)
+
+GTS supports multi-level type inheritance. The audit event family demonstrates a **3-level chain**:
+
+| Level | GTS Type Identifier | Abstract? | Description |
+|-------|---------------------|-----------|-------------|
+| 1 — Base | `gts.x.core.events.type.v1~` | yes | Generic event envelope |
+| 2 — Derived | `gts.x.core.events.type.v1~x.core.audit.type.v1~` | yes | Audit event — adds `action`, `actor_id`, `ip_address`, `user_agent` |
+| 3 — Concrete | `gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~` | no | IAM Settings Changed audit event |
+
+Each level uses `allOf` + `$ref` to derive from its parent:
+
+- **Level 2** schema: `./types/gts.x.core.events.type.v1~x.core.audit.type.v1~.schema.json`
+- **Level 3** schema: `./types/gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~.schema.json`
+- **Topic**: `./instances/gts.x.core.events.topic.v1~x.core.audit.events.v1.json`
+- **Instance**: `./instances/gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~.examples.json`
+
 ### Field name aliases (recommended)
 
 If a payload cannot use `id` / `type`, implementations may also support:
