@@ -248,6 +248,7 @@ class TestCaseTestOp6SchemaValidation_InvalidSchemaIdPrefix(HttpRunner):
             })
             .validate()
             .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
     ]
 
@@ -281,6 +282,7 @@ class TestCaseTestOp6SchemaValidation_InvalidSchemaIdWildcard(HttpRunner):
             })
             .validate()
             .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
     ]
 
@@ -313,6 +315,7 @@ class TestCaseTestOp6SchemaValidation_SchemaMissingId(HttpRunner):
             })
             .validate()
             .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
     ]
 
@@ -346,6 +349,7 @@ class TestCaseTestOp6SchemaValidation_SchemaNonGtsId(HttpRunner):
             })
             .validate()
             .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
     ]
 
@@ -384,6 +388,7 @@ class TestCaseTestOp6SchemaValidation_SchemaGtsUriWithInvalidBody(HttpRunner):
             })
             .validate()
             .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
     ]
 
