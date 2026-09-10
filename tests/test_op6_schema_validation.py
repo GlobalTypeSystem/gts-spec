@@ -7,6 +7,7 @@ extended JSON Schema constraints (formats, nesting, enums, arrays).
 """
 
 from .conftest import get_gts_base_url
+from .helpers.http_run_helpers import register as _register
 from httprunner import HttpRunner, Config, Step, RunRequest
 
 
@@ -1216,6 +1217,287 @@ class TestCaseOp6_AbstractType_RejectCombinedAnonInstance(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
             .assert_equal("body.id", "gts.x.test6.abstractcomb.base.v1~d2e3f4a5-6789-4abc-8def-222222222222")
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Unknown x-gts-* extension keyword tests
+#
+# The GTS Type Schema is a JSON Schema document annotated with the GTS-specific
+# keywords in the reserved `x-gts-*` namespace (README §Terminology / §9). The
+# specification defines exactly five such keywords:
+#
+# - x-gts-ref            (§9.6)
+# - x-gts-traits-schema  (§9.7)
+# - x-gts-traits         (§9.7)
+# - x-gts-final          (§9.11)
+# - x-gts-abstract       (§9.11)
+#
+# Any other `x-gts-*` key is an **unknown extension** — a typo (`x-gts-trait`),
+# a dropped/experimental keyword (`x-gts-traits-completeness`,
+# `x-gts-trait-merge`), or a vendor keyword that never became part of the spec.
+# Because the `x-gts-*` prefix is reserved for GTS semantics, an implementation
+# MUST NOT silently ignore an unknown one: when validation is enabled
+# (`?validate=true`) registration MUST fail fast (422) rather than accept a
+# schema whose GTS meaning the registry cannot interpret.
+#
+# These tests assert that:
+# - a schema exercising every supported `x-gts-*` keyword in a valid position is
+#   accepted with validation on (positive control);
+# - an unknown `x-gts-*` keyword is rejected wherever it appears — at the document
+#   top level, nested in a subschema (`properties` / `$defs` / `allOf` entry), and
+#   as a near-miss typo of a real keyword.
+#
+# The rule is about the *keyword name* being outside the supported set; it is
+# orthogonal to the placement rule for the four document-level keywords
+# (§9.7.1/§9.11, covered by test_xgts_keyword_placement.py).
+# ---------------------------------------------------------------------------
+
+_XGTS_SCHEMA = "http://json-schema.org/draft-07/schema#"
+
+
+def _register_validated(gts_id, body, expected_status, label):
+    """POST /entities?validate=true and assert the resulting status code.
+
+    `body` is the schema body without `$id`/`$schema`; both are injected here.
+    """
+    return Step(
+        RunRequest(label)
+        .post("/entities")
+        .with_params(**{"validate": "true"})
+        .with_json({
+            **body,
+            "$$id": gts_id,
+            "$$schema": _XGTS_SCHEMA,
+        })
+        .validate()
+        .assert_equal("status_code", expected_status)
+    )
+
+
+# Positive control — every supported x-gts-* keyword is accepted
+
+
+class TestCaseSupportedExtensions_Accepted(HttpRunner):
+    """All five supported x-gts-* keywords, in valid positions, register cleanly.
+
+    Positive control: proves the rejection tests below fail because of the
+    *unknown* keyword name, not because validation rejects x-gts-* wholesale.
+    Covers x-gts-abstract, x-gts-traits-schema and x-gts-ref on the base, and
+    x-gts-final and x-gts-traits on the derived type.
+    """
+
+    config = Config("unknown-ext: supported keywords accepted").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_validated(
+            "gts://gts.x.testext.supported.base.v1~",
+            {
+                "type": "object",
+                "x-gts-abstract": True,
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                },
+                "properties": {
+                    "id": {"type": "string"},
+                    "ownerRef": {"type": "string", "x-gts-ref": "gts.*"},
+                },
+            },
+            200,
+            "register base using x-gts-abstract, x-gts-traits-schema, x-gts-ref",
+        ),
+        Step(
+            RunRequest("register derived using x-gts-final and x-gts-traits")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.testext.supported.base.v1~x.testext._.leaf.v1~",
+                "$$schema": _XGTS_SCHEMA,
+                "type": "object",
+                "x-gts-final": True,
+                "x-gts-traits": {"retention": "P30D"},
+                "allOf": [{"$$ref": "gts://gts.x.testext.supported.base.v1~"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+    ]
+
+
+# Unknown x-gts-* keyword at the document top level
+
+
+class TestCaseUnknown_TopLevelRejected(HttpRunner):
+    """An unknown x-gts-* keyword at the top level MUST be rejected."""
+
+    config = Config("unknown-ext: unknown top-level keyword rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_validated(
+            "gts://gts.x.testext.toplevel.base.v1~",
+            {
+                "type": "object",
+                "x-gts-bogus": True,
+                "properties": {"id": {"type": "string"}},
+            },
+            422,
+            "register schema with unknown x-gts-bogus at top level should be rejected",
+        ),
+    ]
+
+
+# Unknown x-gts-* keyword nested in subschemas
+
+
+class TestCaseUnknown_InsidePropertiesRejected(HttpRunner):
+    """An unknown x-gts-* keyword nested in a `properties` subschema MUST be rejected."""
+
+    config = Config("unknown-ext: unknown keyword inside properties rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_validated(
+            "gts://gts.x.testext.prop.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "widget": {"type": "string", "x-gts-widget": "dropdown"},
+                },
+            },
+            422,
+            "register schema with unknown x-gts-widget inside a property should be rejected",
+        ),
+    ]
+
+
+class TestCaseUnknown_InsideDefsRejected(HttpRunner):
+    """An unknown x-gts-* keyword nested in a `definitions` entry MUST be rejected."""
+
+    config = Config("unknown-ext: unknown keyword inside definitions rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_validated(
+            "gts://gts.x.testext.defs.base.v1~",
+            {
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "definitions": {
+                    "Sub": {"type": "object", "x-gts-experimental": True},
+                },
+            },
+            422,
+            "register schema with unknown x-gts-experimental inside definitions should be rejected",
+        ),
+    ]
+
+
+class TestCaseUnknown_InsideAllOfRejected(HttpRunner):
+    """An unknown x-gts-* keyword nested in an `allOf` entry MUST be rejected."""
+
+    config = Config("unknown-ext: unknown keyword inside allOf rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.testext.allof.base.v1~",
+            {
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base for allOf derivation",
+        ),
+        Step(
+            RunRequest("register derived with unknown x-gts-* inside allOf should be rejected")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.testext.allof.base.v1~x.testext._.derived.v1~",
+                "$$schema": _XGTS_SCHEMA,
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.testext.allof.base.v1~"},
+                    {"type": "object", "x-gts-policy": "strict"},
+                ],
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+# Near-miss typos of supported keywords
+
+
+class TestCaseUnknown_TraitsTypoRejected(HttpRunner):
+    """A near-miss typo of a supported keyword (x-gts-trait) MUST be rejected.
+
+    `x-gts-trait` (singular) is not `x-gts-traits`; treating it as a synonym
+    would silently drop the author's intended trait values, so it must fail.
+    """
+
+    config = Config("unknown-ext: x-gts-trait typo rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_validated(
+            "gts://gts.x.testext.typo.base.v1~",
+            {
+                "type": "object",
+                "x-gts-trait": {"retention": "P30D"},
+                "properties": {"id": {"type": "string"}},
+            },
+            422,
+            "register schema with x-gts-trait (typo of x-gts-traits) should be rejected",
+        ),
+    ]
+
+
+class TestCaseUnknown_RefTypoRejected(HttpRunner):
+    """A near-miss typo of x-gts-ref (x-gts-reference) inside a property MUST be rejected."""
+
+    config = Config("unknown-ext: x-gts-reference typo rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_validated(
+            "gts://gts.x.testext.reftypo.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "ownerRef": {"type": "string", "x-gts-reference": "gts.*"},
+                },
+            },
+            422,
+            "register schema with x-gts-reference (typo of x-gts-ref) should be rejected",
         ),
     ]
 
