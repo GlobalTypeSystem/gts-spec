@@ -1624,5 +1624,59 @@ class TestCaseTestOp8Compatibility_TypeLessObjectConstraints(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_TypeLessArrayConstraints(HttpRunner):
+    """OP#8 - Array keywords constrain type-less schemas.
+
+    JSON Schema applies `items` to array instances even when `type` is omitted.
+    Tightening the item schema therefore rejects old arrays that contain a value
+    accepted by the old schema.
+    """
+    config = Config("OP#8 - Type-less Array Constraints").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register type-less v1.0 array schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless_array.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "items": {"type": "string"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register type-less v1.1 array schema with max length")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless_array.v1.1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "items": {"type": "string", "maxLength": 10},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # The new item constraint rejects old arrays containing longer strings.
+        Step(
+            RunRequest("check type-less array compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.typeless_array.v1.0~",
+                "new_type_id": "gts.x.test8.compat.typeless_array.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "incompatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "incompatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()
