@@ -1565,5 +1565,64 @@ class TestCaseTestOp8Compatibility_ReferencedTypeWidened(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_TypeLessObjectConstraints(HttpRunner):
+    """OP#8 - Object keywords constrain type-less schemas.
+
+    JSON Schema applies `required` and `properties` to object instances even
+    when `type` is omitted. Adding a required property therefore makes the new
+    schema reject an object accepted by the old schema.
+    """
+    config = Config("OP#8 - Type-less Object Constraints").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register type-less v1.0 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "required": ["eventId"],
+                "properties": {"eventId": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register type-less v1.1 schema with required field")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless.v1.1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "required": ["eventId", "source"],
+                "properties": {
+                    "eventId": {"type": "string"},
+                    "source": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # The new required property rejects old object instances without source.
+        Step(
+            RunRequest("check type-less object compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.typeless.v1.0~",
+                "new_type_id": "gts.x.test8.compat.typeless.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "incompatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "incompatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()
