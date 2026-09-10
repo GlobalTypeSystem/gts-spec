@@ -393,6 +393,324 @@ class TestCaseTestOp6SchemaValidation_SchemaGtsUriWithInvalidBody(HttpRunner):
     ]
 
 
+class TestCaseTestOp6SchemaValidation_LiteralDoubleDollarIdRejected(HttpRunner):
+    """OP#6 - Reject a schema that uses a literal ``$$id`` field.
+
+    ``$$id``/``$$ref``/``$$schema`` are NOT GTS or JSON-Schema fields — the
+    doubled ``$`` is purely an HttpRunner escaping artifact (HttpRunner
+    unescapes ``$$`` -> ``$`` on the wire). A real, non-HttpRunner client that
+    literally transmits ``$$id`` therefore provides no valid ``$id`` field, so
+    schema registration must fail with 422.
+
+    ESCAPING NOTE: because HttpRunner collapses ``$$`` -> ``$``, transmitting a
+    literal two-dollar ``$$id`` requires writing ``$$$$id`` here. ``$$schema``
+    transmits the real ``$schema`` keyword so the document is still recognized
+    as a JSON Schema (isolating the bad ``$$id`` as the sole reason for
+    rejection).
+    """
+
+    config = Config(
+        "OP#6 - Schema Validation: reject literal double-dollar id"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with literal double-dollar id should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$$$id": "gts://gts.x.test6.literal_double_dollar.reject.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "required": ["id"]
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", True)
+            .assert_contains("body.error", "Unable to detect GTS ID in schema")
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_DoubleDollarSchemaAndId_TreatedAsInstance(HttpRunner):
+    """OP#6 - Literal $$schema + literal $$id are treated as instance fields.
+
+    Only canonical $schema marks a JSON Schema document. A literal $$schema is
+    not a schema marker, and literal $$id is not the canonical id field.
+    Therefore this payload is treated as an instance and (without a real id
+    field) is rejected as an instance — the same as any JSON object lacking
+    a recognizable GTS id field.
+
+    ESCAPING: HttpRunner turns $$ -> $, so to transmit literal $$schema/$$id
+    we send $$$$schema/$$$$id in the source below.
+    """
+
+    config = Config(
+        "OP#6 - Schema Validation: literal double-dollar schema + id treated as instance"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register literal $$schema + $$id should be instance error")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$$$schema": "http://json-schema.org/draft-07/schema#",
+                "$$$$id": "gts://gts.x.test6.double_dollar.instance_like.v1~",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", False)
+            .assert_contains("body.error", "Unable to detect GTS ID in instance entity")
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_DoubleDollarSchemaWithRealId_TreatedAsInstance(HttpRunner):
+    """OP#6 - Literal $$schema + real $id is treated as an instance.
+
+    Since $$schema is not a schema marker, the payload is not a type-schema.
+    The real $id acts as an instance id field and registration succeeds as an
+    instance entity.
+
+    ESCAPING: $$$$schema transmits literal $$schema, while $$id transmits real
+    $id.
+    """
+
+    config = Config(
+        "OP#6 - Schema Validation: literal double-dollar schema with real id is instance"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register literal $$schema + real $id should be instance success")
+            .post("/entities")
+            .with_json({
+                "$$$$schema": "http://json-schema.org/draft-07/schema#",
+                "$$id": "gts://gts.x.test6.double_dollar.instance_ok.v1~",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.is_type_schema", False)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_DoubleDollarRefNotMapped(HttpRunner):
+    """OP#6 - A literal ``$$ref`` must NOT be treated as JSON Schema ``$ref``.
+
+    ``$$ref`` is an HttpRunner escaping artifact (HttpRunner unescapes ``$$`` ->
+    ``$`` on the wire), not a JSON Schema keyword. A schema that references its
+    parent via a literal ``$$ref`` therefore does NOT inherit the parent's
+    constraints — the doubled keyword is an unknown no-op keyword.
+
+    This is proven by contrast against a real ``$ref`` using the SAME base and
+    the SAME (parent-violating) instance shape:
+
+      - real ``$ref``  -> parent constraint inherited  -> instance FAILS (ok=False)
+      - literal ``$$ref`` -> parent constraint ignored -> instance PASSES (ok=True)
+
+    If a future regression re-introduced ``$$ref`` -> ``$ref`` mapping, the
+    ``$$ref`` step below would flip to ok=False and this test would fail.
+
+    ESCAPING NOTE: HttpRunner collapses ``$$`` -> ``$``, so ``$$id``/``$$schema``
+    transmit the real ``$id``/``$schema`` keywords, ``$$ref`` transmits a real
+    ``$ref``, and ``$$$$ref`` transmits a literal ``$$ref``.
+    """
+
+    config = Config(
+        "OP#6 - Schema Validation: literal double-dollar ref is not a ref"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    _BASE = "gts.x.test6.dref.base.v1~"
+    _DER_REF = "gts.x.test6.dref.base.v1~x.test6._.der_ref.v1~"
+    _DER_DD = "gts.x.test6.dref.base.v1~x.test6._.der_dd.v1~"
+    _INST_REF = "gts.x.test6.dref.base.v1~x.test6._.der_ref.v1~x.y._.i1.v1.0"
+    _INST_DD = "gts.x.test6.dref.base.v1~x.test6._.der_dd.v1~x.y._.i2.v1.0"
+
+    teststeps = [
+        # Base type requires base_field.
+        Step(
+            RunRequest("register base schema requiring base_field")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{_BASE}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["id", "type", "base_field"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "type": {"type": "string"},
+                    "base_field": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        # --- Control: real $ref inherits the base constraint ---
+        Step(
+            RunRequest("register derived schema using real ref")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{_DER_REF}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$ref": f"gts://{_BASE}"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register instance missing base_field, must be ok because no validation requested")
+            .post("/entities")
+            .with_json({"id": _INST_REF, "type": _DER_REF})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.id", _INST_REF)
+            .assert_equal("body.type_id", _DER_REF)
+        ),
+        Step(
+            RunRequest("validate instance under real ref should fail")
+            .post("/validate-instance")
+            .with_json({"instance_id": _INST_REF})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("register invalid ref instance with validation should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({"id": _INST_REF, "type": _DER_REF})
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "base_field")
+        ),
+        # --- Subject: literal $$ref does NOT inherit the base constraint ---
+        Step(
+            RunRequest("register derived schema using literal double-dollar ref")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{_DER_DD}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$$$ref": f"gts://{_BASE}"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register instance missing base_field (double-dollar variant)")
+            .post("/entities")
+            .with_json({"id": _INST_DD, "type": _DER_DD})
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate instance under literal double-dollar ref should pass")
+            .post("/validate-instance")
+            .with_json({"instance_id": _INST_DD})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest(
+                "register literal double-dollar ref instance with validation should pass"
+            )
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({"id": _INST_DD, "type": _DER_DD})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_DoubleDollarRefDerivedSchemaMismatch(HttpRunner):
+    """OP#6 - A derived-looking ID with literal ``$$ref`` is schema-incompatible.
+
+    The GTS ID chain says that the second schema derives from the first, so
+    schema validation must compare the two declarations. A literal ``$$ref``
+    is not JSON Schema ``$ref`` and does not inherit the base declaration.
+    Registering the derived schema with validation enabled must therefore
+    reject the schema as incompatible with its GTS base.
+
+    HttpRunner escaping: ``$$$$ref`` sends a literal ``$$ref`` on the wire.
+    """
+
+    config = Config(
+        "OP#6 - Schema Validation: double-dollar ref derived mismatch"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    _BASE = "gts.x.test6.dref_mismatch.base.v1~"
+    _DERIVED = "gts.x.test6.dref_mismatch.base.v1~x.test6._.literal_dd.v1~"
+
+    teststeps = [
+        Step(
+            RunRequest("register base schema for derived mismatch")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{_BASE}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["base_field"],
+                "properties": {"base_field": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest("reject derived schema with literal double-dollar ref")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": f"gts://{_DERIVED}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$$$ref": f"gts://{_BASE}"}],
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", True)
+            .assert_contains("body.error", "not compatible with base")
+            .assert_contains("body.error", "base_field")
+        ),
+    ]
+
+
 class TestCaseTestOp6SchemaValidation_UnknownInstanceFormat(HttpRunner):
     """OP#6 - Reject instance with no recognizable GTS id/type fields.
 
