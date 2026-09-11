@@ -2613,7 +2613,7 @@ class TestCaseValidateEntity_ValidInstance(HttpRunner):
                 "required": ["id", "type", "occurredAt"],
                 "properties": {
                     "type": {"type": "string"},
-                    "id": {"type": "string", "format": "uuid"},
+                    "id": {"type": "string"},
                     "occurredAt": {
                         "type": "string",
                         "format": "date-time"

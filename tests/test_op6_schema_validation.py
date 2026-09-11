@@ -844,7 +844,7 @@ _STANDARD_FORMATS = (
     ("emailValue", "email", "user@example.com", "not-an-email"),
     ("dateTimeValue", "date-time", "2025-01-15T10:30:00Z", "not-date-time"),
     ("dateValue", "date", "2025-01-15", "2025-13-40"),
-    ("timeValue", "time", "10:30:00Z", "25:99:99Z"),
+    ("timeValue", "time", "10:30:00", "25:99:99Z"),
     ("uriValue", "uri", "https://example.com/resource", "://not-a-uri"),
     ("hostnameValue", "hostname", "example.com", "not a hostname"),
     ("ipv4Value", "ipv4", "192.168.1.1", "999.999.999.999"),
@@ -901,7 +901,7 @@ class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
                     "type": _STANDARD_FORMAT_TYPE_ID,
                     "id": (
                         f"{_STANDARD_FORMAT_TYPE_ID}"
-                        f"x.test6._.invalid_{format_name.replace('-', '_')}.v1.0"
+                        f"x.test6._.invalid_{field}.v1.0"
                     ),
                     **{**_STANDARD_FORMAT_VALUES, field: invalid},
                 },
@@ -913,13 +913,47 @@ class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
             _validate_instance(
                 (
                     f"{_STANDARD_FORMAT_TYPE_ID}"
-                    f"x.test6._.invalid_{format_name.replace('-', '_')}.v1.0"
+                    f"x.test6._.invalid_{field}.v1.0"
                 ),
                 False,
                 f"reject instance with invalid {format_name}",
             )
             for field, format_name, _, _ in _STANDARD_FORMATS
         ],
+    ]
+
+
+class TestCaseTestOp6Validation_UuidRejectsGtsId(HttpRunner):
+    config = Config("OP#6 Extended - UUID Format Validation").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.formats.uuid.v1~",
+            {
+                "type": "object",
+                "required": ["uuidValue"],
+                "properties": {"uuidValue": {"type": "string", "format": "uuid"}},
+            },
+            "register UUID format schema",
+        ),
+        _register_instance(
+            {
+                "type": "gts.x.test6.formats.uuid.v1~",
+                "id": "gts.x.test6.formats.uuid.v1~x.test6._.gts_id.v1.0",
+                "uuidValue": "gts.x.test6.formats.uuid.v1~550e8400-e29b-41d4-a716-446655440000",
+            },
+            "register instance with GTS ID in UUID field",
+        ),
+        _validate_instance(
+            "gts.x.test6.formats.uuid.v1~x.test6._.gts_id.v1.0",
+            False,
+            "reject GTS ID in UUID field",
+        ),
     ]
 
 
