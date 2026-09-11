@@ -901,7 +901,7 @@ class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
                     "type": _STANDARD_FORMAT_TYPE_ID,
                     "id": (
                         f"{_STANDARD_FORMAT_TYPE_ID}"
-                        f"x.test6._.invalid_{field}.v1.0"
+                        f"x.test6._.invalid_{format_name.replace('-', '_')}.v1.0"
                     ),
                     **{**_STANDARD_FORMAT_VALUES, field: invalid},
                 },
@@ -913,7 +913,7 @@ class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
             _validate_instance(
                 (
                     f"{_STANDARD_FORMAT_TYPE_ID}"
-                    f"x.test6._.invalid_{field}.v1.0"
+                    f"x.test6._.invalid_{format_name.replace('-', '_')}.v1.0"
                 ),
                 False,
                 f"reject instance with invalid {format_name}",
