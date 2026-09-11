@@ -1678,5 +1678,95 @@ class TestCaseTestOp8Compatibility_TypeLessArrayConstraints(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_EquivalentDialectSpellings(HttpRunner):
+    config = Config("OP#8 - Equivalent Dialect Spellings").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register http Draft-07 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_equivalent.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register https Draft-07 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_equivalent.v1.1~",
+                "$$schema": "https://json-schema.org/draft-07/schema",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check equivalent dialect compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.dialect_equivalent.v1.0~",
+                "new_type_id": "gts.x.test8.compat.dialect_equivalent.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "compatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "compatible")
+        ),
+    ]
+
+
+class TestCaseTestOp8Compatibility_DistinctDialects(HttpRunner):
+    config = Config("OP#8 - Distinct Dialects").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register Draft-07 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_changed.v1.0~",
+                "$$schema": "https://json-schema.org/draft-07/schema",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register Draft 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_changed.v1.1~",
+                "$$schema": "http://json-schema.org/draft/2020-12/schema#",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check distinct dialect compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.dialect_changed.v1.0~",
+                "new_type_id": "gts.x.test8.compat.dialect_changed.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "unknown")
+            .assert_equal("body.forward_compatibility", "unknown")
+            .assert_equal("body.full_compatibility", "unknown")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()
