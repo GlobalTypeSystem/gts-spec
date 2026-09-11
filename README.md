@@ -177,7 +177,7 @@ The GTS identifier is a string with total length of 1024 characters maximum.
   - Combined anonymous instance: `gts.<vendor>.<package>.<namespace>.<type>.v<MAJOR>[.<MINOR>]~<UUID>`
   - Well-known and combined anonymous instance identifiers MUST include a left-hand type segment in a chain (see 2.2 and 3.7).
   - Combined anonymous instance identifiers MUST include a UUID tail.
-  - Note: no trailing `~` for instances. 
+  - Note: no trailing `~` for instances.
 
 The `<vendor>` refers to a string code that indicates the origin of a given schema or instance definition. This can be valuable in systems that support cross-vendor data exchange, such as events or configuration files, especially in environments with deployable applications or plugins.
 
@@ -1300,9 +1300,9 @@ gts\.
 `is_type` captures the optional trailing `~` (present for type IDs, absent for instance IDs).
 
 ### 8.2 Chained identifier regex
- 
+
  For chained identifiers, the pattern enforces that all segments except the final instance designator are type IDs (with `~` separators):
- 
+
  ```regex
  ^\s*gts\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.v(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?(?:~[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.v(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?)*(?:~(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?)?\s*$
  ```
@@ -1404,7 +1404,7 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 - **OP#6 - Schema Validation**: Validate object instances against their corresponding schemas. When validating instances, if the rightmost type in the chain is marked `x-gts-abstract: true`, validation MUST fail (see section 9.11)
 - **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
 - **OP#8 - Type Schema Evolution Compatibility Checking**: Compare two definitions of one type identity, addressed by their distinct GTS Type Identifiers, and report a Compatibility Verdict (`compatible`, `incompatible`, or `unknown`) for the backward, forward, and full relations. `unknown` means the checker could not establish either compatibility or incompatibility; it is not itself evidence of incompatibility. The checker reports evidence, while registry publication policy decides how the verdicts affect admission.
-- **OP#9 - Version Casting**: Transform instances between compatible MINOR versions
+- **OP#9 - Version Casting**: Transform instances between compatible MINOR versions. The response MUST report `is_backward_compatible`, `is_forward_compatible`, and `is_fully_compatible` for the source and target Type Schemas using the accepted-instance-set relations in §4.3. `is_fully_compatible` MUST equal the logical AND of the backward and forward values. These schema-compatibility verdicts are distinct from whether a particular transformed entity validates against the target schema; when a cast succeeds, the response includes that entity as `casted_entity`.
 - **OP#10 - Query Execution**: Filter identifier collections using the GTS query language
 - **OP#11 - Attribute Access**: Retrieve property values and metadata using the attribute selector (`@`)
 - **OP#12 - Type Derivation Validation**: Validate that a derived type correctly extends its base chain. Today this includes JSON Schema-level constraint compatibility (every derived schema MUST conform to all constraints defined in its parent schemas throughout the inheritance hierarchy — `additionalProperties`, narrowing/widening, etc. — regardless of whether the derived schema references the parent via `allOf` + `$ref` or re-declares parent fields directly) and trait inheritance from OP#13. This ensures type safety in extension and prevents constraint violations in multi-level type hierarchies. When validating derived types, if any base in the chain is marked `x-gts-final: true`, validation MUST fail (see section 9.11)

@@ -800,8 +800,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "title": "Response Cast Cast Post"
+                  "$ref": "#/components/schemas/CastResponse"
                 }
               }
             }
@@ -914,6 +913,33 @@
   },
   "components": {
     "schemas": {
+      "CastResponse": {
+        "properties": {
+          "casted_entity": {
+            "type": "object",
+            "title": "Casted Entity"
+          },
+          "is_backward_compatible": {
+            "type": "boolean",
+            "title": "Is Backward Compatible"
+          },
+          "is_forward_compatible": {
+            "type": "boolean",
+            "title": "Is Forward Compatible"
+          },
+          "is_fully_compatible": {
+            "type": "boolean",
+            "title": "Is Fully Compatible"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_backward_compatible",
+          "is_forward_compatible",
+          "is_fully_compatible"
+        ],
+        "title": "CastResponse"
+      },
       "CastRequest": {
         "properties": {
           "instance_id": {
