@@ -5071,7 +5071,7 @@ class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
             _register_derived(
                 (
                     f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
-                    f"x.test13._.invalid_{format_name}.v1~"
+                    f"x.test13._.invalid_{format_name.replace('-', '_')}.v1~"
                 ),
                 f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}",
                 {
@@ -5089,7 +5089,7 @@ class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
             _validate_type_schema(
                 (
                     f"{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
-                    f"x.test13._.invalid_{format_name}.v1~"
+                    f"x.test13._.invalid_{format_name.replace('-', '_')}.v1~"
                 ),
                 False,
                 f"reject trait with invalid {format_name}",
