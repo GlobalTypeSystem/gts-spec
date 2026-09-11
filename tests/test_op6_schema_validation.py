@@ -844,7 +844,8 @@ _STANDARD_FORMATS = (
     ("emailValue", "email", "user@example.com", "not-an-email"),
     ("dateTimeValue", "date-time", "2025-01-15T10:30:00Z", "not-date-time"),
     ("dateValue", "date", "2025-01-15", "2025-13-40"),
-    ("timeValue", "time", "10:30:00", "25:99:99Z"),
+    ("timeValueZ", "time", "10:30:00", "25:99:99Z"),
+    ("timeValue", "time", "10:30:00", "25:99:99"),
     ("uriValue", "uri", "https://example.com/resource", "://not-a-uri"),
     ("hostnameValue", "hostname", "example.com", "not a hostname"),
     ("ipv4Value", "ipv4", "192.168.1.1", "999.999.999.999"),
@@ -901,7 +902,7 @@ class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
                     "type": _STANDARD_FORMAT_TYPE_ID,
                     "id": (
                         f"{_STANDARD_FORMAT_TYPE_ID}"
-                        f"x.test6._.invalid_{field}.v1.0"
+                        f"x.test6._.invalid_{field.lower()}.v1.0"
                     ),
                     **{**_STANDARD_FORMAT_VALUES, field: invalid},
                 },
@@ -913,7 +914,7 @@ class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
             _validate_instance(
                 (
                     f"{_STANDARD_FORMAT_TYPE_ID}"
-                    f"x.test6._.invalid_{field}.v1.0"
+                    f"x.test6._.invalid_{field.lower()}.v1.0"
                 ),
                 False,
                 f"reject instance with invalid {format_name}",
