@@ -9,7 +9,7 @@
   "dedup": {
     "strategy": "time-window",
     "window": "PT10M",
-    "keyPaths": ["/typeId", "/payload/resourceId"]
+    "keyPaths": ["/type", "/subject", "/payload/settingKey"]
   },
   "storage": {
     "kind": "elk",
