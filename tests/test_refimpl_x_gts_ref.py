@@ -1013,6 +1013,102 @@ class TestCaseXGtsRef_NestedCombinators(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
+    config = Config("x-gts-ref: implicit object and local refs").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register implicit object x-gts-ref schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_implicit._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "required": ["id", "ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_implicit._.target.v1~",
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register implicit object invalid reference")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_implicit._.holder.v1~x.vendor._.bad.v1",
+                "ref": "gts.x.other._.target.v1~x.vendor._.bad.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate implicit object invalid reference")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_implicit._.holder.v1~x.vendor._.bad.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "does not match pattern")
+        ),
+        Step(
+            RunRequest("register local ref x-gts-ref schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_local._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {"$$ref": "#/definitions/TargetRef"},
+                },
+                "definitions": {
+                    "TargetRef": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_local._.target.v1~",
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register local ref invalid reference")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_local._.holder.v1~x.vendor._.bad.v1",
+                "ref": "gts.x.other._.target.v1~x.vendor._.bad.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate local ref invalid reference")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_local._.holder.v1~x.vendor._.bad.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "does not match pattern")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_JsonPointer().test_start()

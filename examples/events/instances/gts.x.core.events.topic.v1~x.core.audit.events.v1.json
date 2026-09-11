@@ -1,0 +1,19 @@
+{
+  "id": "gts.x.core.events.topic.v1~x.core.audit.events.v1",
+  "name": "audit",
+  "description": "Audit trail events (settings changes, access control, compliance).",
+  "retention": "P730D",
+  "ordering": "global",
+  "partitions": 6,
+  "partitionKeyPath": "/key",
+  "dedup": {
+    "strategy": "time-window",
+    "window": "PT10M",
+    "keyPaths": ["/type", "/subject", "/payload/settingKey"]
+  },
+  "storage": {
+    "kind": "elk",
+    "config": { "indexPrefix": "audit-events" }
+  },
+  "tags": ["audit", "compliance", "security"]
+}

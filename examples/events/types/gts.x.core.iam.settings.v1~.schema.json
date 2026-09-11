@@ -1,0 +1,42 @@
+{
+  "$id": "gts://gts.x.core.iam.settings.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IAM Settings",
+  "description": "Represents an IAM security setting (e.g. password policy, MFA configuration, session timeout).",
+  "type": "object",
+  "required": ["tenantId", "category", "properties"],
+  "properties": {
+    "type": {
+      "description": "Stable dot-separated path identifying the setting.",
+      "type": "string",
+      "x-gts-ref": "/$id"
+    },
+    "tenantId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "The id of the tenant that owns this setting."
+    },
+    "category": {
+      "description": "GTS well-known instance identifier of the settings category.",
+      "type": "string",
+      "x-gts-ref": "gts.x.core.iam.settings_category.v1~"
+    },
+    "properties": {
+      "description": "Type-specific settings data; see derived type schema.",
+      "type": "object"
+    },
+    "description": {
+      "description": "Human-readable description of the setting.",
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedBy": {
+      "description": "Identifier of the actor who last changed this setting.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

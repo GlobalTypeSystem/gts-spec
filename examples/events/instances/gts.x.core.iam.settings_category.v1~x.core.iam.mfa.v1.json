@@ -1,0 +1,5 @@
+{
+  "id": "gts.x.core.iam.settings_category.v1~x.core.iam.mfa.v1",
+  "name": "MFA",
+  "description": "Multi-factor authentication enforcement and allowed methods."
+}

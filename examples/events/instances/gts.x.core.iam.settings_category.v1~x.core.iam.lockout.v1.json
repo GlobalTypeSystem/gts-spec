@@ -1,0 +1,5 @@
+{
+  "id": "gts.x.core.iam.settings_category.v1~x.core.iam.lockout.v1",
+  "name": "Lockout",
+  "description": "Account lockout thresholds and durations after failed authentication attempts."
+}

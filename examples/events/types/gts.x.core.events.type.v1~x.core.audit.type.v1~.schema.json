@@ -1,0 +1,47 @@
+{
+  "$id": "gts://gts.x.core.events.type.v1~x.core.audit.type.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-gts-abstract": true,
+  "title": "Audit Event (Abstract)",
+  "description": "Abstract audit event type. Adds actor_id, action, ip_address, and user_agent to the base event payload. The affected resource is identified by subject/subjectType from the base envelope. Concrete audit event types must derive from this type.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.events.type.v1~" },
+    {
+      "type": "object",
+      "required": ["type", "payload"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "x-gts-ref": "/$id"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["action", "actor_id", "ip_address", "user_agent"],
+          "properties": {
+            "action": {
+              "description": "The action performed (e.g. create, update, delete, login, logout).",
+              "type": "string"
+            },
+            "actor_id": {
+              "description": "Identifier of the actor (user or service) that performed the action.",
+              "type": "string"
+            },
+            "ip_address": {
+              "description": "IP address from which the action was performed.",
+              "type": "string"
+            },
+            "user_agent": {
+              "description": "User-Agent string of the client that performed the action.",
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "x-gts-traits": {
+    "topicRef": "gts.x.core.events.topic.v1~x.core.audit.events.v1",
+    "retention": "P730D"
+  }
+}

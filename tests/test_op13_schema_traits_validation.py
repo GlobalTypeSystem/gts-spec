@@ -4646,3 +4646,454 @@ class TestCaseOp13_Merge_DeleteThenReadd_AcrossLayers(HttpRunner):
             "validate leaf - retention re-added after mid deleted it",
         ),
     ]
+
+
+# ---------------------------------------------------------------------------
+# x-gts-ref resolution inside x-gts-traits values (issue #107)
+#
+# When a trait-schema property declares x-gts-ref, the concrete value
+# provided in x-gts-traits MUST be validated against the reference:
+#   - the value must be a syntactically valid GTS identifier, AND
+#   - the referenced entity must be registered in the registry.
+#
+# These tests exercise both the positive path (registered topic) and the
+# negative path (nonexistent topic) for a topicRef trait annotated with
+# x-gts-ref.
+# ---------------------------------------------------------------------------
+
+
+class TestCaseOp13_TraitRef_TopicRefValid(HttpRunner):
+    """OP#13 / x-gts-ref in traits: topicRef points to a registered topic.
+
+    Registers a topic type schema, a topic instance, and an event type whose
+    x-gts-traits.topicRef resolves to that topic. Validation must pass.
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref: topicRef resolves to registered topic"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Register topic type schema
+        _register(
+            "gts://gts.x.test13.tref.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic type schema",
+        ),
+        # Register a concrete topic instance
+        _register_instance(
+            {
+                "id": (
+                    "gts.x.test13.tref.topic.v1~"
+                    "x.test13._.orders.v1"
+                ),
+                "name": "orders",
+            },
+            "register topic instance (orders)",
+        ),
+        # Register event base with trait-schema declaring topicRef + x-gts-ref
+        _register(
+            "gts://gts.x.test13.tref.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.tref.topic.v1~",
+                        },
+                        "retention": {
+                            "type": "string",
+                            "default": "P30D",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+            "register event base with topicRef trait (x-gts-ref)",
+        ),
+        # Derived event: topicRef points to the registered topic
+        _register_derived(
+            (
+                "gts://gts.x.test13.tref.event.v1~"
+                "x.test13._.order_placed.v1~"
+            ),
+            "gts://gts.x.test13.tref.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.tref.topic.v1~"
+                        "x.test13._.orders.v1"
+                    ),
+                    "retention": "P90D",
+                },
+            },
+            "register derived with topicRef to registered topic",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.tref.event.v1~"
+                "x.test13._.order_placed.v1~"
+            ),
+            True,
+            "validate - topicRef resolves to registered topic, should pass",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_TopicRefNonexistent(HttpRunner):
+    """OP#13 / x-gts-ref in traits: topicRef points to a nonexistent topic.
+
+    The topicRef value has valid GTS syntax and correct prefix, but the
+    referenced entity does not exist in the registry. Validation must fail.
+    This is the regression scenario described in issue #107.
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref: topicRef to nonexistent topic fails"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Reuse the same topic type schema (may already be registered)
+        _register(
+            "gts://gts.x.test13.tref.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic type schema (idempotent)",
+        ),
+        # Register event base with trait-schema declaring topicRef + x-gts-ref
+        _register(
+            "gts://gts.x.test13.trefm.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.tref.topic.v1~",
+                        },
+                        "retention": {
+                            "type": "string",
+                            "default": "P30D",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+            "register event base with topicRef trait (x-gts-ref)",
+        ),
+        # Derived event: topicRef points to a topic that does NOT exist
+        _register_derived(
+            (
+                "gts://gts.x.test13.trefm.event.v1~"
+                "x.test13._.order_placed_bad.v1~"
+            ),
+            "gts://gts.x.test13.trefm.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.tref.topic.v1~"
+                        "x.test13._.nonexistent_topic.v12.0"
+                    ),
+                    "retention": "P90D",
+                },
+            },
+            "register derived with topicRef to nonexistent topic",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.trefm.event.v1~"
+                "x.test13._.order_placed_bad.v1~"
+            ),
+            False,
+            "validate should fail - topicRef references nonexistent topic",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_MalformedValues(HttpRunner):
+    """OP#13 / x-gts-ref in traits: malformed topicRef values must fail.
+
+    Exercises three classes of bad values in x-gts-traits for a property
+    annotated with x-gts-ref:
+      - not a GTS identifier at all (plain string)
+      - partial / syntactically invalid GTS identifier (too few segments)
+      - valid GTS identifier but wrong prefix (doesn't match x-gts-ref)
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref: malformed trait ref values rejected"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Register topic type schema (the x-gts-ref target type)
+        _register(
+            "gts://gts.x.test13.tref.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic type schema (idempotent)",
+        ),
+        # Register event base with topicRef trait annotated with x-gts-ref
+        _register(
+            "gts://gts.x.test13.trefbad.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.tref.topic.v1~",
+                        },
+                        "retention": {
+                            "type": "string",
+                            "default": "P30D",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {
+                    "id": {"type": "string"},
+                },
+            },
+            "register event base with topicRef trait (x-gts-ref)",
+        ),
+        # --- Case 1: not a GTS identifier at all ---
+        _register_derived(
+            (
+                "gts://gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_plain_string.v1~"
+            ),
+            "gts://gts.x.test13.trefbad.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": "hello world",
+                    "retention": "P90D",
+                },
+            },
+            "register derived - topicRef is plain string",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_plain_string.v1~"
+            ),
+            False,
+            "reject - topicRef 'hello world' is not a GTS identifier",
+        ),
+        # --- Case 2: partial / invalid GTS syntax (too few segments) ---
+        _register_derived(
+            (
+                "gts://gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_partial_gts.v1~"
+            ),
+            "gts://gts.x.test13.trefbad.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": "gts.x.y.z",
+                    "retention": "P90D",
+                },
+            },
+            "register derived - topicRef is invalid GTS syntax",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_partial_gts.v1~"
+            ),
+            False,
+            "reject - topicRef 'gts.x.y.z' is not a valid GTS identifier",
+        ),
+        # --- Case 3: valid GTS identifier but wrong prefix ---
+        _register_derived(
+            (
+                "gts://gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_wrong_prefix.v1~"
+            ),
+            "gts://gts.x.test13.trefbad.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.other.namespace.thing.v1~"
+                        "x.other._.some_topic.v1"
+                    ),
+                    "retention": "P90D",
+                },
+            },
+            "register derived - topicRef has wrong prefix",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_wrong_prefix.v1~"
+            ),
+            False,
+            "reject - topicRef prefix doesn't match x-gts-ref declaration",
+        ),
+        # --- Case 4: empty string ---
+        _register_derived(
+            (
+                "gts://gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_empty.v1~"
+            ),
+            "gts://gts.x.test13.trefbad.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": "",
+                    "retention": "P90D",
+                },
+            },
+            "register derived - topicRef is empty string",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.trefbad.event.v1~"
+                "x.test13._.bad_empty.v1~"
+            ),
+            False,
+            "reject - topicRef empty string is not a valid GTS identifier",
+        ),
+    ]
+
+
+_STANDARD_TRAIT_FORMAT_TYPE_ID = "gts.x.test13.formats.event.v1~"
+_STANDARD_TRAIT_FORMATS = (
+    ("uuidValue", "uuid", "550e8400-e29b-41d4-a716-446655440000", "not-a-uuid"),
+    ("emailValue", "email", "user@example.com", "not-an-email"),
+    ("dateTimeValue", "date-time", "2025-01-15T10:30:00Z", "not-date-time"),
+    ("dateValue", "date", "2025-01-15", "2025-13-40"),
+    ("timeValue", "time", "10:30:00Z", "25:99:99Z"),
+    ("uriValue", "uri", "https://example.com/resource", "://not-a-uri"),
+    ("hostnameValue", "hostname", "example.com", "not a hostname"),
+    ("ipv4Value", "ipv4", "192.168.1.1", "999.999.999.999"),
+    ("ipv6Value", "ipv6", "2001:db8::1", "not-an-ipv6-address"),
+)
+_STANDARD_TRAIT_FORMAT_VALUES = {
+    field: valid for field, _, valid, _ in _STANDARD_TRAIT_FORMATS
+}
+_STANDARD_TRAIT_FORMAT_SCHEMA = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        field: {"type": "string", "format": format_name}
+        for field, format_name, _, _ in _STANDARD_TRAIT_FORMATS
+    },
+}
+
+
+class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
+    """OP#13 - Enforce standard JSON Schema formats on trait properties.
+
+    ``url`` is not a standard JSON Schema format; HTTPS URL values are covered
+    by the standard ``uri`` format instead.
+    """
+    config = Config("OP#13 - Standard Trait Format Validation").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}",
+            {
+                "type": "object",
+                "x-gts-traits-schema": _STANDARD_TRAIT_FORMAT_SCHEMA,
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base with standard trait formats",
+        ),
+        _register_derived(
+            (
+                f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
+                "x.test13._.valid_formats.v1~"
+            ),
+            f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}",
+            {
+                "type": "object",
+                "x-gts-traits": _STANDARD_TRAIT_FORMAT_VALUES,
+            },
+            "register derived with valid standard trait formats",
+        ),
+        _validate_type_schema(
+            (
+                f"{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
+                "x.test13._.valid_formats.v1~"
+            ),
+            True,
+            "validate derived with valid standard trait formats",
+        ),
+        *[
+            _register_derived(
+                (
+                    f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
+                    f"x.test13._.invalid_{format_name.replace('-', '_')}.v1~"
+                ),
+                f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}",
+                {
+                    "type": "object",
+                    "x-gts-traits": {
+                        **_STANDARD_TRAIT_FORMAT_VALUES,
+                        field: invalid,
+                    },
+                },
+                f"register derived with invalid trait {format_name}",
+            )
+            for field, format_name, _, invalid in _STANDARD_TRAIT_FORMATS
+        ],
+        *[
+            _validate_type_schema(
+                (
+                    f"{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
+                    f"x.test13._.invalid_{format_name.replace('-', '_')}.v1~"
+                ),
+                False,
+                f"reject trait with invalid {format_name}",
+            )
+            for _, format_name, _, _ in _STANDARD_TRAIT_FORMATS
+        ],
+    ]

@@ -1,0 +1,46 @@
+[
+  {
+    "type": "gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~",
+    "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "tenantId": "4a9e8e2d-3c08-4df1-98b3-1e5e2d1b7b5a",
+    "userId": "d47f3c9a-12ab-4e8f-b567-890123456789",
+    "occurredAt": "2026-03-15T10:22:47Z",
+    "ingestedAt": "2026-03-15T10:22:48Z",
+    "source": "iam-service",
+    "sequenceNumber": 42,
+    "previousSequenceNumber": 41,
+    "subject": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~x.core.iam.password_policy.v1~",
+    "subjectType": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~x.core.iam.password_policy.v1~",
+    "payload": {
+      "action": "update",
+      "actor_id": "d47f3c9a-12ab-4e8f-b567-890123456789",
+      "ip_address": "198.51.100.42",
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/125.0",
+      "settingKey": "security.password-policy.minLength",
+      "oldValue": "8",
+      "newValue": "12"
+    }
+  },
+  {
+    "type": "gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~",
+    "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "tenantId": "4a9e8e2d-3c08-4df1-98b3-1e5e2d1b7b5a",
+    "userId": "e58a4dbb-23bc-5f90-c678-901234567890",
+    "occurredAt": "2026-03-15T14:05:12Z",
+    "ingestedAt": "2026-03-15T14:05:13Z",
+    "source": "iam-service",
+    "sequenceNumber": 43,
+    "previousSequenceNumber": 42,
+    "subject": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~x.core.iam.mfa_policy.v1~",
+    "subjectType": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~x.core.iam.mfa_policy.v1~",
+    "payload": {
+      "action": "update",
+      "actor_id": "e58a4dbb-23bc-5f90-c678-901234567890",
+      "ip_address": "10.0.0.1",
+      "user_agent": "compliance-enforcer/2.1.0",
+      "settingKey": "security.mfa.required",
+      "oldValue": "false",
+      "newValue": "true"
+    }
+  }
+]

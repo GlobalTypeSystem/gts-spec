@@ -1,0 +1,16 @@
+[
+  {
+    "type": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~x.core.iam.mfa_policy.v1~",
+    "tenantId": "4a9e8e2d-3c08-4df1-98b3-1e5e2d1b7b5a",
+    "category": "gts.x.core.iam.settings_category.v1~x.core.iam.mfa.v1",
+    "properties": {
+      "required": true,
+      "allowedMethods": ["totp", "webauthn"],
+      "gracePeriodDays": 7,
+      "enforcementMode": "audit"
+    },
+    "description": "Multi-factor authentication enforcement policy.",
+    "updatedAt": "2026-03-15T14:05:12Z",
+    "updatedBy": "e58a4dbb-23bc-5f90-c678-901234567890"
+  }
+]

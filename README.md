@@ -177,7 +177,7 @@ The GTS identifier is a string with total length of 1024 characters maximum.
   - Combined anonymous instance: `gts.<vendor>.<package>.<namespace>.<type>.v<MAJOR>[.<MINOR>]~<UUID>`
   - Well-known and combined anonymous instance identifiers MUST include a left-hand type segment in a chain (see 2.2 and 3.7).
   - Combined anonymous instance identifiers MUST include a UUID tail.
-  - Note: no trailing `~` for instances. 
+  - Note: no trailing `~` for instances.
 
 The `<vendor>` refers to a string code that indicates the origin of a given schema or instance definition. This can be valuable in systems that support cross-vendor data exchange, such as events or configuration files, especially in environments with deployable applications or plugins.
 
@@ -1300,9 +1300,9 @@ gts\.
 `is_type` captures the optional trailing `~` (present for type IDs, absent for instance IDs).
 
 ### 8.2 Chained identifier regex
- 
+
  For chained identifiers, the pattern enforces that all segments except the final instance designator are type IDs (with `~` separators):
- 
+
  ```regex
  ^\s*gts\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.v(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?(?:~[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*\.v(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?)*(?:~(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?)?\s*$
  ```
@@ -1384,7 +1384,7 @@ The post-`gts://` content must therefore parse as a valid GTS identifier with no
 **JSON instances (well-known vs anonymous)**
 
 - **Well-known instances (named)**: recommended to use a GTS identifier in the `id` field (alternatives: `gtsId`, `gts_id`). Prefer a chained identifier so the **left segment(s)** define the GTS Type automatically, and the **rightmost** segment is the instance name.
-  - Example (well-known topic/stream instance): `gts.x.core.events.topic.v1~x.commerce._.orders.v1.0`
+  - Example (well-known topic/stream instance): `gts.x.core.events.topic.v1~x.commerce.orders.orders.v1.0`
 - **Anonymous instances**: typically use the `id` field to store the object UUID, and store the GTS Type Identifier separately in a `type` field (alternatives: `gtsType`, `gts_type`).
   - Example (anonymous event instance): `id: "7a1d2f34-5678-49ab-9012-abcdef123456"`, `type: "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~"`
 
@@ -1397,17 +1397,30 @@ See working examples under `./examples/events`:
 Implement and expose all operations OP#1–OP#13 listed above and add appropriate unit tests.
 
 - **OP#1 - ID Validation**: Verify identifier syntax
+
 - **OP#2 - ID Extraction**: Extract identifiers from JSON objects or JSON Schema documents
+
 - **OP#3 - ID Parsing**: Decompose identifiers into constituent parts (vendor, package, namespace, type, version, etc.)
+
 - **OP#4 - ID Pattern Matching**: Match identifiers against patterns containing wildcards
+
 - **OP#5 - ID to UUID Mapping**: Generate deterministic UUIDs from GTS identifiers
+
 - **OP#6 - Schema Validation**: Validate object instances against their corresponding schemas. When validating instances, if the rightmost type in the chain is marked `x-gts-abstract: true`, validation MUST fail (see section 9.11)
+- **JSON Schema formats**: OP#6 and OP#13 MUST enforce `uuid`, `email`, `date-time`, `date`, `time`, `uri`, `hostname`, `ipv4`, and `ipv6` formats as assertions on string values, including instance properties and effective trait values. Other format names retain the selected JSON Schema dialect's semantics. See [ADR-0005](adr/0005-json-schema-format-assertions.md).
+
 - **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
-- **OP#8 - Type Schema Evolution Compatibility Checking**: Compare two definitions of one type identity, addressed by their distinct GTS Type Identifiers, and report a Compatibility Verdict (`compatible`, `incompatible`, or `unknown`) for the backward, forward, and full relations. `unknown` means the checker could not establish either compatibility or incompatibility; it is not itself evidence of incompatibility. The checker reports evidence, while registry publication policy decides how the verdicts affect admission.
-- **OP#9 - Version Casting**: Transform instances between compatible MINOR versions
+
+- **OP#8 - Type Schema Evolution Compatibility Checking**: Compare two definitions of one type identity, addressed by their distinct GTS Type Identifiers, and report a Compatibility Verdict (`compatible`, `incompatible`, or `unknown`) for the backward, forward, and full relations. `unknown` means the checker could not establish either compatibility or incompatibility; it is not itself evidence of incompatibility. When the compared schemas declare different JSON Schema dialects, OP#8 MUST return `unknown` for backward, forward, and full compatibility. Equivalent URI spellings of the same dialect MUST be treated as the same dialect. The checker reports evidence, while registry publication policy decides how the verdicts affect admission.
+
+- **OP#9 - Version Casting**: Transform instances between compatible MINOR versions. The response MUST report the `backward_compatibility`, `forward_compatibility`, and `full_compatibility` verdicts (`compatible`, `incompatible`, or `unknown`) for the source and target Type Schemas using the accepted-instance-set relations in §4.3. When schema compatibility cannot be established, OP#9 MUST preserve the `unknown` verdict rather than report it as incompatibility. These schema-compatibility verdicts are distinct from whether a particular transformed entity validates against the target schema; successful validation of a casted instance does not by itself establish schema compatibility. When a cast succeeds, the response includes that entity as `casted_entity`.
+
 - **OP#10 - Query Execution**: Filter identifier collections using the GTS query language
+
 - **OP#11 - Attribute Access**: Retrieve property values and metadata using the attribute selector (`@`)
+
 - **OP#12 - Type Derivation Validation**: Validate that a derived type correctly extends its base chain. Today this includes JSON Schema-level constraint compatibility (every derived schema MUST conform to all constraints defined in its parent schemas throughout the inheritance hierarchy — `additionalProperties`, narrowing/widening, etc. — regardless of whether the derived schema references the parent via `allOf` + `$ref` or re-declares parent fields directly) and trait inheritance from OP#13. This ensures type safety in extension and prevents constraint violations in multi-level type hierarchies. When validating derived types, if any base in the chain is marked `x-gts-final: true`, validation MUST fail (see section 9.11)
+
 - **OP#13 - Schema Traits Validation**: Validate schema traits (`x-gts-traits-schema` / `x-gts-traits`). See section 9.7 for full semantics and validation rules.
 
 ### 9.3 - GTS entities registration
@@ -1830,6 +1843,8 @@ Result:    ❌ NO MATCH (different major versions)
 ### 11.0 Relationship to JSON Schema
 
 GTS Type Schemas **extend JSON Schema** with a vendor keyword set (`x-gts-*`) and a set of **registry-enforced semantic rules** (see §3.2 derivation, §9.11 modifiers, OP#12 derivation compatibility, OP#13 trait validation). GTS does **not** impose additional syntactic restrictions on the standard JSON Schema body: any syntactically valid JSON Schema body that carries a valid GTS `$id` is a syntactically valid GTS Type Schema. The constraints GTS does enforce on document structure concern only its own `x-gts-*` keywords in GTS Type Schemas — these are type-level annotations that MUST appear at the document top level and are rejected when misplaced (§9.7.1, §9.11). Implementations MUST treat the GTS keywords described in this specification as layered on top of the underlying JSON Schema dialect's semantics, alongside the standard JSON Schema keywords (`$id`, `$ref`, `allOf`, `const`, …) used here.
+
+GTS schema validation MUST reject schema keywords with the `x-gts-` prefix that are not defined by this specification, at the document root or in any subschema. This check MUST run on explicit schema validation and on registration with validation enabled. This rule applies to schema keywords, not instance property names or keys in literal data such as `examples`, `default`, or `const`.
 
 **Dialect-agnostic.** GTS does not pin Type Schemas to a single JSON Schema draft. The dialect of any concrete GTS Type Schema is set by its `$schema` URI, and implementations MUST honour that dialect when validating or interpreting the schema body. The reference examples in this specification declare `$schema: http://json-schema.org/draft-07/schema#` because Draft-07 has the broadest tooling support and is the safest baseline for cross-vendor interoperability; however, Type Schemas that declare a later dialect — Draft 2019-09 (`https://json-schema.org/draft/2019-09/schema`) or Draft 2020-12 (`https://json-schema.org/draft/2020-12/schema`) — are equally valid GTS Type Schemas. Authors who wish to use post-Draft-07 keywords (`$defs`, `prefixItems`, `unevaluatedProperties`, `unevaluatedItems`, `$dynamicRef`/`$dynamicAnchor`, `dependentRequired`, `dependentSchemas`, …) MAY do so, provided the dialect declared in `$schema` admits those keywords and the GTS-specific rules (derivation compatibility per OP#12, trait validation per OP#13, modifiers per §9.11) are satisfied.
 

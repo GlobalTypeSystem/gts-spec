@@ -1,0 +1,47 @@
+{
+  "$id": "gts://gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Audit Event: IAM Settings Changed",
+  "description": "Emitted when an IAM security setting is modified (e.g. password policy, MFA configuration, session timeout).",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.events.type.v1~x.core.audit.type.v1~" },
+    {
+      "type": "object",
+      "required": ["type", "payload", "subjectType"],
+      "properties": {
+        "type": {
+          "const": "gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~",
+          "$comment": "The value is required only for IDE-side validation"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["settingKey", "oldValue", "newValue"],
+          "additionalProperties": false,
+          "properties": {
+            "action": { "const": "update" },
+            "actor_id": { "type": "string" },
+            "ip_address": { "type": "string" },
+            "user_agent": { "type": "string" },
+            "settingKey": {
+              "description": "Dot-separated path of the setting that was changed.",
+              "type": "string"
+            },
+            "oldValue": {
+              "description": "Previous value of the setting.",
+              "type": "string"
+            },
+            "newValue": {
+              "description": "New value of the setting.",
+              "type": "string"
+            }
+          }
+        },
+        "subjectType": {
+          "type": "string",
+          "x-gts-ref": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~"
+        }
+      }
+    }
+  ]
+}

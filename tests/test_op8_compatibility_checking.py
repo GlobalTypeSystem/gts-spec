@@ -1565,5 +1565,256 @@ class TestCaseTestOp8Compatibility_ReferencedTypeWidened(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_TypeLessObjectConstraints(HttpRunner):
+    """OP#8 - Object keywords constrain type-less schemas.
+
+    JSON Schema applies `required` and `properties` to object instances even
+    when `type` is omitted. Adding a required property therefore makes the new
+    schema reject an object accepted by the old schema.
+    """
+    config = Config("OP#8 - Type-less Object Constraints").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register type-less v1.0 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "required": ["eventId"],
+                "properties": {"eventId": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register type-less v1.1 schema with required field")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless.v1.1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "required": ["eventId", "source"],
+                "properties": {
+                    "eventId": {"type": "string"},
+                    "source": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # The new required property rejects old object instances without source.
+        Step(
+            RunRequest("check type-less object compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.typeless.v1.0~",
+                "new_type_id": "gts.x.test8.compat.typeless.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "incompatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "incompatible")
+        ),
+    ]
+
+
+class TestCaseTestOp8Compatibility_TypeLessArrayConstraints(HttpRunner):
+    """OP#8 - Array keywords constrain type-less schemas.
+
+    JSON Schema applies `items` to array instances even when `type` is omitted.
+    Tightening the item schema therefore rejects old arrays that contain a value
+    accepted by the old schema.
+    """
+    config = Config("OP#8 - Type-less Array Constraints").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register type-less v1.0 array schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless_array.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "items": {"type": "string"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register type-less v1.1 array schema with max length")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.typeless_array.v1.1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "items": {"type": "string", "maxLength": 10},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # The new item constraint rejects old arrays containing longer strings.
+        Step(
+            RunRequest("check type-less array compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.typeless_array.v1.0~",
+                "new_type_id": "gts.x.test8.compat.typeless_array.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "incompatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "incompatible")
+        ),
+    ]
+
+
+class TestCaseTestOp8Compatibility_EquivalentDialectSpellings(HttpRunner):
+    config = Config("OP#8 - Equivalent Dialect Spellings").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register http Draft-07 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_equivalent.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register https Draft-07 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_equivalent.v1.1~",
+                "$$schema": "https://json-schema.org/draft-07/schema",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check equivalent dialect compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.dialect_equivalent.v1.0~",
+                "new_type_id": "gts.x.test8.compat.dialect_equivalent.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "compatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "compatible")
+        ),
+    ]
+
+
+class TestCaseTestOp8Compatibility_DistinctDialects(HttpRunner):
+    config = Config("OP#8 - Distinct Dialects").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register Draft-07 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_changed.v1.0~",
+                "$$schema": "https://json-schema.org/draft-07/schema",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register Draft 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.dialect_changed.v1.1~",
+                "$$schema": "http://json-schema.org/draft/2020-12/schema#",
+                "type": "string",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check distinct dialect compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.dialect_changed.v1.0~",
+                "new_type_id": "gts.x.test8.compat.dialect_changed.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "unknown")
+            .assert_equal("body.forward_compatibility", "unknown")
+            .assert_equal("body.full_compatibility", "unknown")
+        ),
+    ]
+
+
+class TestCaseTestOp8Compatibility_Draft202012UnevaluatedProperties(HttpRunner):
+    config = Config("OP#8 - Draft 2020-12 unevaluatedProperties").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register open Draft 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.unevaluated.v1.0~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register closed Draft 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.unevaluated.v1.1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "unevaluatedProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check Draft 2020-12 content model compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.unevaluated.v1.0~",
+                "new_type_id": "gts.x.test8.compat.unevaluated.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "incompatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "incompatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()

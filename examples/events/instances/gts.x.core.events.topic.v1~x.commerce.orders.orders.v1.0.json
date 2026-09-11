@@ -1,5 +1,5 @@
 {
-  "id": "gts.x.core.events.topic.v1~x.commerce._.orders.v1.0",
+  "id": "gts.x.core.events.topic.v1~x.commerce.orders.orders.v1.0",
   "name": "orders",
   "description": "Order lifecycle events topic",
   "retention": "P90D",

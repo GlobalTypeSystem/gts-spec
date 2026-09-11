@@ -557,6 +557,95 @@
         }
       }
     },
+    "/validate-json": {
+      "post": {
+        "summary": "Validate transient JSON as a GTS instance or Type Schema",
+        "operationId": "validate_json_validate_json_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateJsonResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/validate-json/{gts_type}": {
+      "post": {
+        "summary": "Validate transient JSON against an explicit GTS Type Schema",
+        "operationId": "validate_json_as_type_validate_json__gts_type__post",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Gts Type"
+            },
+            "name": "gts_type",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Body"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidateJsonResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/resolve-relationships": {
       "get": {
         "summary": "Build schema/entity graph for a GTS ID",
@@ -710,8 +799,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "title": "Response Cast Cast Post"
+                  "$ref": "#/components/schemas/CastResponse"
                 }
               }
             }
@@ -824,6 +912,48 @@
   },
   "components": {
     "schemas": {
+      "CastResponse": {
+        "properties": {
+          "casted_entity": {
+            "type": "object",
+            "title": "Casted Entity"
+          },
+          "backward_compatibility": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "title": "Backward Compatibility"
+          },
+          "forward_compatibility": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "title": "Forward Compatibility"
+          },
+          "full_compatibility": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "title": "Full Compatibility"
+          }
+        },
+        "type": "object",
+        "required": [
+          "backward_compatibility",
+          "forward_compatibility",
+          "full_compatibility"
+        ],
+        "title": "CastResponse"
+      },
       "CastRequest": {
         "properties": {
           "instance_id": {
@@ -872,6 +1002,60 @@
           "type_schema"
         ],
         "title": "TypeSchemaRegister"
+      },
+      "ValidateJsonResult": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type Id"
+          },
+          "is_type_schema": {
+            "type": "boolean",
+            "title": "Is Type Schema"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "id",
+          "type_id",
+          "is_type_schema",
+          "error"
+        ],
+        "title": "ValidateJsonResult"
       },
       "ValidateInstanceRequest": {
         "properties": {

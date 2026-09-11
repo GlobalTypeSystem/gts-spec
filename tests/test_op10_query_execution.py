@@ -663,5 +663,45 @@ class TestCaseTestOp10Query_UseCase4_AllV1BaseAndDerived(HttpRunner):
     ]
 
 
+class TestCaseTestOp10Query_ExplicitMajorZeroInstance(HttpRunner):
+    """OP#10 - Query Execution: an instance ID with an explicit v0 is queryable.
+
+    GTS major and minor versions are non-negative integers. An explicit v0
+    instance segment is therefore complete and must not be rejected as missing
+    a version.
+    """
+    config = Config("OP#10 - Query (explicit v0 instance)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register v0 instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.test10.zero.event.v0~x.test10._.instance.v0",
+                "type": "gts.x.test10.zero.event.v0~",
+                "eventId": "evt-v0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Query the exact v0 instance ID.
+        Step(
+            RunRequest("query explicit v0 instance")
+            .get("/query")
+            .with_params(**{
+                "expr": "gts.x.test10.zero.event.v0~x.test10._.instance.v0"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_length_equal("body.results", 1)
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp10Query_ExactMatch().test_start()

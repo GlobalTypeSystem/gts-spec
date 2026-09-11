@@ -1,0 +1,27 @@
+{
+  "$id": "gts://gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IAM Security Policy Setting",
+  "description": "A security-policy setting such as password-policy rules, MFA requirements, or session timeouts.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.iam.settings.v1~" },
+    {
+      "type": "object",
+      "required": ["properties"],
+      "properties": {
+        "properties": {
+          "type": "object",
+          "required": ["enforcementMode"],
+          "properties": {
+            "enforcementMode": {
+              "description": "Whether the policy is actively enforced, audit-only, or disabled.",
+              "type": "string",
+              "enum": ["enforce", "audit", "disabled"]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
