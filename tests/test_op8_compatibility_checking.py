@@ -1768,5 +1768,53 @@ class TestCaseTestOp8Compatibility_DistinctDialects(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_Draft202012UnevaluatedProperties(HttpRunner):
+    config = Config("OP#8 - Draft 2020-12 unevaluatedProperties").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register open Draft 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.unevaluated.v1.0~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register closed Draft 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.unevaluated.v1.1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "unevaluatedProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check Draft 2020-12 content model compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.unevaluated.v1.0~",
+                "new_type_id": "gts.x.test8.compat.unevaluated.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "incompatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "incompatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()
