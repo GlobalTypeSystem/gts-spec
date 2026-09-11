@@ -605,7 +605,6 @@
             "required": true,
             "schema": {
               "type": "string",
-              "pattern": "^gts\\..+~$",
               "title": "Gts Type"
             },
             "name": "gts_type",
