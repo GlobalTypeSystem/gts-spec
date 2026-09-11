@@ -918,24 +918,39 @@
             "type": "object",
             "title": "Casted Entity"
           },
-          "is_backward_compatible": {
-            "type": "boolean",
-            "title": "Is Backward Compatible"
+          "backward_compatibility": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "title": "Backward Compatibility"
           },
-          "is_forward_compatible": {
-            "type": "boolean",
-            "title": "Is Forward Compatible"
+          "forward_compatibility": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "title": "Forward Compatibility"
           },
-          "is_fully_compatible": {
-            "type": "boolean",
-            "title": "Is Fully Compatible"
+          "full_compatibility": {
+            "type": "string",
+            "enum": [
+              "compatible",
+              "incompatible",
+              "unknown"
+            ],
+            "title": "Full Compatibility"
           }
         },
         "type": "object",
         "required": [
-          "is_backward_compatible",
-          "is_forward_compatible",
-          "is_fully_compatible"
+          "backward_compatibility",
+          "forward_compatibility",
+          "full_compatibility"
         ],
         "title": "CastResponse"
       },

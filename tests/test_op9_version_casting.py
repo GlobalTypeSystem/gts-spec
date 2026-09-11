@@ -462,7 +462,7 @@ class TestCaseTestOp9Cast_SchemaToSchemaNotAllowed(HttpRunner):
     ]
 
 
-def _enum_cast_steps(case_name, old_enum, new_enum, backward, forward):
+def _enum_cast_steps(case_name, old_enum, new_enum, backward, forward, full):
     """Build a cast case with the enum constraint inside a property allOf."""
     old_constraint = {"type": "string"}
     new_constraint = {"type": "string"}
@@ -522,9 +522,9 @@ def _enum_cast_steps(case_name, old_enum, new_enum, backward, forward):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.casted_entity.status", "active")
-            .assert_equal("body.is_backward_compatible", backward)
-            .assert_equal("body.is_forward_compatible", forward)
-            .assert_equal("body.is_fully_compatible", backward and forward)
+            .assert_equal("body.backward_compatibility", backward)
+            .assert_equal("body.forward_compatibility", forward)
+            .assert_equal("body.full_compatibility", full)
         ),
     ]
 
@@ -541,7 +541,8 @@ class TestCaseTestOp9Cast_EnumRemoved(HttpRunner):
         super().test_start()
 
     teststeps = _enum_cast_steps(
-        "removed", ["active", "inactive"], None, True, False
+        "removed", ["active", "inactive"], None,
+        "compatible", "incompatible", "incompatible",
     )
 
 
@@ -557,8 +558,68 @@ class TestCaseTestOp9Cast_EnumAdded(HttpRunner):
         super().test_start()
 
     teststeps = _enum_cast_steps(
-        "added", None, ["active", "inactive"], False, True
+        "added", None, ["active", "inactive"],
+        "incompatible", "compatible", "incompatible",
     )
+
+
+class TestCaseTestOp9Cast_DistinctDialects(HttpRunner):
+    config = Config("OP#9 - Cast (distinct dialects)").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register Draft-07 source schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test9.dialect.cast.v1.0~",
+                "$$schema": "https://json-schema.org/draft-07/schema",
+                "type": "object",
+                "properties": {"status": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register Draft 2020-12 target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test9.dialect.cast.v1.1~",
+                "$$schema": "http://json-schema.org/draft/2020-12/schema#",
+                "type": "object",
+                "properties": {"status": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register source instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.test9.dialect.cast.v1.0~x.test9._.source.v1",
+                "type": "gts.x.test9.dialect.cast.v1.0~",
+                "status": "active",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("cast instance across distinct dialects")
+            .post("/cast")
+            .with_json({
+                "instance_id": "gts.x.test9.dialect.cast.v1.0~x.test9._.source.v1",
+                "to_type_id": "gts.x.test9.dialect.cast.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.casted_entity.status", "active")
+            .assert_equal("body.backward_compatibility", "unknown")
+            .assert_equal("body.forward_compatibility", "unknown")
+            .assert_equal("body.full_compatibility", "unknown")
+        ),
+    ]
 
 
 if __name__ == "__main__":
