@@ -1384,7 +1384,7 @@ The post-`gts://` content must therefore parse as a valid GTS identifier with no
 **JSON instances (well-known vs anonymous)**
 
 - **Well-known instances (named)**: recommended to use a GTS identifier in the `id` field (alternatives: `gtsId`, `gts_id`). Prefer a chained identifier so the **left segment(s)** define the GTS Type automatically, and the **rightmost** segment is the instance name.
-  - Example (well-known topic/stream instance): `gts.x.core.events.topic.v1~x.commerce._.orders.v1.0`
+  - Example (well-known topic/stream instance): `gts.x.core.events.topic.v1~x.commerce.orders.orders.v1.0`
 - **Anonymous instances**: typically use the `id` field to store the object UUID, and store the GTS Type Identifier separately in a `type` field (alternatives: `gtsType`, `gts_type`).
   - Example (anonymous event instance): `id: "7a1d2f34-5678-49ab-9012-abcdef123456"`, `type: "gts.x.core.events.type.v1~x.commerce.orders.order_placed.v1.0~"`
 
