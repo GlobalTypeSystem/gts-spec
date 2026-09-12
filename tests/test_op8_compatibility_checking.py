@@ -1816,5 +1816,64 @@ class TestCaseTestOp8Compatibility_Draft202012UnevaluatedProperties(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_ConditionalUnevaluatedProperties(HttpRunner):
+    """Conditional applicators make root ``unevaluatedProperties`` lowering unsafe.
+
+    The source schema evaluates ``value`` through ``then``. A compatibility
+    implementation that lowers it to ``additionalProperties: false`` would
+    hide that evaluation and return a definitive but incorrect verdict. The
+    expected ``unknown`` result confirms that conditional schemas are left
+    unresolved by the inclusion checker.
+    """
+    config = Config("OP#8 - Conditional unevaluatedProperties").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register conditional source schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.conditional.v1.0~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "if": {"required": ["value"]},
+                "then": {"properties": {"value": {"type": "string"}}},
+                "unevaluatedProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register closed target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.conditional.v1.1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check conditional unevaluatedProperties compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.conditional.v1.0~",
+                "new_type_id": "gts.x.test8.compat.conditional.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "unknown")
+            .assert_equal("body.forward_compatibility", "unknown")
+            .assert_equal("body.full_compatibility", "unknown")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()
