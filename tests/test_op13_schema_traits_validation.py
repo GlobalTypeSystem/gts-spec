@@ -5002,10 +5002,10 @@ _STANDARD_TRAIT_FORMAT_TYPE_ID = "gts.x.test13.formats.event.v1~"
 _STANDARD_TRAIT_FORMATS = (
     ("uuidValue", "uuid", "550e8400-e29b-41d4-a716-446655440000", "not-a-uuid"),
     ("emailValue", "email", "user@example.com", "not-an-email"),
-    ("dateTimeValue", "date-time", "2025-01-15 10:30:00Z", "2025-01-15 10:30:00"),
-    ("dateTimeValueT", "date-time", "2025-01-15T10:30:00Z", "2025-01-15T10:30:00"),
-    ("dateTimeFracValue", "date-time", "2025-01-15T10:30:00.123Z", "2025-01-15T10:30:61.123Z"),
-    ("dateTimeTZValue", "date-time", "2025-01-15T10:30:00+01:00", "2025-01-15T10:30:00+25:00"),
+    ("dateTimeValue", "date-time", "2008-10-12T10:30:00Z", "2008-10-12 10:30:00Z"),
+    ("dateTimeValueT", "date-time", "2011-07-22T10:30:00Z", "2011-07-22T10:30:00"),
+    ("dateTimeFracValue", "date-time", "2025-06-19T10:30:00.123Z", "2025-06-19T10:30:61.123Z"),
+    ("dateTimeTZValue", "date-time", "2027-04-26T10:30:00+01:00", "2027-04-26T10:30:00+25:00"),
     ("dateValue", "date", "2025-01-15", "2025-13-40"),
     ("timeValueOffset", "time", "10:30:00Z", "10:30:00"), # time offset is mandatory in 'time-format' draft-07
     ("timeValueOverflow", "time", "10:30:00Z", "10:00:61Z"),
