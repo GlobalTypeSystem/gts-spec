@@ -844,7 +844,7 @@ _STANDARD_FORMATS = (
     ("emailValue", "email", "user@example.com", "not-an-email"),
     ("dateTimeValue", "date-time", "2025-01-15T10:30:00Z", "not-date-time"),
     ("dateValue", "date", "2025-01-15", "2025-13-40"),
-    ("timeValueZ", "time", "10:30:00", "25:99:99Z"),
+    ("timeValueZ", "time", "10:30:00", "10:30:00Z"),
     ("timeValue", "time", "10:30:00", "25:99:99"),
     ("uriValue", "uri", "https://example.com/resource", "://not-a-uri"),
     ("hostnameValue", "hostname", "example.com", "not a hostname"),
