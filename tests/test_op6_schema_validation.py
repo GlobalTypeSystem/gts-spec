@@ -842,14 +842,20 @@ _STANDARD_FORMAT_TYPE_ID = "gts.x.test6.formats.standard.v1~"
 _STANDARD_FORMATS = (
     ("uuidValue", "uuid", "550e8400-e29b-41d4-a716-446655440000", "not-a-uuid"),
     ("emailValue", "email", "user@example.com", "not-an-email"),
-    ("dateTimeValue", "date-time", "2025-01-15T10:30:00Z", "not-date-time"),
+    ("dateTimeValue", "date-time", "2025-01-15 10:30:00Z", "2025-01-15 10:30:00"),
+    ("dateTimeValueT", "date-time", "2025-01-15T10:30:00Z", "2025-01-15T10:30:00"),
+    ("dateTimeFracValue", "date-time", "2025-01-15T10:30:00.123Z", "2025-01-15T10:30:61.123Z"),
+    ("dateTimeTZValue", "date-time", "2025-01-15T10:30:00+01:00", "2025-01-15T10:30:00+25:00"),
     ("dateValue", "date", "2025-01-15", "2025-13-40"),
-    ("timeValueZ", "time", "10:30:00", "10:30:00Z"),
-    ("timeValue", "time", "10:30:00", "25:99:99"),
+    ("timeValueOffset", "time", "10:30:00Z", "10:30:00"), # time offset is mandatory in 'time-format' draft-07
+    ("timeValueOverflow", "time", "10:30:00Z", "10:00:61Z"),
+    ("timeValueFracZ", "time", "10:30:00.123Z", "10:00:61.123Z"),
+    ("timeValueTZ", "time", "10:30:00+01:00", "10:30:00+25:00"),
     ("uriValue", "uri", "https://example.com/resource", "://not-a-uri"),
     ("hostnameValue", "hostname", "example.com", "not a hostname"),
     ("ipv4Value", "ipv4", "192.168.1.1", "999.999.999.999"),
     ("ipv6Value", "ipv6", "2001:db8::1", "not-an-ipv6-address"),
+    ("regexValue", "regex", "^[A-Za-z0-9]+$", "[unclosed"),
 )
 _STANDARD_FORMAT_VALUES = {
     field: valid for field, _, valid, _ in _STANDARD_FORMATS
