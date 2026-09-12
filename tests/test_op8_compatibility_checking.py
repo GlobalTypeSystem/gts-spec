@@ -1875,5 +1875,70 @@ class TestCaseTestOp8Compatibility_ConditionalUnevaluatedProperties(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_IdentityFullyCompatible(HttpRunner):
+    """OP#8 - Identity baseline: two structurally identical schemas.
+
+    Anchors the compatibility matrix: when the new schema is byte-for-byte the
+    same shape as the old one, every instance is mutually valid, so all three
+    verdicts MUST be ``compatible``.
+    """
+    config = Config("OP#8 - Identity (fully compatible)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    _SCHEMA_BODY = {
+        "$$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "required": ["eventId", "count"],
+        "properties": {
+            "eventId": {"type": "string"},
+            "count": {"type": "integer", "minimum": 0},
+            "label": {"type": "string"},
+        },
+        "additionalProperties": False,
+    }
+
+    teststeps = [
+        Step(
+            RunRequest("register v1.0 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.identity.v1.0~",
+                **_SCHEMA_BODY,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register v1.1 identical schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.identity.v1.1~",
+                **_SCHEMA_BODY,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check identity compatibility")
+            .get("/compatibility")
+            .with_params(
+                **{
+                    "old_type_id": "gts.x.test8.compat.identity.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.identity.v1.1~",
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "compatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "compatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()
