@@ -1204,6 +1204,260 @@ class TestCaseTestOp6Validation_ArrayConstraints(HttpRunner):
 
 
 # ---------------------------------------------------------------------------
+# Extended JSON Schema constraint tests — negative cases
+#
+# The positive constraint tests above (enum / nested / array / minimum) only
+# prove that a *conforming* instance passes. On their own they cannot detect a
+# no-op validator that always returns ok=True. These tests supply the missing
+# violating instances so each keyword is exercised in both directions. Standard
+# `format` keywords already have negative coverage in
+# TestCaseTestOp6Validation_StandardFormats, so they are not repeated here.
+# ---------------------------------------------------------------------------
+
+
+class TestCaseTestOp6Validation_EnumConstraints_Invalid(HttpRunner):
+    """OP#6 - An instance whose value is outside the schema enum MUST fail."""
+
+    config = Config("OP#6 Extended - Enum Validation (invalid)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.enuminvalid.status.v1~",
+            {
+                "type": "object",
+                "required": ["statusId", "status"],
+                "properties": {
+                    "statusId": {"type": "string"},
+                    "status": {
+                        "type": "string",
+                        "enum": ["pending", "approved", "rejected"],
+                    },
+                },
+            },
+            "register schema with enum",
+        ),
+        _register_instance(
+            {
+                "type": "gts.x.test6.enuminvalid.status.v1~",
+                "id": "gts.x.test6.enuminvalid.status.v1~x.test6._.bad_status.v1",
+                "statusId": "STATUS-001",
+                "status": "escalated",
+            },
+            "register instance with out-of-enum status",
+        ),
+        _validate_instance(
+            "gts.x.test6.enuminvalid.status.v1~x.test6._.bad_status.v1",
+            False,
+            "reject instance whose status is not in the enum",
+        ),
+    ]
+
+
+class TestCaseTestOp6Validation_ArrayConstraints_Invalid(HttpRunner):
+    """OP#6 - Arrays violating minItems / maxItems MUST fail validation."""
+
+    config = Config("OP#6 Extended - Array Constraints (invalid)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.arrayinvalid.tags.v1~",
+            {
+                "type": "object",
+                "required": ["itemId", "tags"],
+                "properties": {
+                    "itemId": {"type": "string"},
+                    "tags": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "items": {"type": "string"},
+                    },
+                },
+            },
+            "register schema with array constraints",
+        ),
+        # Below minItems (empty array).
+        _register_instance(
+            {
+                "type": "gts.x.test6.arrayinvalid.tags.v1~",
+                "id": "gts.x.test6.arrayinvalid.tags.v1~x.test6._.too_few.v1",
+                "itemId": "ITEM-001",
+                "tags": [],
+            },
+            "register instance with too few tags",
+        ),
+        _validate_instance(
+            "gts.x.test6.arrayinvalid.tags.v1~x.test6._.too_few.v1",
+            False,
+            "reject instance below minItems",
+        ),
+        # Above maxItems (four entries).
+        _register_instance(
+            {
+                "type": "gts.x.test6.arrayinvalid.tags.v1~",
+                "id": "gts.x.test6.arrayinvalid.tags.v1~x.test6._.too_many.v1",
+                "itemId": "ITEM-002",
+                "tags": ["a", "b", "c", "d"],
+            },
+            "register instance with too many tags",
+        ),
+        _validate_instance(
+            "gts.x.test6.arrayinvalid.tags.v1~x.test6._.too_many.v1",
+            False,
+            "reject instance above maxItems",
+        ),
+    ]
+
+
+class TestCaseTestOp6Validation_NestedObjects_Invalid(HttpRunner):
+    """OP#6 - Violations inside nested objects / arrays MUST fail validation.
+
+    Covers a missing deeply-nested required property and a numeric `minimum`
+    violation on an array item, neither of which is exercised by the positive
+    nested-object test.
+    """
+
+    config = Config("OP#6 Extended - Nested Object Validation (invalid)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.nestedinvalid.order.v1~",
+            {
+                "type": "object",
+                "required": ["orderId", "customer", "items"],
+                "properties": {
+                    "orderId": {"type": "string"},
+                    "customer": {
+                        "type": "object",
+                        "required": ["customerId", "address"],
+                        "properties": {
+                            "customerId": {"type": "string"},
+                            "address": {
+                                "type": "object",
+                                "required": ["street", "country"],
+                                "properties": {
+                                    "street": {"type": "string"},
+                                    "country": {"type": "string"},
+                                },
+                            },
+                        },
+                    },
+                    "items": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "required": ["sku", "quantity"],
+                            "properties": {
+                                "sku": {"type": "string"},
+                                "quantity": {"type": "integer", "minimum": 1},
+                            },
+                        },
+                    },
+                },
+            },
+            "register nested schema",
+        ),
+        # Missing deeply-nested required property (customer.address.country).
+        _register_instance(
+            {
+                "type": "gts.x.test6.nestedinvalid.order.v1~",
+                "id": "gts.x.test6.nestedinvalid.order.v1~x.test6._.no_country.v1",
+                "orderId": "ORD-1",
+                "customer": {
+                    "customerId": "CUST-1",
+                    "address": {"street": "123 Main St"},
+                },
+                "items": [{"sku": "SKU-1", "quantity": 1}],
+            },
+            "register instance missing nested required country",
+        ),
+        _validate_instance(
+            "gts.x.test6.nestedinvalid.order.v1~x.test6._.no_country.v1",
+            False,
+            "reject instance missing customer.address.country",
+        ),
+        # Numeric minimum violation on an array item (quantity 0).
+        _register_instance(
+            {
+                "type": "gts.x.test6.nestedinvalid.order.v1~",
+                "id": "gts.x.test6.nestedinvalid.order.v1~x.test6._.bad_qty.v1",
+                "orderId": "ORD-2",
+                "customer": {
+                    "customerId": "CUST-2",
+                    "address": {"street": "1 Elm St", "country": "USA"},
+                },
+                "items": [{"sku": "SKU-2", "quantity": 0}],
+            },
+            "register instance with quantity below minimum",
+        ),
+        _validate_instance(
+            "gts.x.test6.nestedinvalid.order.v1~x.test6._.bad_qty.v1",
+            False,
+            "reject instance whose item quantity is below minimum",
+        ),
+    ]
+
+
+class TestCaseTestOp6Validation_AdditionalPropertiesRejected(HttpRunner):
+    """OP#6 - An instance with an undeclared property MUST fail a closed schema.
+
+    The envelope schemas set ``additionalProperties: false`` but no test sends
+    an instance carrying an unexpected top-level property. This proves the
+    closed-model constraint is actually enforced on stored instances.
+    """
+
+    config = Config("OP#6 Extended - additionalProperties enforced").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.closed.event.v1~",
+            {
+                "type": "object",
+                "required": ["name"],
+                "properties": {"name": {"type": "string"}},
+                "additionalProperties": False,
+            },
+            "register closed schema",
+        ),
+        _register_instance(
+            {
+                "type": "gts.x.test6.closed.event.v1~",
+                "id": "gts.x.test6.closed.event.v1~x.test6._.extra_prop.v1",
+                "name": "valid",
+                "unexpected": "value",
+            },
+            "register instance with an undeclared property",
+        ),
+        _validate_instance(
+            "gts.x.test6.closed.event.v1~x.test6._.extra_prop.v1",
+            False,
+            "reject instance carrying an undeclared property",
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
 # Anonymous instance validation tests (UUID id + separate type field)
 # ---------------------------------------------------------------------------
 
