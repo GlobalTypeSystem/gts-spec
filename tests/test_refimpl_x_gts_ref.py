@@ -1109,6 +1109,63 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_RootLocalReference(HttpRunner):
+    """A bare ``$ref: "#"`` must traverse the complete root schema.
+
+    Existing local-reference coverage uses ``#/...`` pointers into a
+    subschema. This case is distinct: a recursive child points to the root
+    document itself, and the nested ``x-gts-ref`` must still be validated.
+    """
+    config = Config("x-gts-ref: root local reference").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register root local reference schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_root._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "link": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_root._.target.v1~",
+                    },
+                    "child": {"$$ref": "#"},
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register root local reference invalid instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_root._.holder.v1~x.vendor._.bad.v1",
+                "child": {"link": "gts.x.other._.target.v1~x.vendor._.bad.v1"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate root local reference invalid instance")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_root._.holder.v1~x.vendor._.bad.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "does not match pattern")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_JsonPointer().test_start()
