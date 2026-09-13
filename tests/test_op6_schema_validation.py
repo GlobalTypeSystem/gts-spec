@@ -930,6 +930,116 @@ class TestCaseTestOp6Validation_StandardFormats(HttpRunner):
     ]
 
 
+_REGEX_ECMA262_TYPE_ID = "gts.x.test6.formats.regexecma.v1~"
+_REGEX_ECMA262_SCHEMA = {
+    "type": "object",
+    "required": ["regexValue"],
+    "properties": {"regexValue": {"type": "string", "format": "regex"}},
+}
+
+# Strings that ARE valid ECMA 262 regular expressions. The Draft-07 `regex`
+# format asserts that the value is a regular expression valid according to the
+# ECMA 262 dialect (README §9.2, ADR-0005), so these MUST validate.
+_REGEX_ECMA262_VALID = (
+    ("anchored_class", "^[A-Za-z0-9]+$"),
+    ("shorthand_bounded", "\\d{3}-\\d{4}"),
+    ("group_alternation", "(foo|bar)+"),
+    ("range_bounded", "[a-z]{1,3}"),
+    ("optional_escaped_slash", "^(https?):\\/\\/"),
+    ("lazy_quantifier", "a.*?b"),
+    ("nested_groups", "(a(b)?c)*"),
+    ("class_shorthand", "[\\s\\S]*"),
+    ("escaped_metachar", "\\(\\d+\\)"),
+)
+
+# Strings that are NOT valid ECMA 262 regular expressions and therefore MUST be
+# rejected when constrained by `format: regex`.
+_REGEX_ECMA262_INVALID = (
+    ("unterminated_class", "[unclosed"),
+    ("unterminated_group", "(unclosed"),
+    ("reversed_quantifier", "a{3,2}"),
+    ("trailing_backslash", "\\"),
+    ("leading_quantifier", "*abc"),
+    ("unmatched_paren", "a)"),
+    ("dangling_quantifier", "a**"),
+)
+
+
+class TestCaseTestOp6Validation_RegexEcma262(HttpRunner):
+    """OP#6 - Enforce the Draft-07 `regex` format as an ECMA 262 assertion.
+
+    README §9.2 and ADR-0005 require `regex` to be asserted on string values:
+    a value is valid only when it is a regular expression valid according to the
+    ECMA 262 regular expression dialect. Valid patterns must pass; strings that
+    are not valid ECMA 262 regular expressions must be rejected.
+    """
+    config = Config("OP#6 Extended - Regex ECMA 262 Conformance").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    teststeps = [
+        _register(
+            f"gts://{_REGEX_ECMA262_TYPE_ID}",
+            _REGEX_ECMA262_SCHEMA,
+            "register schema with regex format",
+        ),
+        *[
+            _register_instance(
+                {
+                    "type": _REGEX_ECMA262_TYPE_ID,
+                    "id": (
+                        f"{_REGEX_ECMA262_TYPE_ID}"
+                        f"x.test6._.regex_valid_{label}.v1.0"
+                    ),
+                    "regexValue": pattern,
+                },
+                f"register instance with valid ECMA 262 regex ({label})",
+            )
+            for label, pattern in _REGEX_ECMA262_VALID
+        ],
+        *[
+            _validate_instance(
+                (
+                    f"{_REGEX_ECMA262_TYPE_ID}"
+                    f"x.test6._.regex_valid_{label}.v1.0"
+                ),
+                True,
+                f"accept valid ECMA 262 regex ({label})",
+            )
+            for label, _ in _REGEX_ECMA262_VALID
+        ],
+        *[
+            _register_instance(
+                {
+                    "type": _REGEX_ECMA262_TYPE_ID,
+                    "id": (
+                        f"{_REGEX_ECMA262_TYPE_ID}"
+                        f"x.test6._.regex_invalid_{label}.v1.0"
+                    ),
+                    "regexValue": pattern,
+                },
+                f"register instance with invalid ECMA 262 regex ({label})",
+            )
+            for label, pattern in _REGEX_ECMA262_INVALID
+        ],
+        *[
+            _validate_instance(
+                (
+                    f"{_REGEX_ECMA262_TYPE_ID}"
+                    f"x.test6._.regex_invalid_{label}.v1.0"
+                ),
+                False,
+                f"reject invalid ECMA 262 regex ({label})",
+            )
+            for label, _ in _REGEX_ECMA262_INVALID
+        ],
+    ]
+
+
 class TestCaseTestOp6Validation_UuidRejectsGtsId(HttpRunner):
     config = Config("OP#6 Extended - UUID Format Validation").base_url(
         get_gts_base_url()
