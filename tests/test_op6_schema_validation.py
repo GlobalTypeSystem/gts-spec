@@ -6,10 +6,6 @@ including well-known instances (chained GTS IDs), anonymous instances
 extended JSON Schema constraints (formats, nesting, enums, arrays).
 """
 
-import re
-
-import requests
-
 from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
     register as _register,
@@ -2798,76 +2794,144 @@ class TestCaseOp6ValidateJson_NonObjectBody(HttpRunner):
     ]
 
 
-def test_server_validation_error_does_not_include_an_absolute_file_path():
-    type_id = "gts.x.test6.error_path.v1~"
-    instance_id = f"{type_id}x.test6._.invalid.v1"
-    base_url = get_gts_base_url()
-    schema = {
-        "$$id": f"gts://{type_id}",
-        "$$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "required": ["id", "type", "address"],
-        "properties": {
-            "id": {"type": "string"},
-            "type": {"const": type_id},
-            "address": {"type": "string", "format": "ipv4"},
-        },
-    }
-    instance = {"id": instance_id, "type": type_id, "address": "999.999.999.999"}
+class TestCaseOp6ValidationErrorPath(HttpRunner):
+    config = Config(
+        "OP#6 validation errors do not expose absolute file paths"
+    ).base_url(get_gts_base_url())
 
-    assert requests.post(f"{base_url}/entities", json=schema).status_code == 200
-    assert requests.post(f"{base_url}/entities", json=instance).status_code == 200
-    response = requests.post(
-        f"{base_url}/validate-instance", json={"instance_id": instance_id}
-    )
+    def test_start(self):
+        super().test_start()
 
-    assert response.status_code == 200
-    result = response.json()
-    assert result["ok"] is False
-    assert re.search(r"file:///(?:[^/]+/)+", result["error"]) is None
-
-
-def test_instance_resubmission_is_idempotent_but_content_changes_are_rejected():
-    type_id = "gts.x.test6.resubmit.instance.v1~"
-    instance_id = f"{type_id}x.test6._.example.v1"
-    base_url = get_gts_base_url()
-    schema = {
-        "$$id": f"gts://{type_id}",
-        "$$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "required": ["id", "type", "value"],
-        "properties": {
-            "id": {"type": "string"},
-            "type": {"const": type_id},
-            "value": {"type": "string"},
-        },
-    }
-    instance = {"id": instance_id, "type": type_id, "value": "initial"}
-
-    assert requests.post(f"{base_url}/entities", json=schema).status_code == 200
-    assert requests.post(f"{base_url}/entities", json=instance).status_code == 200
-    assert requests.post(f"{base_url}/entities", json=instance).status_code == 200
-    changed_instance = {**instance, "value": "changed"}
-    assert requests.post(f"{base_url}/entities", json=changed_instance).status_code == 409
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.error.path.v1~",
+            {
+                "type": "object",
+                "required": ["id", "type", "address"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "type": {"const": "gts.x.test6.error.path.v1~"},
+                    "address": {"type": "string", "format": "ipv4"},
+                },
+            },
+            "register schema for portable validation error",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test6.error.path.v1~x.test6._.invalid.v1",
+                "type": "gts.x.test6.error.path.v1~",
+                "address": "999.999.999.999",
+            },
+            "register instance with invalid address",
+        ),
+        Step(
+            RunRequest("validate invalid address without an absolute file path")
+            .post("/validate-instance")
+            .with_json(
+                {"instance_id": "gts.x.test6.error.path.v1~x.test6._.invalid.v1"}
+            )
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_regex_match("body.error", r"(?s)^(?!.*file:///).*$")
+        ),
+    ]
 
 
-def test_type_resubmission_is_idempotent_but_schema_changes_are_rejected():
-    type_id = "gts.x.test6.resubmit.type.v1~"
-    base_url = get_gts_base_url()
-    schema = {
-        "$$id": f"gts://{type_id}",
-        "$$schema": "http://json-schema.org/draft-07/schema#",
-        "type": "object",
-        "properties": {"value": {"type": "string"}},
-    }
+class TestCaseOp6InstanceResubmission(HttpRunner):
+    config = Config(
+        "OP#6 instance resubmission is immutable"
+    ).base_url(get_gts_base_url())
 
-    assert requests.post(f"{base_url}/entities", json=schema).status_code == 200
-    assert requests.post(f"{base_url}/entities", json=schema).status_code == 200
-    changed_schema = {
-        **schema,
-        "properties": {"value": {"type": "integer"}},
-    }
-    assert requests.post(f"{base_url}/entities", json=changed_schema).status_code == 409
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.resubmit.instance.v1~",
+            {
+                "type": "object",
+                "required": ["id", "type", "value"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "type": {"const": "gts.x.test6.resubmit.instance.v1~"},
+                    "value": {"type": "string"},
+                },
+            },
+            "register schema for instance resubmission",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test6.resubmit.instance.v1~x.test6._.example.v1",
+                "type": "gts.x.test6.resubmit.instance.v1~",
+                "value": "initial",
+            },
+            "register instance initially",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test6.resubmit.instance.v1~x.test6._.example.v1",
+                "type": "gts.x.test6.resubmit.instance.v1~",
+                "value": "initial",
+            },
+            "resubmit identical instance",
+        ),
+        Step(
+            RunRequest("reject changed instance content")
+            .post("/entities")
+            .with_json(
+                {
+                    "id": "gts.x.test6.resubmit.instance.v1~x.test6._.example.v1",
+                    "type": "gts.x.test6.resubmit.instance.v1~",
+                    "value": "changed",
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 409)
+        ),
+    ]
+
+
+class TestCaseOp6TypeResubmission(HttpRunner):
+    config = Config(
+        "OP#6 type resubmission is immutable"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.resubmit.type.v1~",
+            {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+            },
+            "register type schema initially",
+        ),
+        _register(
+            "gts://gts.x.test6.resubmit.type.v1~",
+            {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+            },
+            "resubmit identical type schema",
+        ),
+        Step(
+            RunRequest("reject changed type schema")
+            .post("/entities")
+            .with_json(
+                {
+                    "$$id": "gts://gts.x.test6.resubmit.type.v1~",
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {"value": {"type": "integer"}},
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 409)
+        ),
+    ]
 
 
 if __name__ == "__main__":
