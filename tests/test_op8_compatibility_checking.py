@@ -1817,13 +1817,20 @@ class TestCaseTestOp8Compatibility_Draft202012UnevaluatedProperties(HttpRunner):
 
 
 class TestCaseTestOp8Compatibility_ConditionalUnevaluatedProperties(HttpRunner):
-    """Conditional applicators make root ``unevaluatedProperties`` lowering unsafe.
+    """Conditional applicators must not be lowered to ``additionalProperties``.
 
-    The source schema evaluates ``value`` through ``then``. A compatibility
-    implementation that lowers it to ``additionalProperties: false`` would
-    hide that evaluation and return a definitive but incorrect verdict. The
-    expected ``unknown`` result confirms that conditional schemas are left
-    unresolved by the inclusion checker.
+    The source (v1.0) accepts ``{}`` and ``{"value": <string>}``; the target
+    (v1.1) accepts only ``{}``, so the target's accepted-instance set is a
+    strict subset of the source's. Per §4.3 the definitive verdicts are
+    backward ``incompatible``, forward ``compatible``, full ``incompatible``.
+
+    An implementation that mechanically lowers ``unevaluatedProperties`` to
+    ``additionalProperties: false`` would compute the source's set incorrectly
+    and reach a wrong verdict. README §4.3/§9.2 allow ``unknown`` when the
+    checker cannot establish a relation, but do not require it here. This test
+    therefore accepts either the correct definitive verdict or ``unknown`` for
+    each relation, so a checker that solves the conditional case is not
+    rejected.
     """
     config = Config("OP#8 - Conditional unevaluatedProperties").base_url(
         get_gts_base_url()
@@ -1868,9 +1875,9 @@ class TestCaseTestOp8Compatibility_ConditionalUnevaluatedProperties(HttpRunner):
             })
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.backward_compatibility", "unknown")
-            .assert_equal("body.forward_compatibility", "unknown")
-            .assert_equal("body.full_compatibility", "unknown")
+            .assert_contained_by("body.backward_compatibility", ["incompatible", "unknown"])
+            .assert_contained_by("body.forward_compatibility", ["compatible", "unknown"])
+            .assert_contained_by("body.full_compatibility", ["incompatible", "unknown"])
         ),
     ]
 
