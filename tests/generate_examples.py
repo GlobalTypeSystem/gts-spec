@@ -8,6 +8,7 @@ include the server's validation error as comments for use in fixtures and toolin
 
 import argparse
 import json
+import re
 from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
@@ -151,7 +152,9 @@ def identify_entity(body):
 def validation_error(result):
     error = result.get("error")
     if isinstance(error, str) and error:
-        return error
+        return re.sub(
+            r"(file:///)(?:[^/'\"\s#]+/)+([^/'\"\s]+)", r"\1\2", error
+        )
     if "errors" in result:
         return json.dumps(result["errors"], ensure_ascii=False)
     return "Validation response reported ok: false."
