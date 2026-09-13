@@ -115,6 +115,41 @@ export GTS_BASE_URL=http://127.0.0.1:8001
 pytest
 ```
 
+## Generating reusable examples
+
+`generate_examples.py` runs the conformance tests against a GTS server and records the JSON entities submitted to the server. It writes only entities that the server subsequently reports as valid or invalid, preserving the server's actual request payloads rather than recreating them from test source code.
+
+Start a compatible GTS server, then run the generator with the same Python environment used for the test suite:
+
+```bash
+python tests/generate_examples.py
+```
+
+Use `--gts-base-url` to specify the GTS server URL, `--output` to select another destination, or provide one or more `test_*.py` paths to generate examples from a subset of the suite:
+
+```bash
+python tests/generate_examples.py \
+    --gts-base-url http://127.0.0.1:8000 \
+    --output ./generated-examples \
+    tests/test_op6_schema_validation.py
+```
+
+By default, the generator writes to `gts-test-examples/` with this layout:
+
+```
+gts-test-examples/
+  valid/
+    instances/*.json
+    types/*.schema.json
+  invalid/
+    instances/*.jsonc
+    types/*.schema.jsonc
+```
+
+Invalid JSONC files begin with `// Invalid:` comments containing the validation error returned by the server. Valid examples remain strict JSON so they can be consumed directly by JSON parsers.
+
+The generated corpus is useful beyond end-to-end testing. Static validators can use the valid and invalid pairs as regression fixtures, IDE plugins can surface the embedded invalid-example reasons while editing schemas or instances, and documentation, language bindings, and editor integrations can use the real request payloads as example data without requiring a running registry.
+
 ## Implemented test cases
 
 - [x] **OP#1 - ID Validation**: Verify identifier syntax using regex patterns
