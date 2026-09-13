@@ -20,7 +20,7 @@ class EntityRecorder:
     def __init__(self):
         self.entities = {}
         self.results = {}
-        self.type_entity_urls = {}
+        self.entity_urls = {}
         self._original_request = None
 
     def pytest_configure(self, config):
@@ -59,27 +59,23 @@ class EntityRecorder:
         entity_id, kind = identify_entity(body)
         if entity_id is not None:
             self.entities[entity_id] = (kind, body)
-            if (
-                kind == "types"
-                and url is not None
-                and response is not None
-                and response.ok
-            ):
-                self.type_entity_urls[entity_id] = url
+            if url is not None and response is not None and response.ok:
+                self.entity_urls[entity_id] = url
 
-    def validate_unvalidated_types(self):
-        validated_type_ids = {
-            entity_id
-            for _, kind, entity_id in self.results
-            if kind == "types"
-        }
-        for entity_id in sorted(self.type_entity_urls.keys() - validated_type_ids):
-            body = {"type_id": entity_id}
+    def validate_unvalidated_entities(self):
+        validated_entity_ids = {entity_id for _, _, entity_id in self.results}
+        for entity_id in sorted(self.entity_urls.keys() - validated_entity_ids):
+            kind, _ = self.entities[entity_id]
+            path = (
+                "/validate-type-schema" if kind == "types" else "/validate-instance"
+            )
+            field = "type_id" if kind == "types" else "instance_id"
+            body = {field: entity_id}
             response = requests.post(
-                urljoin(self.type_entity_urls[entity_id], "validate-type-schema"),
+                urljoin(self.entity_urls[entity_id], path),
                 json=body,
             )
-            self._record_validation("/validate-type-schema", body, response)
+            self._record_validation(path, body, response)
 
     def _record_validation(self, path, body, response):
         result = parse_response(response)
@@ -216,7 +212,7 @@ def main(argv=None):
     if args.gts_base_url:
         pytest_args.extend(["--gts-base-url", args.gts_base_url])
     exit_code = pytest.main(pytest_args, plugins=[recorder])
-    recorder.validate_unvalidated_types()
+    recorder.validate_unvalidated_entities()
     written = write_examples(args.output, recorder.results)
     print(f"Generated {written} examples in {args.output}")
     return exit_code
