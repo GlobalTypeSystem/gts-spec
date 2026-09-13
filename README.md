@@ -1407,7 +1407,7 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 - **OP#5 - ID to UUID Mapping**: Generate deterministic UUIDs from GTS identifiers
 
 - **OP#6 - Schema Validation**: Validate object instances against their corresponding schemas. When validating instances, if the rightmost type in the chain is marked `x-gts-abstract: true`, validation MUST fail (see section 9.11)
-- **JSON Schema formats**: OP#6 and OP#13 MUST enforce `uuid`, `email`, `date-time`, `date`, `time`, `uri`, `hostname`, `ipv4`, and `ipv6` formats as assertions on string values, including instance properties and effective trait values. Other format names retain the selected JSON Schema dialect's semantics. See [ADR-0005](adr/0005-json-schema-format-assertions.md).
+- **JSON Schema formats**: OP#6 and OP#13 MUST enforce `uuid`, `email`, `date-time`, `date`, `time`, `uri`, `hostname`, `ipv4`, `ipv6`, and `regex` formats as assertions on string values, including instance properties and effective trait values. The `regex` format follows JSON Schema Draft-07: a value is valid when it is a regular expression that is valid according to the ECMA 262 regular expression dialect. Other format names retain the selected JSON Schema dialect's semantics. See [ADR-0005](adr/0005-json-schema-format-assertions.md).
 
 - **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
 

@@ -36,7 +36,7 @@ GTS would require assertion for every format recognized by an implementation or 
 
 ### Option 3 — Assert the core interchange formats
 
-GTS requires OP#6 and OP#13 to assert `uuid`, `email`, `date-time`, `date`, `time`, `uri`, `hostname`, `ipv4`, and `ipv6` when they constrain string values. This applies to instance properties and the effective trait values validated against the effective trait schema. Other format names retain their selected JSON Schema dialect's semantics.
+GTS requires OP#6 and OP#13 to assert `uuid`, `email`, `date-time`, `date`, `time`, `uri`, `hostname`, `ipv4`, `ipv6`, and `regex` when they constrain string values. This applies to instance properties and the effective trait values validated against the effective trait schema. The `regex` format follows its JSON Schema Draft-07 definition: a string value is valid when it is a regular expression that is valid according to the ECMA 262 regular expression dialect. Other format names retain their selected JSON Schema dialect's semantics.
 
 ## Decision Outcome
 

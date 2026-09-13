@@ -682,8 +682,8 @@ class TestCaseTestOp10Query_ExplicitMajorZeroInstance(HttpRunner):
             RunRequest("register v0 instance")
             .post("/entities")
             .with_json({
-                "id": "gts.x.test10.zero.event.v0~x.test10._.instance.v0",
-                "type": "gts.x.test10.zero.event.v0~",
+                "id": "gts.x.test10_zero.zero.event.v0~x.test10_zero._.instance.v0",
+                "type": "gts.x.test10_zero.zero.event.v0~",
                 "eventId": "evt-v0",
             })
             .validate()
@@ -694,7 +694,7 @@ class TestCaseTestOp10Query_ExplicitMajorZeroInstance(HttpRunner):
             RunRequest("query explicit v0 instance")
             .get("/query")
             .with_params(**{
-                "expr": "gts.x.test10.zero.event.v0~x.test10._.instance.v0"
+                "expr": "gts.x.test10_zero.zero.event.v0~x.test10_zero._.instance.v0"
             })
             .validate()
             .assert_equal("status_code", 200)

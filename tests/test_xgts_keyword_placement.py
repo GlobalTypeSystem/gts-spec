@@ -325,3 +325,131 @@ class TestCaseAbstract_InsideDefsRejected(HttpRunner):
             .assert_equal("status_code", 422)
         ),
     ]
+
+
+# ---------------------------------------------------------------------------
+# Matrix completion — remaining (keyword × subschema-position) cells
+#
+# The cases above cover most (keyword, position) pairs across this file and
+# test_refimpl_x_gts_final_abstract.py (allOf cases). These three fill the
+# still-missing cells so every document-level keyword is proven to be rejected
+# in allOf, `properties`, and `definitions` positions:
+#   - x-gts-traits-schema inside `properties`
+#   - x-gts-final inside `definitions`
+#   - x-gts-abstract inside `properties`
+# ---------------------------------------------------------------------------
+
+
+class TestCaseTraitsSchema_InsidePropertiesRejected(HttpRunner):
+    """x-gts-traits-schema nested inside a `properties` subschema MUST be rejected.
+
+    Complements TestCaseTraitsSchema_InsideAllOfRejected: the placement rule is
+    about *any* subschema, so a trait-schema buried in a property is equally a
+    misplacement (§9.7.1/§9.11).
+    """
+
+    config = Config("placement: x-gts-traits-schema inside properties rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with x-gts-traits-schema inside a property should be rejected")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.testkp.tschemaprop.base.v1~",
+                "$$schema": _SCHEMA,
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "nested": {
+                        "type": "object",
+                        "x-gts-traits-schema": {
+                            "type": "object",
+                            "properties": {"topicRef": {"type": "string"}},
+                        },
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseFinal_InsideDefsRejected(HttpRunner):
+    """x-gts-final nested inside a `definitions` entry MUST be rejected (§9.7.1/§9.11).
+
+    Complements TestCaseFinal_InsidePropertiesRejected (this file) and the allOf
+    case in test_refimpl_x_gts_final_abstract.py.
+    """
+
+    config = Config("placement: x-gts-final inside definitions rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with x-gts-final inside definitions should be rejected")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.testkp.finaldefs.base.v1~",
+                "$$schema": _SCHEMA,
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+                "definitions": {
+                    "Sub": {
+                        "type": "object",
+                        "x-gts-final": True,
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseAbstract_InsidePropertiesRejected(HttpRunner):
+    """x-gts-abstract nested inside a `properties` subschema MUST be rejected (§9.7.1/§9.11).
+
+    Complements TestCaseAbstract_InsideDefsRejected (this file) and the allOf
+    case in test_refimpl_x_gts_final_abstract.py.
+    """
+
+    config = Config("placement: x-gts-abstract inside properties rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with x-gts-abstract inside a property should be rejected")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.testkp.absprop.base.v1~",
+                "$$schema": _SCHEMA,
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "nested": {
+                        "type": "object",
+                        "x-gts-abstract": True,
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]

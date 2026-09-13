@@ -1816,5 +1816,136 @@ class TestCaseTestOp8Compatibility_Draft202012UnevaluatedProperties(HttpRunner):
     ]
 
 
+class TestCaseTestOp8Compatibility_ConditionalUnevaluatedProperties(HttpRunner):
+    """Conditional applicators must not be lowered to ``additionalProperties``.
+
+    The source (v1.0) accepts ``{}`` and ``{"value": <string>}``; the target
+    (v1.1) accepts only ``{}``, so the target's accepted-instance set is a
+    strict subset of the source's. Per §4.3 the definitive verdicts are
+    backward ``incompatible``, forward ``compatible``, full ``incompatible``.
+
+    An implementation that mechanically lowers ``unevaluatedProperties`` to
+    ``additionalProperties: false`` would compute the source's set incorrectly
+    and reach a wrong verdict. README §4.3/§9.2 allow ``unknown`` when the
+    checker cannot establish a relation, but do not require it here. This test
+    therefore accepts either the correct definitive verdict or ``unknown`` for
+    each relation, so a checker that solves the conditional case is not
+    rejected.
+    """
+    config = Config("OP#8 - Conditional unevaluatedProperties").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register conditional source schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.conditional.v1.0~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "if": {"required": ["value"]},
+                "then": {"properties": {"value": {"type": "string"}}},
+                "unevaluatedProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register closed target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.conditional.v1.1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check conditional unevaluatedProperties compatibility")
+            .get("/compatibility")
+            .with_params(**{
+                "old_type_id": "gts.x.test8.compat.conditional.v1.0~",
+                "new_type_id": "gts.x.test8.compat.conditional.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_contained_by("body.backward_compatibility", ["incompatible", "unknown"])
+            .assert_contained_by("body.forward_compatibility", ["compatible", "unknown"])
+            .assert_contained_by("body.full_compatibility", ["incompatible", "unknown"])
+        ),
+    ]
+
+
+class TestCaseTestOp8Compatibility_IdentityFullyCompatible(HttpRunner):
+    """OP#8 - Identity baseline: two structurally identical schemas.
+
+    Anchors the compatibility matrix: when the new schema is byte-for-byte the
+    same shape as the old one, every instance is mutually valid, so all three
+    verdicts MUST be ``compatible``.
+    """
+    config = Config("OP#8 - Identity (fully compatible)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    _SCHEMA_BODY = {
+        "$$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "required": ["eventId", "count"],
+        "properties": {
+            "eventId": {"type": "string"},
+            "count": {"type": "integer", "minimum": 0},
+            "label": {"type": "string"},
+        },
+        "additionalProperties": False,
+    }
+
+    teststeps = [
+        Step(
+            RunRequest("register v1.0 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.identity.v1.0~",
+                **_SCHEMA_BODY,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register v1.1 identical schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test8.compat.identity.v1.1~",
+                **_SCHEMA_BODY,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("check identity compatibility")
+            .get("/compatibility")
+            .with_params(
+                **{
+                    "old_type_id": "gts.x.test8.compat.identity.v1.0~",
+                    "new_type_id": "gts.x.test8.compat.identity.v1.1~",
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.backward_compatibility", "compatible")
+            .assert_equal("body.forward_compatibility", "compatible")
+            .assert_equal("body.full_compatibility", "compatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()

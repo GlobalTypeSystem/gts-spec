@@ -12,6 +12,7 @@ from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
     register as _register,
     register_derived as _register_derived,
+    register_derived_redeclared as _register_derived_redeclared,
     register_instance as _register_instance,
     validate_entity as _validate_entity,
     validate_instance as _validate_instance,
@@ -53,6 +54,51 @@ class TestCaseFinal_RejectDerivedSchema(HttpRunner):
             "gts.x.testfa.final.reject.v1~x.testfa._.derived.v1~",
             False,
             "validate derived should fail",
+        ),
+    ]
+
+
+class TestCaseFinal_RejectDerivedSchema_NoAllOf(HttpRunner):
+    """x-gts-final: the final check is derivation-form independent.
+
+    Every other final-derivation test establishes derivation via `allOf` +
+    `$ref`. Per ADR-0001, derivation is established by the chained `$id` alone,
+    so a descendant that restates its body directly (no `allOf`) from a final
+    base MUST still fail. This is the only test that exercises the no-allOf
+    derivation form against a final base.
+    """
+
+    config = Config("final: reject derived schema (no allOf)").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.testfa.finalnoallof.base.v1~",
+            {
+                "type": "object",
+                "x-gts-final": True,
+                "properties": {"name": {"type": "string"}},
+            },
+            "register final base",
+        ),
+        _register_derived_redeclared(
+            "gts://gts.x.testfa.finalnoallof.base.v1~x.testfa._.derived.v1~",
+            "gts://gts.x.testfa.finalnoallof.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "extra": {"type": "string"},
+                },
+            },
+            "register derived from final base without allOf",
+        ),
+        _validate_type_schema(
+            "gts.x.testfa.finalnoallof.base.v1~x.testfa._.derived.v1~",
+            False,
+            "validate derived should fail - base is final regardless of body form",
         ),
     ]
 

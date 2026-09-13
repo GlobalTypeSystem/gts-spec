@@ -622,5 +622,78 @@ class TestCaseTestOp9Cast_DistinctDialects(HttpRunner):
     ]
 
 
+class TestCaseTestOp9Cast_AllOfHiddenConstraintVisible(HttpRunner):
+    """OP#9 - A constraint hidden inside a target ``allOf`` stays visible to the
+    compatibility checker.
+
+    The v1.1 target restates ``name`` twice under ``allOf`` with different
+    ``minLength`` bounds. The effective (intersected) constraint is
+    ``minLength: 5``, which tightens the v1.0 bound of ``minLength: 1``. The cast
+    verdict must therefore report the target as not backward compatible instead
+    of treating the hidden tighter bound as compatible. The source instance is
+    only the transport required by ``/cast``; the compatibility verdict compares
+    the two registered type schemas.
+    """
+    config = Config("OP#9 - Cast (allOf hidden constraint visible)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register v1.0 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test9.allof.hidden.v1.0~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"name": {"type": "string", "minLength": 1}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register v1.1 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test9.allof.hidden.v1.1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [
+                    {"properties": {"name": {"type": "string", "minLength": 1}}},
+                    {"properties": {"name": {"type": "string", "minLength": 5}}},
+                ],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register source instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.test9.allof.hidden.v1.0~x.test9._.source.v1",
+                "type": "gts.x.test9.allof.hidden.v1.0~",
+                "name": "valid",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("cast with hidden allOf constraint")
+            .post("/cast")
+            .with_json({
+                "instance_id": "gts.x.test9.allof.hidden.v1.0~x.test9._.source.v1",
+                "to_type_id": "gts.x.test9.allof.hidden.v1.1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.casted_entity.name", "valid")
+            .assert_equal("body.backward_compatibility", "incompatible")
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp9Cast_MinorVersionUpcast().test_start()
