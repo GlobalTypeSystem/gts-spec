@@ -1,0 +1,63 @@
+{
+  "$id": "gts://gts.x.advanced.schema.profile.v1~",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Advanced Profile (Draft 2020-12)",
+  "description": "Demonstrates $defs and unevaluatedProperties under Draft 2020-12.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "#/$defs/envelope" },
+    { "$ref": "#/$defs/profileFields" }
+  ],
+  "$defs": {
+    "envelope": {
+      "type": "object",
+      "required": ["id", "type", "display_name"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "type": {
+          "type": "string",
+          "const": "gts.x.advanced.schema.profile.v1~"
+        },
+        "display_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "profileFields": {
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/nonEmptyString"
+          },
+          "uniqueItems": true
+        },
+        "contact": {
+          "type": "object",
+          "required": ["email"],
+          "properties": {
+            "email": {
+              "type": "string",
+              "format": "email"
+            },
+            "homepage": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "unevaluatedProperties": false
+        }
+      }
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "unevaluatedProperties": false
+}

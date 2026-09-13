@@ -1,0 +1,111 @@
+{
+  "$id": "gts://gts.x.advanced.schema.login_event.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "x-gts-abstract": true,
+  "title": "Advanced Login Event (Base)",
+  "description": "Abstract base schema illustrating Draft-07 format assertions, root-pointer x-gts-ref, and trait schema declaration.",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "tenant_id",
+    "occurred_at",
+    "event_date",
+    "event_time",
+    "origin_uri",
+    "origin_host",
+    "source_ipv4",
+    "source_ipv6",
+    "rule_regex",
+    "kind"
+  ],
+  "properties": {
+    "id": {
+      "description": "Event instance identifier.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "type": {
+      "description": "Concrete GTS type identifier.",
+      "type": "string",
+      "x-gts-ref": "/$id"
+    },
+    "tenant_id": {
+      "description": "Tenant scope for this event.",
+      "type": "string",
+      "format": "uuid"
+    },
+    "occurred_at": {
+      "description": "Timestamp when the event occurred.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "event_date": {
+      "description": "Event calendar date.",
+      "type": "string",
+      "format": "date"
+    },
+    "event_time": {
+      "description": "Event clock time.",
+      "type": "string",
+      "format": "time"
+    },
+    "actor_email": {
+      "description": "Present for human-initiated login events.",
+      "type": "string",
+      "format": "email"
+    },
+    "origin_uri": {
+      "description": "Source URI.",
+      "type": "string",
+      "format": "uri"
+    },
+    "origin_host": {
+      "description": "Source host.",
+      "type": "string",
+      "format": "hostname"
+    },
+    "source_ipv4": {
+      "description": "Client IPv4 address.",
+      "type": "string",
+      "format": "ipv4"
+    },
+    "source_ipv6": {
+      "description": "Client IPv6 address.",
+      "type": "string",
+      "format": "ipv6"
+    },
+    "rule_regex": {
+      "description": "Matching rule recorded as an ECMA-262 regex pattern.",
+      "type": "string",
+      "format": "regex"
+    },
+    "kind": {
+      "description": "Originator type.",
+      "type": "string",
+      "enum": ["human", "service"]
+    },
+    "payload": {
+      "description": "Derived types constrain payload shape.",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "x-gts-traits-schema": {
+    "type": "object",
+    "required": ["topicRef", "retention"],
+    "additionalProperties": false,
+    "properties": {
+      "topicRef": {
+        "description": "Target topic for this event family.",
+        "type": "string",
+        "x-gts-ref": "gts.x.core.events.topic.v1~"
+      },
+      "retention": {
+        "description": "ISO-8601 retention duration.",
+        "type": "string",
+        "pattern": "^P(?!$).+"
+      }
+    }
+  }
+}

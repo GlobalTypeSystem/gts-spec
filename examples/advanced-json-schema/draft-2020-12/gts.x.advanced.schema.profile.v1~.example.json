@@ -1,0 +1,10 @@
+{
+  "id": "8ac88a2d-6fd9-4742-a95d-8f5bbff85cc2",
+  "type": "gts.x.advanced.schema.profile.v1~",
+  "display_name": "Platform Operator",
+  "tags": ["iam", "security", "ops"],
+  "contact": {
+    "email": "operator@example.com",
+    "homepage": "https://example.com/operators/platform"
+  }
+}

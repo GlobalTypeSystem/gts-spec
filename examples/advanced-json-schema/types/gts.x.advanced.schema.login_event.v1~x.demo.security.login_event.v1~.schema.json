@@ -1,0 +1,104 @@
+{
+  "$id": "gts://gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Advanced Login Event (Concrete)",
+  "description": "Concrete derived type demonstrating allOf derivation, local definitions, local references, and conditional constraints.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.advanced.schema.login_event.v1~" },
+    {
+      "type": "object",
+      "required": ["type", "payload", "canonical_type"],
+      "properties": {
+        "type": {
+          "const": "gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~"
+        },
+        "canonical_type": {
+          "description": "Shows x-gts-ref pointing to a local JSON Pointer target that resolves to a GTS ID string.",
+          "type": "string",
+          "x-gts-ref": "/properties/type/const"
+        },
+        "payload": {
+          "type": "object",
+          "required": ["auth_method", "credential"],
+          "properties": {
+            "auth_method": {
+              "type": "string",
+              "enum": ["password", "oauth2", "m2m"]
+            },
+            "user_id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "client_id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_\\-]{2,63}$"
+            },
+            "redirect_uri": {
+              "type": "string",
+              "format": "uri"
+            },
+            "credential": {
+              "$ref": "#/definitions/credential"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": { "const": "human" }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "required": ["actor_email"],
+            "properties": {
+              "payload": {
+                "required": ["user_id", "redirect_uri"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": { "const": "service" }
+            },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "payload": {
+                "required": ["client_id"]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "definitions": {
+    "credential": {
+      "type": "object",
+      "required": ["fingerprint", "rotates_on"],
+      "properties": {
+        "fingerprint": {
+          "type": "string",
+          "pattern": "^[A-Fa-f0-9]{32,64}$"
+        },
+        "rotates_on": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "x-gts-traits": {
+    "topicRef": "gts.x.core.events.topic.v1~x.core.audit.events.v1",
+    "retention": "P180D"
+  }
+}

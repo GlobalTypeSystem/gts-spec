@@ -1,0 +1,50 @@
+[
+  {
+    "id": "9a3f1e43-34a5-4e89-b8e3-67bc64b67501",
+    "type": "gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~",
+    "canonical_type": "gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~",
+    "tenant_id": "11111111-2222-3333-4444-555555555555",
+    "occurred_at": "2026-09-13T11:22:33Z",
+    "event_date": "2026-09-13",
+    "event_time": "11:22:33Z",
+    "actor_email": "analyst@example.com",
+    "origin_uri": "https://iam.example.com/login",
+    "origin_host": "iam.example.com",
+    "source_ipv4": "203.0.113.21",
+    "source_ipv6": "2001:db8::21",
+    "rule_regex": "^(admin|auditor)_[a-z0-9_]+$",
+    "kind": "human",
+    "payload": {
+      "auth_method": "oauth2",
+      "user_id": "4ea55a8e-d0cc-4fd1-a11f-c271f4c2a7af",
+      "redirect_uri": "https://console.example.com/callback",
+      "credential": {
+        "fingerprint": "8E1A6F3B4C2D5A7E8F9A0B1C2D3E4F55",
+        "rotates_on": "2026-10-01"
+      }
+    }
+  },
+  {
+    "id": "13a5a850-857f-4f0f-95f8-85f50bb20e36",
+    "type": "gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~",
+    "canonical_type": "gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~",
+    "tenant_id": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    "occurred_at": "2026-09-13T12:00:00Z",
+    "event_date": "2026-09-13",
+    "event_time": "12:00:00Z",
+    "origin_uri": "https://m2m.example.net/token",
+    "origin_host": "m2m.example.net",
+    "source_ipv4": "198.51.100.42",
+    "source_ipv6": "2001:db8:1::42",
+    "rule_regex": "^[a-z]+\\.[a-z]+$",
+    "kind": "service",
+    "payload": {
+      "auth_method": "m2m",
+      "client_id": "svc_iam_gateway",
+      "credential": {
+        "fingerprint": "ABCD1234ABCD1234ABCD1234ABCD1234ABCD1234",
+        "rotates_on": "2026-11-01"
+      }
+    }
+  }
+]
