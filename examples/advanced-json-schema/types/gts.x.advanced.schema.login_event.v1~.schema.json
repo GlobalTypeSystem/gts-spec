@@ -30,6 +30,11 @@
       "type": "string",
       "x-gts-ref": "/$id"
     },
+    "canonical_type": {
+      "description": "Optional canonical GTS type identifier supplied by concrete derived types.",
+      "type": "string",
+      "x-gts-ref": "gts.*"
+    },
     "tenant_id": {
       "description": "Tenant scope for this event.",
       "type": "string",

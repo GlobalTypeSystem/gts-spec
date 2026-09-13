@@ -16,7 +16,7 @@
         "canonical_type": {
           "description": "Shows x-gts-ref pointing to a local JSON Pointer target that resolves to a GTS ID string.",
           "type": "string",
-          "x-gts-ref": "/properties/type/const"
+          "x-gts-ref": "/allOf/1/properties/type/const"
         },
         "payload": {
           "type": "object",
