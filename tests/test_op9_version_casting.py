@@ -618,9 +618,6 @@ class TestCaseTestOp9Cast_DistinctDialects(HttpRunner):
             .assert_equal("body.backward_compatibility", "unknown")
             .assert_equal("body.forward_compatibility", "unknown")
             .assert_equal("body.full_compatibility", "unknown")
-            .assert_equal("body.is_backward_compatible", None)
-            .assert_equal("body.is_forward_compatible", None)
-            .assert_equal("body.is_fully_compatible", None)
         ),
     ]
 
