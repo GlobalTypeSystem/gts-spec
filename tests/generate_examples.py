@@ -57,10 +57,18 @@ class EntityRecorder:
 
     def _record_entity(self, body, url=None, response=None):
         entity_id, kind = identify_entity(body)
-        if entity_id is not None:
-            self.entities[entity_id] = (kind, body)
-            if url is not None and response is not None and response.ok:
-                self.entity_urls[entity_id] = url
+        if entity_id is None:
+            return
+        # Preserve the last successfully registered body. A rejected
+        # resubmission (e.g. 409 on changed content under an immutable
+        # registry) must not overwrite the object the server actually holds,
+        # otherwise the rejected replacement would be exported as valid.
+        rejected = response is not None and not response.ok
+        if rejected and entity_id in self.entities:
+            return
+        self.entities[entity_id] = (kind, body)
+        if url is not None and response is not None and response.ok:
+            self.entity_urls[entity_id] = url
 
     def validate_unvalidated_entities(self):
         validated_entity_ids = {entity_id for _, _, entity_id in self.results}
