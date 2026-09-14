@@ -74,6 +74,7 @@ class EntityRecorder:
             response = requests.post(
                 urljoin(self.entity_urls[entity_id], path),
                 json=body,
+                timeout=30,
             )
             self._record_validation(path, body, response)
 
