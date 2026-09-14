@@ -49,6 +49,12 @@ This approach provides:
 - **Portability**: Tests can run in any environment with Python and network access
 - **Simplicity**: No complex test harnesses or language interop required
 
+### Server behaviour prerequisites
+
+Some test cases assert behaviour that the specification leaves implementation-defined. Servers under test must satisfy these prerequisites for the suite to pass:
+
+- **Immutable registry** (`OP#6` resubmission cases, e.g. `TestCaseOp6InstanceResubmission` / `TestCaseOp6TypeResubmission`): registration is treated as immutable per identifier. Resubmitting an entity with **identical** content under an existing ID must succeed (`200`), while submitting **changed** content under an already-registered ID must be rejected with `409 Conflict`. Spec §6 does not mandate a mutability policy, so implementations that permit in-place updates will not satisfy these tests.
+
 ## Running the tests
 
 ### With Docker (recommended)
