@@ -177,7 +177,7 @@ class TestCaseXGtsRef_JsonPointer(HttpRunner):
             RunRequest("register pointer schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts://gts.x.testref._.pointer.v1~",
+                "$$id": "gts://gts.x.testref.json_pointer.pointer.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "title": "PTR-TITLE",
                 "description": "PTR-DESC",
@@ -197,8 +197,8 @@ class TestCaseXGtsRef_JsonPointer(HttpRunner):
             RunRequest("register valid pointer instance")
             .post("/entities")
             .with_json({
-                "type": "gts.x.testref._.pointer.v1~",
-                "id": "gts.x.testref._.pointer.v1~x.vendor._.ptr_ok.v1",
+                "type": "gts.x.testref.json_pointer.pointer.v1~",
+                "id": "gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1",
             })
             .validate()
             .assert_equal("status_code", 200)
@@ -207,7 +207,7 @@ class TestCaseXGtsRef_JsonPointer(HttpRunner):
             RunRequest("register valid pointer instance")
             .post("/entities")
             .with_json({
-                "id": "gts.x.testref._.capability.v1~",
+                "id": "gts.x.testref.json_pointer.capability.v1~",
             })
             .validate()
             .assert_equal("status_code", 200)
@@ -216,7 +216,7 @@ class TestCaseXGtsRef_JsonPointer(HttpRunner):
             RunRequest("validate valid pointer instance")
             .post("/validate-instance")
             .with_json({
-                "instance_id": "gts.x.testref._.pointer.v1~x.vendor._.ptr_ok.v1"
+                "instance_id": "gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1"
             })
             .validate()
             .assert_equal("status_code", 200)
@@ -224,19 +224,19 @@ class TestCaseXGtsRef_JsonPointer(HttpRunner):
         ),
         Step(
             RunRequest("get valid pointer instance")
-            .get("/entities/gts.x.testref._.pointer.v1~x.vendor._.ptr_ok.v1")
+            .get("/entities/gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1")
             .validate()
             .assert_equal("status_code", 200)
-            .assert_equal("body.content.type", "gts.x.testref._.pointer.v1~")
-            .assert_equal("body.content.id", "gts.x.testref._.pointer.v1~x.vendor._.ptr_ok.v1")
+            .assert_equal("body.content.type", "gts.x.testref.json_pointer.pointer.v1~")
+            .assert_equal("body.content.id", "gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1")
         ),
         # Register invalid instance (wrong refDesc)
         Step(
             RunRequest("register invalid pointer instance - wrong refDesc")
             .post("/entities")
             .with_json({
-                "type": "gts.x.testref._.pointer.v1~",
-                "id": "gts.x.testref._.wrong_pointer.v1~x.vendor._.ptr_bad_desc.v1",
+                "type": "gts.x.testref.json_pointer.pointer.v1~",
+                "id": "gts.x.testref.json_pointer.wrong_pointer.v1~x.vendor._.ptr_bad_desc.v1",
             })
             .validate()
             .assert_equal("status_code", 200)
@@ -245,7 +245,7 @@ class TestCaseXGtsRef_JsonPointer(HttpRunner):
             RunRequest("validate invalid pointer instance - wrong refDesc should fail")
             .post("/validate-instance")
             .with_json({
-                "instance_id": "gts.x.testref._.wrong_pointer.v1~x.vendor._.ptr_bad_desc.v1"
+                "instance_id": "gts.x.testref.json_pointer.wrong_pointer.v1~x.vendor._.ptr_bad_desc.v1"
             })
             .validate()
             .assert_equal("status_code", 200)
