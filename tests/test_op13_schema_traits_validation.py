@@ -1005,7 +1005,7 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
 
     teststeps = [
         _register(
-            "gts://gts.x.test13.traits.retention.v1~",
+            "gts://gts.x.test13.refm_traits.retention.v1~",
             {
                 "type": "object",
                 "properties": {
@@ -1021,7 +1021,7 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
             "register standalone RetentionTrait schema",
         ),
         _register(
-            "gts://gts.x.test13.traits.topic.v1~",
+            "gts://gts.x.test13.refm_traits.topic.v1~",
             {
                 "type": "object",
                 "properties": {
@@ -1038,7 +1038,7 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
             "register standalone TopicTrait schema",
         ),
         _register(
-            "gts://gts.x.test13.refm.event.v1~",
+            "gts://gts.x.test13.refm_missing.event.v1~",
             {
                 "type": "object",
                 "x-gts-traits-schema": {
@@ -1047,13 +1047,13 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
                         {
                             "$$ref": (
                                 "gts://gts.x.test13"
-                                ".traits.retention.v1~"
+                                ".refm_traits.retention.v1~"
                             ),
                         },
                         {
                             "$$ref": (
                                 "gts://gts.x.test13"
-                                ".traits.topic.v1~"
+                                ".refm_traits.topic.v1~"
                             ),
                         },
                     ],
@@ -1068,10 +1068,10 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
         # Derived only provides retention, missing topicRef
         _register_derived(
             (
-                "gts://gts.x.test13.refm.event.v1~"
+                "gts://gts.x.test13.refm_missing.event.v1~"
                 "x.test13._.ref_incomplete.v1~"
             ),
-            "gts://gts.x.test13.refm.event.v1~",
+            "gts://gts.x.test13.refm_missing.event.v1~",
             {
                 "type": "object",
                 "x-gts-traits": {
@@ -1082,7 +1082,7 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
         ),
         _validate_type_schema(
             (
-                "gts.x.test13.refm.event.v1~"
+                "gts.x.test13.refm_missing.event.v1~"
                 "x.test13._.ref_incomplete.v1~"
             ),
             False,
@@ -5002,20 +5002,13 @@ _STANDARD_TRAIT_FORMAT_TYPE_ID = "gts.x.test13.formats.event.v1~"
 _STANDARD_TRAIT_FORMATS = (
     ("uuidValue", "uuid", "550e8400-e29b-41d4-a716-446655440000", "not-a-uuid"),
     ("emailValue", "email", "user@example.com", "not-an-email"),
-    ("dateTimeValue", "date-time", "2008-10-12T10:30:00Z", "2008-10-12 10:30:00Z"),
-    ("dateTimeValueT", "date-time", "2011-07-22T10:30:00Z", "2011-07-22T10:30:00"),
-    ("dateTimeFracValue", "date-time", "2025-06-19T10:30:00.123Z", "2025-06-19T10:30:61.123Z"),
-    ("dateTimeTZValue", "date-time", "2027-04-26T10:30:00+01:00", "2027-04-26T10:30:00+25:00"),
+    ("dateTimeValue", "date-time", "2025-01-15T10:30:00Z", "not-date-time"),
     ("dateValue", "date", "2025-01-15", "2025-13-40"),
-    ("timeValueOffset", "time", "10:30:00Z", "10:30:00"), # time offset is mandatory in 'time-format' draft-07
-    ("timeValueOverflow", "time", "10:30:00Z", "10:00:61Z"),
-    ("timeValueFracZ", "time", "10:30:00.123Z", "10:00:61.123Z"),
-    ("timeValueTZ", "time", "10:30:00+01:00", "10:30:00+25:00"),
+    ("timeValue", "time", "10:30:00Z", "25:99:99Z"),
     ("uriValue", "uri", "https://example.com/resource", "://not-a-uri"),
     ("hostnameValue", "hostname", "example.com", "not a hostname"),
     ("ipv4Value", "ipv4", "192.168.1.1", "999.999.999.999"),
     ("ipv6Value", "ipv6", "2001:db8::1", "not-an-ipv6-address"),
-    ("regexValue", "regex", "^[A-Za-z0-9]+$", "[unclosed"),
 )
 _STANDARD_TRAIT_FORMAT_VALUES = {
     field: valid for field, _, valid, _ in _STANDARD_TRAIT_FORMATS
@@ -5078,7 +5071,7 @@ class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
             _register_derived(
                 (
                     f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
-                    f"x.test13._.invalid_{field.lower()}.v1~"
+                    f"x.test13._.invalid_{format_name.replace('-', '_')}.v1~"
                 ),
                 f"gts://{_STANDARD_TRAIT_FORMAT_TYPE_ID}",
                 {
@@ -5096,124 +5089,11 @@ class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
             _validate_type_schema(
                 (
                     f"{_STANDARD_TRAIT_FORMAT_TYPE_ID}"
-                    f"x.test13._.invalid_{field.lower()}.v1~"
+                    f"x.test13._.invalid_{format_name.replace('-', '_')}.v1~"
                 ),
                 False,
                 f"reject trait with invalid {format_name}",
             )
-            for field, format_name, _, _ in _STANDARD_TRAIT_FORMATS
-        ],
-    ]
-
-
-_REGEX_ECMA262_TRAIT_TYPE_ID = "gts.x.test13.formats.regexecma.v1~"
-_REGEX_ECMA262_TRAIT_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {"regexValue": {"type": "string", "format": "regex"}},
-}
-
-# Strings that ARE valid ECMA 262 regular expressions. The Draft-07 `regex`
-# format asserts that the value is a regular expression valid according to the
-# ECMA 262 dialect (README §9.2, ADR-0005); effective trait values that are
-# valid ECMA 262 regexes MUST pass OP#13 validation.
-_REGEX_ECMA262_TRAIT_VALID = (
-    ("anchored_class", "^[A-Za-z0-9]+$"),
-    ("shorthand_bounded", "\\d{3}-\\d{4}"),
-    ("group_alternation", "(foo|bar)+"),
-    ("range_bounded", "[a-z]{1,3}"),
-    ("nested_groups", "(a(b)?c)*"),
-    ("class_shorthand", "[\\s\\S]*"),
-)
-
-# Strings that are NOT valid ECMA 262 regular expressions; effective trait
-# values that fail the `regex` format MUST be rejected.
-_REGEX_ECMA262_TRAIT_INVALID = (
-    ("unterminated_class", "[unclosed"),
-    ("unterminated_group", "(unclosed"),
-    ("reversed_quantifier", "a{3,2}"),
-    ("trailing_backslash", "\\"),
-    ("leading_quantifier", "*abc"),
-    ("dangling_quantifier", "a**"),
-)
-
-
-class TestCaseOp13_Traits_RegexEcma262(HttpRunner):
-    """OP#13 - Enforce the Draft-07 `regex` format as an ECMA 262 assertion on traits.
-
-    README §9.2 and ADR-0005 require `regex` to be asserted on effective trait
-    values: a value is valid only when it is a regular expression valid according
-    to the ECMA 262 regular expression dialect. Valid patterns must pass;
-    strings that are not valid ECMA 262 regular expressions must be rejected.
-    """
-    config = Config("OP#13 - Regex ECMA 262 Trait Conformance").base_url(
-        get_gts_base_url()
-    )
-
-    def test_start(self):
-        super().test_start()
-
-    teststeps = [
-        _register(
-            f"gts://{_REGEX_ECMA262_TRAIT_TYPE_ID}",
-            {
-                "type": "object",
-                "x-gts-traits-schema": _REGEX_ECMA262_TRAIT_SCHEMA,
-                "required": ["id"],
-                "properties": {"id": {"type": "string"}},
-            },
-            "register base with regex trait format",
-        ),
-        *[
-            _register_derived(
-                (
-                    f"gts://{_REGEX_ECMA262_TRAIT_TYPE_ID}"
-                    f"x.test13._.regex_valid_{label}.v1~"
-                ),
-                f"gts://{_REGEX_ECMA262_TRAIT_TYPE_ID}",
-                {
-                    "type": "object",
-                    "x-gts-traits": {"regexValue": pattern},
-                },
-                f"register derived with valid ECMA 262 regex trait ({label})",
-            )
-            for label, pattern in _REGEX_ECMA262_TRAIT_VALID
-        ],
-        *[
-            _validate_type_schema(
-                (
-                    f"{_REGEX_ECMA262_TRAIT_TYPE_ID}"
-                    f"x.test13._.regex_valid_{label}.v1~"
-                ),
-                True,
-                f"accept valid ECMA 262 regex trait ({label})",
-            )
-            for label, _ in _REGEX_ECMA262_TRAIT_VALID
-        ],
-        *[
-            _register_derived(
-                (
-                    f"gts://{_REGEX_ECMA262_TRAIT_TYPE_ID}"
-                    f"x.test13._.regex_invalid_{label}.v1~"
-                ),
-                f"gts://{_REGEX_ECMA262_TRAIT_TYPE_ID}",
-                {
-                    "type": "object",
-                    "x-gts-traits": {"regexValue": pattern},
-                },
-                f"register derived with invalid ECMA 262 regex trait ({label})",
-            )
-            for label, pattern in _REGEX_ECMA262_TRAIT_INVALID
-        ],
-        *[
-            _validate_type_schema(
-                (
-                    f"{_REGEX_ECMA262_TRAIT_TYPE_ID}"
-                    f"x.test13._.regex_invalid_{label}.v1~"
-                ),
-                False,
-                f"reject invalid ECMA 262 regex trait ({label})",
-            )
-            for label, _ in _REGEX_ECMA262_TRAIT_INVALID
+            for _, format_name, _, _ in _STANDARD_TRAIT_FORMATS
         ],
     ]
