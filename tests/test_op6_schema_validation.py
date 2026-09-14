@@ -2796,7 +2796,7 @@ class TestCaseOp6ValidateJson_NonObjectBody(HttpRunner):
 
 class TestCaseOp6ValidationErrorPath(HttpRunner):
     config = Config(
-        "OP#6 validation errors do not expose absolute file paths"
+        "OP#6 validation errors do not expose file URI references"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -2833,7 +2833,7 @@ class TestCaseOp6ValidationErrorPath(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
-            .assert_regex_match("body.error", r"(?s)^(?!.*file:///).*$")
+            .assert_regex_match("body.error", r"(?si)^(?!.*file://).*$")
         ),
     ]
 
