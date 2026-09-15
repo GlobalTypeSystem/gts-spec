@@ -8,7 +8,6 @@ The chained GTS ID is the authoritative source for determining an instance's
 parent schema. Any explicit type fields are ignored when the ID is chained.
 """
 
-import requests
 from .conftest import get_gts_base_url
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -141,7 +140,7 @@ class TestCaseOp2TypeIdPriority_TypeUsedForAnonymous(HttpRunner):
     ]
 
 
-def test_op2_chained_id_takes_priority_over_explicit_type() -> None:
+def test_op2_chained_id_takes_priority_over_explicit_type(gts_session) -> None:
     """
     When a well-known instance has both a chained GTS ID and an explicit
     `type` field, the chained GTS ID MUST take priority for type_id.
@@ -158,7 +157,7 @@ def test_op2_chained_id_takes_priority_over_explicit_type() -> None:
         # Explicit type declares different parent (should be IGNORED)
         "type": "gts.acme.core.models.product.v1~",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
 
@@ -178,7 +177,7 @@ def test_op2_chained_id_takes_priority_over_explicit_type() -> None:
     )
 
 
-def test_op2_chain_derivation_alone() -> None:
+def test_op2_chain_derivation_alone(gts_session) -> None:
     """
     When a well-known instance has only a chained GTS ID (no explicit
     `type`), the type_id MUST be derived from the chain.
@@ -190,7 +189,7 @@ def test_op2_chain_derivation_alone() -> None:
             "acme.core.instances.user1.v1"
         ),
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
 
@@ -200,7 +199,7 @@ def test_op2_chain_derivation_alone() -> None:
     assert body["selected_type_id_field"] == "id"
 
 
-def test_op2_type_used_for_anonymous_instance() -> None:
+def test_op2_type_used_for_anonymous_instance(gts_session) -> None:
     """
     For anonymous instances (UUID id), the explicit `type` field is used
     since there is no chained GTS ID to derive schema from.
@@ -210,7 +209,7 @@ def test_op2_type_used_for_anonymous_instance() -> None:
         "id": "7a1d2f34-5678-49ab-9012-abcdef123456",
         "type": "gts.acme.core.models.order.v1~",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
 
@@ -221,7 +220,7 @@ def test_op2_type_used_for_anonymous_instance() -> None:
     assert body["selected_type_id_field"] == "type"
 
 
-def test_op2_gtsTid_used_for_anonymous_instance() -> None:
+def test_op2_gtsTid_used_for_anonymous_instance(gts_session) -> None:
     """
     The `gtsTid` field can also be used for anonymous instances when
     there is no chained GTS ID.
@@ -231,7 +230,7 @@ def test_op2_gtsTid_used_for_anonymous_instance() -> None:
         "id": "7a1d2f34-5678-49ab-9012-abcdef123456",
         "gtsTid": "gts.acme.core.models.order.v1~",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
 
@@ -242,7 +241,7 @@ def test_op2_gtsTid_used_for_anonymous_instance() -> None:
     assert body["selected_type_id_field"] == "gtsTid"
 
 
-def test_op2_deeply_chained_id_ignores_explicit_type() -> None:
+def test_op2_deeply_chained_id_ignores_explicit_type(gts_session) -> None:
     """
     For deeply chained IDs (3+ segments), the chain still takes priority
     and any explicit type field is ignored.
@@ -258,7 +257,7 @@ def test_op2_deeply_chained_id_ignores_explicit_type() -> None:
         # Explicit type pointing elsewhere (IGNORED)
         "type": "gts.different.schema.type.v1~",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
 
@@ -274,7 +273,7 @@ def test_op2_deeply_chained_id_ignores_explicit_type() -> None:
     assert body["selected_type_id_field"] == "id"
 
 
-def test_op2_single_segment_gts_id_uses_explicit_type() -> None:
+def test_op2_single_segment_gts_id_uses_explicit_type(gts_session) -> None:
     """
     For single-segment GTS IDs (no chain), the explicit `type` field
     is used since there's no parent to derive from the ID.
@@ -286,7 +285,7 @@ def test_op2_single_segment_gts_id_uses_explicit_type() -> None:
         # Explicit type is used since ID has no chain
         "type": "gts.acme.core.models.base.v1~",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
 
@@ -297,7 +296,7 @@ def test_op2_single_segment_gts_id_uses_explicit_type() -> None:
     assert body["selected_type_id_field"] == "type"
 
 
-def test_op2_combined_anonymous_id_takes_priority_over_explicit_type() -> None:
+def test_op2_combined_anonymous_id_takes_priority_over_explicit_type(gts_session) -> None:
     """
     For combined anonymous instance identifiers (type-chain + UUID tail),
     type_id MUST be derived from the `id` prefix up to the last '~', and
@@ -312,7 +311,7 @@ def test_op2_combined_anonymous_id_takes_priority_over_explicit_type() -> None:
         ),
         "type": "gts.different.schema.type.v1~",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
 
