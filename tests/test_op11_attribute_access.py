@@ -232,7 +232,7 @@ class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
             RunRequest("register base event schema")
             .post("/entities")
             .with_json({
-                "$$id": "gts://gts.x.test11.events.type.v1~",
+                "$$id": "gts://gts.x.test11.nosymbol.type.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "required": ["eventId", "type", "tenantId", "occurredAt"],
@@ -254,20 +254,20 @@ class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
             .post("/entities")
             .with_json({
                 "$$id": (
-                    "gts://gts.x.test11.events.type.v1~"
+                    "gts://gts.x.test11.nosymbol.type.v1~"
                     "x.test11.nosymbol.event.v1.0~"
                 ),
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "allOf": [
-                    {"$$ref": "gts://gts.x.test11.events.type.v1~"},
+                    {"$$ref": "gts://gts.x.test11.nosymbol.type.v1~"},
                     {
                         "type": "object",
                         "required": ["type", "payload"],
                         "properties": {
                             "type": {
                                 "const": (
-                                    "gts.x.test11.events.type.v1~"
+                                    "gts.x.test11.nosymbol.type.v1~"
                                     "x.test11.nosymbol.event.v1.0~"
                                 )
                             },
@@ -290,9 +290,9 @@ class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
             RunRequest("register instance")
             .post("/entities")
             .with_json({
-                "id": "cf6i7j89-0123-94fg-4567-fgh678901234",
+                "id": "test11-nosymbol-instance",
                 "type": (
-                    "gts.x.test11.events.type.v1~"
+                    "gts.x.test11.nosymbol.type.v1~"
                     "x.test11.nosymbol.event.v1.0~"
                 ),
 
@@ -312,7 +312,7 @@ class TestCaseTestOp11AttrAccess_MissingAtSymbol(HttpRunner):
             .with_params(
                 **{
                     "gts_with_path": (
-                        "gts.x.test11.events.type.v1~"
+                        "gts.x.test11.nosymbol.type.v1~"
                         "x.test11.nosymbol.event.v1.0"
                     )
                 }

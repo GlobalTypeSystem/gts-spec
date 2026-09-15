@@ -2794,5 +2794,145 @@ class TestCaseOp6ValidateJson_NonObjectBody(HttpRunner):
     ]
 
 
+class TestCaseOp6ValidationErrorPath(HttpRunner):
+    config = Config(
+        "OP#6 validation errors do not expose file URI references"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.error.path.v1~",
+            {
+                "type": "object",
+                "required": ["id", "type", "address"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "type": {"const": "gts.x.test6.error.path.v1~"},
+                    "address": {"type": "string", "format": "ipv4"},
+                },
+            },
+            "register schema for portable validation error",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test6.error.path.v1~x.test6._.invalid.v1",
+                "type": "gts.x.test6.error.path.v1~",
+                "address": "999.999.999.999",
+            },
+            "register instance with invalid address",
+        ),
+        Step(
+            RunRequest("validate invalid address without an absolute file path")
+            .post("/validate-instance")
+            .with_json(
+                {"instance_id": "gts.x.test6.error.path.v1~x.test6._.invalid.v1"}
+            )
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_regex_match("body.error", r"(?si)^(?!.*file://).*$")
+        ),
+    ]
+
+
+class TestCaseOp6InstanceResubmission(HttpRunner):
+    config = Config(
+        "OP#6 instance resubmission is immutable"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.resubmit.instance.v1~",
+            {
+                "type": "object",
+                "required": ["id", "type", "value"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "type": {"const": "gts.x.test6.resubmit.instance.v1~"},
+                    "value": {"type": "string"},
+                },
+            },
+            "register schema for instance resubmission",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test6.resubmit.instance.v1~x.test6._.example.v1",
+                "type": "gts.x.test6.resubmit.instance.v1~",
+                "value": "initial",
+            },
+            "register instance initially",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test6.resubmit.instance.v1~x.test6._.example.v1",
+                "type": "gts.x.test6.resubmit.instance.v1~",
+                "value": "initial",
+            },
+            "resubmit identical instance",
+        ),
+        Step(
+            RunRequest("reject changed instance content")
+            .post("/entities")
+            .with_json(
+                {
+                    "id": "gts.x.test6.resubmit.instance.v1~x.test6._.example.v1",
+                    "type": "gts.x.test6.resubmit.instance.v1~",
+                    "value": "changed",
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 409)
+        ),
+    ]
+
+
+class TestCaseOp6TypeResubmission(HttpRunner):
+    config = Config(
+        "OP#6 type resubmission is immutable"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test6.resubmit.type.v1~",
+            {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+            },
+            "register type schema initially",
+        ),
+        _register(
+            "gts://gts.x.test6.resubmit.type.v1~",
+            {
+                "type": "object",
+                "properties": {"value": {"type": "string"}},
+            },
+            "resubmit identical type schema",
+        ),
+        Step(
+            RunRequest("reject changed type schema")
+            .post("/entities")
+            .with_json(
+                {
+                    "$$id": "gts://gts.x.test6.resubmit.type.v1~",
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {"value": {"type": "integer"}},
+                }
+            )
+            .validate()
+            .assert_equal("status_code", 409)
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp6ValidateInstance_ValidInstance().test_start()
