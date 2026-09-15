@@ -16,8 +16,10 @@ import functools
 import requests
 from requests.adapters import HTTPAdapter
 
+POOL_MAXSIZE = 16
 
-def build_session(pool_maxsize: int = 16) -> requests.Session:
+
+def build_session() -> requests.Session:
     """Build a fresh pooled ``requests.Session``.
 
     The adapter is mounted for both http and https so the same pool is used
@@ -25,8 +27,8 @@ def build_session(pool_maxsize: int = 16) -> requests.Session:
     """
     session = requests.Session()
     adapter = HTTPAdapter(
-        pool_connections=pool_maxsize,
-        pool_maxsize=pool_maxsize,
+        pool_connections=POOL_MAXSIZE,
+        pool_maxsize=POOL_MAXSIZE,
         max_retries=0,
     )
     session.mount("http://", adapter)

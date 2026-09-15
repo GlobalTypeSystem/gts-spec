@@ -1,11 +1,15 @@
 import types
 
+import pytest
+
 from .generate_examples import (
     EntityRecorder,
     identify_entity,
     validation_error,
     write_examples,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class Response:

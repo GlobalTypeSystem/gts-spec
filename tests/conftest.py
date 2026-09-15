@@ -30,8 +30,19 @@ def pytest_configure(config: pytest.Config) -> None:
         os.environ["GTS_BASE_URL"] = cli_opt
 
 
-def pytest_sessionstart(session: pytest.Session) -> None:
-    """Validate connection to GTS server before running any tests."""
+def pytest_collection_modifyitems(
+    config: pytest.Config, items: typing.List[pytest.Item]
+) -> None:
+    """Validate connection to GTS server before running server-dependent tests.
+
+    Pure unit tests (marked ``@pytest.mark.unit``) need no server, so a run that
+    collects only unit tests skips the probe entirely and can run offline. Any
+    run that includes a server-dependent test still fails loudly if the server
+    is unreachable.
+    """
+    if all(item.get_closest_marker("unit") for item in items):
+        return
+
     url = get_gts_base_url() + "/entities"
     try:
         response = get_session().get(url, timeout=5)
