@@ -1,8 +1,17 @@
 import os
+
+# HttpRunner synchronously POSTs to Google Analytics (and inits Sentry) on
+# every test_start, adding ~0.5s per test (up to its 5s timeout if the network
+# is blocked). Opt out before httprunner is imported anywhere.
+os.environ.setdefault("DISABLE_GA", "true")
+os.environ.setdefault("DISABLE_SENTRY", "true")
+
 import sys
 import typing
 import pytest
 import requests
+
+from .helpers.http_client import get_session
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -25,7 +34,7 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     """Validate connection to GTS server before running any tests."""
     url = get_gts_base_url() + "/entities"
     try:
-        response = requests.get(url, timeout=5)
+        response = get_session().get(url, timeout=5)
         response.raise_for_status()
         print(f"\nSuccessfully connected to GTS server at {url}", file=sys.stderr)
     except requests.exceptions.RequestException as e:
@@ -58,3 +67,12 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: typing.Optional[pytest.
 def gts_base_url(pytestconfig: pytest.Config) -> str:
     """GTS base URL fixture with CLI override support."""
     return pytestconfig.getoption("--gts-base-url") or get_gts_base_url()
+
+
+@pytest.fixture(scope="session")
+def gts_session() -> typing.Iterator[requests.Session]:
+    """Session-scoped, connection-pooled HTTP client shared across tests."""
+    session = get_session()
+    yield session
+    session.close()
+    get_session.cache_clear()

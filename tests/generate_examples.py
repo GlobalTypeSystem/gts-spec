@@ -15,6 +15,11 @@ from urllib.parse import urljoin, urlparse
 import pytest
 import requests
 
+try:  # package import (pytest: tests.generate_examples)
+    from .helpers.http_client import get_session
+except ImportError:  # script import (python tests/generate_examples.py)
+    from helpers.http_client import get_session
+
 
 class EntityRecorder:
     def __init__(self):
@@ -79,7 +84,7 @@ class EntityRecorder:
             )
             field = "type_id" if kind == "types" else "instance_id"
             body = {field: entity_id}
-            response = requests.post(
+            response = get_session().post(
                 urljoin(self.entity_urls[entity_id], path),
                 json=body,
                 timeout=30,

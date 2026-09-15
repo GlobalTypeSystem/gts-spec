@@ -1,4 +1,3 @@
-import requests
 from .conftest import get_gts_base_url
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -244,7 +243,7 @@ class TestCaseTestOp2IdExtraction_Case6_GtsDerivedSchema(HttpRunner):
     ]
 
 
-def test_op2_extract_id_gts_base_schema_normalizes_id() -> None:
+def test_op2_extract_id_gts_base_schema_normalizes_id(gts_session) -> None:
     """Schema detection uses $schema; gts:// prefix is stripped from $id.
 
     A base GTS schema has no GTS parent type, so `type_id` MUST be null.
@@ -257,7 +256,7 @@ def test_op2_extract_id_gts_base_schema_normalizes_id() -> None:
         "$id": "gts://gts.x.core.events.type.v1~",
         "type": "object",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
     assert body["is_type_schema"] is True
@@ -265,7 +264,7 @@ def test_op2_extract_id_gts_base_schema_normalizes_id() -> None:
     assert body.get("type_id") is None
 
 
-def test_op2_extract_id_gts_derived_schema_parent_from_chain() -> None:
+def test_op2_extract_id_gts_derived_schema_parent_from_chain(gts_session) -> None:
     """For derived schemas, type_id is derived from the $id chain."""
     url = get_gts_base_url() + "/extract-id"
     payload = {
@@ -276,7 +275,7 @@ def test_op2_extract_id_gts_derived_schema_parent_from_chain() -> None:
         ),
         "type": "object",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
     assert body["is_type_schema"] is True
@@ -287,7 +286,7 @@ def test_op2_extract_id_gts_derived_schema_parent_from_chain() -> None:
     assert body["type_id"] == "gts.x.core.events.type.v1~"
 
 
-def test_op2_extract_id_schema_without_id_is_non_gts_schema() -> None:
+def test_op2_extract_id_schema_without_id_is_non_gts_schema(gts_session) -> None:
     """
     If $schema is present but $id is missing, the document is a schema
     (Rule A) but it is NOT a GTS schema (Rule C #2).
@@ -297,7 +296,7 @@ def test_op2_extract_id_schema_without_id_is_non_gts_schema() -> None:
         "$schema": "http://json-schema.org/draft-07/schema#",
         "type": "object",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
     assert body["is_type_schema"] is True
@@ -311,7 +310,7 @@ def test_op2_extract_id_schema_without_id_is_non_gts_schema() -> None:
     assert body.get("type_id") is None
 
 
-def test_op2_extract_id_id_without_schema_is_not_a_gts_schema() -> None:
+def test_op2_extract_id_id_without_schema_is_not_a_gts_schema(gts_session) -> None:
     """
     If $id is present but $schema is missing, the document is an instance
     (Rule A). The '$id' field value is a GTS identifier (not a GTS schema).
@@ -321,7 +320,7 @@ def test_op2_extract_id_id_without_schema_is_not_a_gts_schema() -> None:
         "id": "7a1d2f34-5678-49ab-9012-abcdef123456",
         "$id": "gts://gts.x.core.events.test_type.v10~",
     }
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
     assert body["is_type_schema"] is False
@@ -330,13 +329,13 @@ def test_op2_extract_id_id_without_schema_is_not_a_gts_schema() -> None:
     assert body.get("type_id") is None
 
 
-def test_op2_extract_id_uuid_without_type_is_non_gts_instance() -> None:
+def test_op2_extract_id_uuid_without_type_is_non_gts_instance(gts_session) -> None:
     """
     UUID id without GTS Type reference is a non-GTS instance (Rule C #3).
     """
     url = get_gts_base_url() + "/extract-id"
     payload = {"id": "7a1d2f34-5678-49ab-9012-abcdef123456"}
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
     assert body["is_type_schema"] is False
@@ -344,11 +343,11 @@ def test_op2_extract_id_uuid_without_type_is_non_gts_instance() -> None:
     assert body.get("type_id") is None
 
 
-def test_op2_extract_id_non_gts_id_is_non_gts_instance() -> None:
+def test_op2_extract_id_non_gts_id_is_non_gts_instance(gts_session) -> None:
     """Non-GTS id value without GTS Type reference is a non-GTS instance."""
     url = get_gts_base_url() + "/extract-id"
     payload = {"id": "not-a-gts-id"}
-    r = requests.post(url, json=payload, timeout=30)
+    r = gts_session.post(url, json=payload, timeout=30)
     assert r.status_code == 200
     body = r.json()
     assert body["is_type_schema"] is False
