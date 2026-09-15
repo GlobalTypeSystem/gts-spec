@@ -1,4 +1,11 @@
 import os
+
+# HttpRunner synchronously POSTs to Google Analytics (and inits Sentry) on
+# every test_start, adding ~0.5s per test (up to its 5s timeout if the network
+# is blocked). Opt out before httprunner is imported anywhere.
+os.environ.setdefault("DISABLE_GA", "true")
+os.environ.setdefault("DISABLE_SENTRY", "true")
+
 import sys
 import typing
 import pytest
