@@ -1,6 +1,7 @@
 """Tests for x-gts-ref validation: prefix enforcement, JSON Pointer resolution, and combinator semantics."""
 
 from .conftest import get_gts_base_url
+from .helpers.http_run_helpers import validate_type_schema as _validate_type_schema
 from httprunner import HttpRunner, Config, Step, RunRequest
 
 
@@ -1105,6 +1106,11 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
             .assert_contains("body.error", "does not match pattern")
+        ),
+        _validate_type_schema(
+            "gts.x.testref_local._.holder.v1~",
+            True,
+            "validate local reference holder schema",
         ),
     ]
 

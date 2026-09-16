@@ -2386,6 +2386,16 @@ class TestCaseOp13_TraitsSchema_BooleanFalse_Inherits_DescendantSetsTraits_Fails
             "register leaf supplying traits",
         ),
         _validate_type_schema(
+            "gts.x.test13.aggfalsei.event.v1~",
+            True,
+            "validate base - false trait-schema permits no trait values",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.aggfalsei.event.v1~x.test13._.mid.v1~",
+            False,
+            "validate mid - false trait-schema permits no traits in derived types",
+        ),
+        _validate_type_schema(
             (
                 "gts.x.test13.aggfalsei.event.v1~"
                 "x.test13._.mid.v1~x.test13._.leaf.v1~"
