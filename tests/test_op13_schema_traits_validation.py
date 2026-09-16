@@ -311,6 +311,171 @@ class TestCaseOp13_TraitsInvalid_WrongType(HttpRunner):
     ]
 
 
+class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
+    """Abstract types are exempt from trait *completeness* (§9.7.5) but NOT from
+    x-gts-ref reference integrity.
+
+    Per §9.7.5 the completeness check (standard JSON Schema validation of the
+    materialized traits) is skipped for x-gts-abstract types; the separate
+    "reference resolution of trait values" rule does NOT exempt abstract types.
+    So an abstract type whose trait x-gts-ref names a constraint type that is not
+    registered MUST still fail on explicit validation - even though a descendant
+    may later supply its own x-gts-ref value.
+    """
+    config = Config(
+        "OP#13 x-gts-ref: abstract still validates missing constraint type"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # NOTE: the topic constraint type is intentionally NOT registered.
+        _register_abstract(
+            "gts://gts.x.test13.absref.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.absref.topic.v1~",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract base whose x-gts-ref names an unregistered topic type",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absref.event.v1~",
+            False,
+            "validate should fail - abstract still enforces x-gts-ref constraint "
+            "type existence (completeness is skipped, reference resolution is not)",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_AbstractRefConstraintResolved(HttpRunner):
+    """Abstract type declaring an x-gts-ref whose constraint type IS registered,
+    and supplying no value, MUST pass.
+
+    Guards against over-strictness: an abstract type must not fail merely for
+    declaring an optional x-gts-ref trait it leaves unresolved (completeness is
+    skipped) as long as the constraint type it names exists.
+    """
+    config = Config(
+        "OP#13 x-gts-ref: abstract with resolved constraint, no value, passes"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.absrefok.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic constraint type",
+        ),
+        _register_abstract(
+            "gts://gts.x.test13.absrefok.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.absrefok.topic.v1~",
+                        },
+                    },
+                    "required": ["topicRef"],
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract base: required topicRef left unresolved, constraint exists",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absrefok.event.v1~",
+            True,
+            "validate should pass - completeness skipped for abstract, "
+            "x-gts-ref constraint type is registered, no value to resolve",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_AbstractRefValueUnregistered(HttpRunner):
+    """Abstract type that DOES declare an x-gts-ref trait value pointing to an
+    unregistered entity MUST fail, even though the constraint type exists and the
+    type is abstract.
+
+    Reference resolution applies to a value the abstract type declares itself;
+    the abstract completeness exemption does not cover x-gts-ref value existence.
+    """
+    config = Config(
+        "OP#13 x-gts-ref: abstract resolves declared trait ref values"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.absrefv.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic constraint type",
+        ),
+        # NOTE: no topic instance is registered, so the declared value dangles.
+        _register_abstract(
+            "gts://gts.x.test13.absrefv.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.absrefv.topic.v1~",
+                        },
+                    },
+                },
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.absrefv.topic.v1~"
+                        "x.test13._.ghost.v1"
+                    ),
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract base declaring a topicRef value to an unregistered topic",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absrefv.event.v1~",
+            False,
+            "validate should fail - abstract still resolves the x-gts-ref trait "
+            "value it declares (referenced topic instance is not registered)",
+        ),
+    ]
+
+
 class TestCaseOp13_TraitsInvalid_UnknownProperty(HttpRunner):
     """OP#13 - Traits: trait value includes unknown property.
 
@@ -2336,6 +2501,11 @@ class TestCaseOp13_TraitsSchema_AbstractIncompatibleNoValues_Fails(HttpRunner):
             top_level={"x-gts-abstract": True},
         ),
         _validate_type_schema(
+            "gts.x.test13.abstincomp.event.v1~",
+            True,
+            "validate should pass - no completeness check",
+        ),
+        _validate_type_schema(
             "gts.x.test13.abstincomp.event.v1~x.test13._.child.v1~",
             False,
             "validate should fail - abstract child trait schema changes type",
@@ -4081,6 +4251,17 @@ class TestCaseOp13_Completeness_AbstractDroppedByConcreteDescendant_Fails(HttpRu
             "register concrete descendant that does NOT resolve the trait",
         ),
         _validate_type_schema(
+            "gts.x.test13.absdrop.event.v1~",
+            True,
+            "validate abstract base via validate-type-schema",
+        ),
+        _validate_entity(
+            "gts.x.test13.absdrop.event.v1~",
+            True,
+            "validate abstract base via validate-entity must match",
+            expected_entity_type="schema",
+        ),
+        _validate_type_schema(
             "gts.x.test13.absdrop.event.v1~x.test13._.concrete.v1~",
             False,
             "validate concrete descendant - inherited required trait unresolved",
@@ -4232,7 +4413,10 @@ class TestCaseOp13_Merge_TypeChange_ObjectReplacedByScalar(HttpRunner):
     """ADR-0004 / RFC 7396: a non-object patch value replaces wholesale (no recursion).
 
     Abstract base sets an object-valued `routing`; the trait-schema constrains
-    `routing` to a string. Because the base is abstract its value is not checked.
+    `routing` to a string. This test asserts the DESCENDANT only and never
+    validates the base directly (the base's own value violation is covered by
+    TestCaseOp13_TraitsInvalid_AbstractValueWrongType; the abstract exemption
+    covers completeness, not value validation).
     The non-abstract descendant sets `routing` to a scalar string. Per RFC 7396
     a non-object member value replaces the target entirely (it does NOT merge
     into the ancestor object), so the effective `routing` is the string and
@@ -4262,7 +4446,7 @@ class TestCaseOp13_Merge_TypeChange_ObjectReplacedByScalar(HttpRunner):
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register abstract base - routing is an object (unchecked, abstract)",
+            "register abstract base - routing is an object (base not validated here)",
         ),
         _register_derived(
             "gts://gts.x.test13.mtchg.event.v1~x.test13._.kid.v1~",
@@ -4342,9 +4526,12 @@ class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_ValueDiscriminated(HttpRu
     Strengthens Merge_NullDelete_FallsBackToDefault, which could pass even if an
     implementation treated `null` as a no-op (the ancestor value also satisfied
     the schema). Here the trait-schema locks `retention` with `const: P7D` and a
-    matching `default: P7D`. The abstract base sets `retention: P30D` — allowed
-    only because abstract types skip the check. The non-abstract descendant
-    writes `retention: null`. If `null` truly deletes, materialization re-applies
+    matching `default: P7D`. The abstract base sets `retention: P30D`; this test
+    asserts the DESCENDANT only and never validates the base directly (validating
+    the base would fail the const - see TestCaseOp13_TraitsInvalid_AbstractValueViolatesConst;
+    the abstract exemption covers completeness, not value validation). The
+    non-abstract descendant writes `retention: null`. If `null` truly deletes,
+    materialization re-applies
     the default `P7D`, which satisfies `const` → passes. If the registry ignored
     `null`, the inherited `P30D` would violate `const: P7D` → fail. The True
     result therefore proves the key was deleted and the default re-applied.
@@ -4373,7 +4560,7 @@ class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_ValueDiscriminated(HttpRu
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register abstract base - retention P30D (skips const check)",
+            "register abstract base - retention P30D (base not validated here)",
         ),
         _register_derived(
             "gts://gts.x.test13.mnulldef.event.v1~x.test13._.kid.v1~",
@@ -5444,6 +5631,11 @@ class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
                 },
             },
             "register derived with topicRef under the unregistered constraint type",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.xrefct.event.v1~",
+            False,
+            "validate should fail - x-gts-ref constraint type is not registered",
         ),
         _validate_type_schema(
             "gts.x.test13.xrefct.event.v1~x.test13._.leaf.v1~",
