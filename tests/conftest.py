@@ -30,17 +30,23 @@ def pytest_configure(config: pytest.Config) -> None:
         os.environ["GTS_BASE_URL"] = cli_opt
 
 
+@pytest.hookimpl(trylast=True)
 def pytest_collection_modifyitems(
     config: pytest.Config, items: typing.List[pytest.Item]
 ) -> None:
     """Validate connection to GTS server before running server-dependent tests.
 
     Pure unit tests (marked ``@pytest.mark.unit``) need no server, so a run that
-    collects only unit tests skips the probe entirely and can run offline. Any
-    run that includes a server-dependent test still fails loudly if the server
-    is unreachable.
+    selects only unit tests (e.g. ``pytest tests -m unit``) skips the probe
+    entirely and can run offline. Any run that includes a server-dependent test
+    still fails loudly if the server is unreachable.
+
+    ``trylast=True`` is required so this hook runs *after* pytest's built-in
+    ``-m``/``-k`` deselection: otherwise ``items`` would still contain the
+    server-dependent tests that the expression is filtering out, and a
+    ``-m unit`` run would probe the server anyway.
     """
-    if all(item.get_closest_marker("unit") for item in items):
+    if not items or all(item.get_closest_marker("unit") for item in items):
         return
 
     url = get_gts_base_url() + "/entities"
