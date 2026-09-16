@@ -19,6 +19,68 @@ from httprunner import HttpRunner, Config
 # ---------------------------------------------------------------------------
 
 
+class TestCaseOp13_Seed_TopicRefRegistry(HttpRunner):
+    """Seed shared x-gts-ref targets for the OP#13 trait tests.
+
+    Many trait tests below annotate a `topicRef` trait with
+    `x-gts-ref: "gts.x.test13.events.topic.v1~"` and supply concrete topic
+    references as trait values. Under §9.6 a *specific* (non-wildcard)
+    `x-gts-ref` is existence-enforced: the constraint type and the full
+    derivation chain of the referenced value MUST be registered, or validation
+    fails. This class registers the topic type and every topic instance those
+    tests reference so their `x-gts-ref` values resolve. It runs first (file
+    order) and the entries persist for the rest of the session's registry.
+    """
+
+    config = Config("OP#13 - Seed topicRef registry").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.events.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic type schema (x-gts-ref target)",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test13.events.topic.v1~x.test13._.orders.v1",
+                "name": "orders",
+            },
+            "register topic instance (orders)",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test13.events.topic.v1~x.core._.default.v1",
+                "name": "default",
+            },
+            "register topic instance (default) referenced by trait-schema defaults",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test13.events.topic.v1~x.test13._.custom.v1",
+                "name": "custom",
+            },
+            "register topic instance (custom)",
+        ),
+        _register_instance(
+            {
+                "id": "gts.x.test13.events.topic.v1~x.test13._.audit.v1",
+                "name": "audit",
+            },
+            "register topic instance (audit)",
+        ),
+    ]
+
+
 class TestCaseOp13_TraitsValid_AllResolved(HttpRunner):
     """OP#13 - Traits: derived schema provides all trait values.
 
@@ -41,7 +103,7 @@ class TestCaseOp13_TraitsValid_AllResolved(HttpRunner):
                         "topicRef": {
                             "type": "string",
                             "description": "Topic reference",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -63,7 +125,7 @@ class TestCaseOp13_TraitsValid_AllResolved(HttpRunner):
                 "type": "object",
                 "x-gts-traits": {
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.orders.v1"
                     ),
                     "retention": "P90D",
@@ -99,9 +161,9 @@ class TestCaseOp13_TraitsValid_DefaultsUsed(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                             "default": (
-                                "gts.x.core.events.topic.v1~"
+                                "gts.x.test13.events.topic.v1~"
                                 "x.core._.default.v1"
                             ),
                         },
@@ -158,7 +220,7 @@ class TestCaseOp13_TraitsInvalid_MissingRequired(HttpRunner):
                         "topicRef": {
                             "type": "string",
                             "description": "Required - no default",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -326,9 +388,9 @@ class TestCaseOp13_TraitsValid_PartialOverride(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                             "default": (
-                                "gts.x.core.events.topic.v1~"
+                                "gts.x.test13.events.topic.v1~"
                                 "x.core._.default.v1"
                             ),
                         },
@@ -352,7 +414,7 @@ class TestCaseOp13_TraitsValid_PartialOverride(HttpRunner):
                 "type": "object",
                 "x-gts-traits": {
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.custom.v1"
                     ),
                 },
@@ -389,7 +451,7 @@ class TestCaseOp13_TraitsValid_BothKeywordsInSameSchema(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -420,7 +482,7 @@ class TestCaseOp13_TraitsValid_BothKeywordsInSameSchema(HttpRunner):
                 },
                 "x-gts-traits": {
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.audit.v1"
                     ),
                 },
@@ -707,7 +769,7 @@ class TestCaseOp13_TraitsValid_ValidateEntity(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -729,7 +791,7 @@ class TestCaseOp13_TraitsValid_ValidateEntity(HttpRunner):
                 "type": "object",
                 "x-gts-traits": {
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.orders.v1"
                     ),
                     "retention": "P90D",
@@ -765,7 +827,7 @@ class TestCaseOp13_TraitsInvalid_ValidateEntity_MissingTrait(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -787,7 +849,7 @@ class TestCaseOp13_TraitsInvalid_ValidateEntity_MissingTrait(HttpRunner):
                 "type": "object",
                 "x-gts-traits": {
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.orders.v1"
                     ),
                 },
@@ -929,7 +991,7 @@ class TestCaseOp13_TraitsValid_RefBasedTraitSchema(HttpRunner):
                     "topicRef": {
                         "description": "Topic reference.",
                         "type": "string",
-                        "x-gts-ref": "gts.x.core.events.topic.v1~",
+                        "x-gts-ref": "gts.x.test13.events.topic.v1~",
                     },
                 },
             },
@@ -975,7 +1037,7 @@ class TestCaseOp13_TraitsValid_RefBasedTraitSchema(HttpRunner):
                 "type": "object",
                 "x-gts-traits": {
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.orders.v1"
                     ),
                     "retention": "P90D",
@@ -1029,7 +1091,7 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
                         "description": "Topic reference.",
                         "type": "string",
                         "x-gts-ref": (
-                            "gts.x.core.events.topic.v1~"
+                            "gts.x.test13.events.topic.v1~"
                         ),
                     },
                 },
@@ -1378,14 +1440,14 @@ class TestCaseOp13_TraitsInvalid_APBlocksExtension(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                         },
                     },
                 },
                 "x-gts-traits": {
                     "retention": "P30D",
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.orders.v1"
                     ),
                 },
@@ -1446,7 +1508,7 @@ class TestCaseOp13_TraitsInvalid_AbstractAPBlocksSchemaExtensionNoValues(HttpRun
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.core.events.topic.v1~",
+                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
                         },
                     },
                 },
@@ -1797,7 +1859,7 @@ class TestCaseOp13_TraitsInvalid_CyclingRef_TwoNode(HttpRunner):
                     "topicRef": {
                         "type": "string",
                         "x-gts-ref": (
-                            "gts.x.core.events.topic.v1~"
+                            "gts.x.test13.events.topic.v1~"
                         ),
                     },
                 },
@@ -1837,7 +1899,7 @@ class TestCaseOp13_TraitsInvalid_CyclingRef_TwoNode(HttpRunner):
                 "x-gts-traits": {
                     "retention": "P30D",
                     "topicRef": (
-                        "gts.x.core.events.topic.v1~"
+                        "gts.x.test13.events.topic.v1~"
                         "x.test13._.orders.v1"
                     ),
                 },
@@ -5209,4 +5271,449 @@ class TestCaseOp13_Traits_RegexEcma262(HttpRunner):
             )
             for label, _ in _REGEX_ECMA262_TRAIT_INVALID
         ],
+    ]
+
+
+# ---------------------------------------------------------------------------
+# x-gts-ref existence semantics for trait values (§9.6)
+#
+# §9.6 accepts two GTS constraint forms of x-gts-ref on a trait property:
+#   - a WILDCARD pattern (e.g. "gts.*", "gts.cf.core.am.*", "...v1~*"): the
+#     value must be a well-formed GTS id that matches the pattern (§10);
+#   - a CONCRETE identifier (e.g. "gts.x.test13.xref....v1~"): the value must be
+#     a well-formed GTS id that matches the constraint (a `~`-terminated
+#     constraint matches the exact id and any derived id).
+#
+# The specification leaves existence checking to the implementation. The GTS
+# reference implementation exercised here enforces it UNIFORMLY for both forms,
+# INCLUDING the bare "gts.*" wildcard: at least one registered GTS type/instance
+# MUST match the referenced value (a `~`-terminated value matches the exact type
+# and any descendant), or validation fails.
+#
+# The inherited cases (a/b/c) below also exercise trait inheritance: an
+# intermediate "audit" type supplies topicRef via x-gts-traits and is itself
+# never validated; a further-derived "user" type inherits that value and is the
+# one validated. Existence of the inherited value's target is resolved when the
+# user type is validated.
+# ---------------------------------------------------------------------------
+
+
+class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
+    """§9.6 wildcard (reference impl): 'gts.*' still requires the value to exist.
+
+    Existence checking is uniform across all GTS constraint forms, including the
+    bare 'gts.*' wildcard. A topicRef whose value is a well-formed GTS id that
+    matches the pattern but is never registered MUST fail; a value that resolves
+    to a registered entity MUST pass.
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref: gts.* wildcard enforces existence"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Register a concrete topic the good value will resolve to.
+        _register(
+            "gts://gts.x.test13.xrefwild.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic type the wildcard value will resolve to",
+        ),
+        _register_instance(
+            {
+                "id": (
+                    "gts.x.test13.xrefwild.topic.v1~"
+                    "x.test13._.orders.v1"
+                ),
+                "name": "orders",
+            },
+            "register topic instance (wildcard resolution target)",
+        ),
+        _register(
+            "gts://gts.x.test13.xrefwild.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {"type": "string", "x-gts-ref": "gts.*"},
+                    },
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base with wildcard x-gts-ref topicRef",
+        ),
+        # --- Negative: value matches gts.* but is never registered ---
+        _register_derived(
+            "gts://gts.x.test13.xrefwild.event.v1~x.test13._.ghost.v1~",
+            "gts://gts.x.test13.xrefwild.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.xrefwild.nowhere.v1~"
+                        "x.test13._.ghost.v1"
+                    ),
+                },
+            },
+            "register derived with topicRef to a never-registered entity",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.xrefwild.event.v1~x.test13._.ghost.v1~",
+            False,
+            "validate - gts.* wildcard requires existence, nonexistent value fails",
+        ),
+        # --- Positive: value matches gts.* and resolves to a registered entity ---
+        _register_derived(
+            "gts://gts.x.test13.xrefwild.event.v1~x.test13._.leaf.v1~",
+            "gts://gts.x.test13.xrefwild.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.xrefwild.topic.v1~"
+                        "x.test13._.orders.v1"
+                    ),
+                },
+            },
+            "register derived with topicRef to a registered entity",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.xrefwild.event.v1~x.test13._.leaf.v1~",
+            True,
+            "validate - gts.* wildcard value resolves to a registered entity, passes",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
+    """§9.6 specific ref: the x-gts-ref CONSTRAINT type must itself exist.
+
+    The topicRef value is a syntactically valid GTS id with the correct prefix,
+    but neither the constraint type nor the value is registered. Validation MUST
+    fail. Complements TestCaseOp13_TraitRef_TopicRefNonexistent, which registers
+    the constraint type but leaves the referenced value unregistered.
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref: missing constraint type fails"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.xrefct.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.xrefct.topic.v1~",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register base whose x-gts-ref points at an unregistered topic type",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.xrefct.event.v1~x.test13._.leaf.v1~",
+            "gts://gts.x.test13.xrefct.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.xrefct.topic.v1~"
+                        "x.test13._.orders.v1"
+                    ),
+                },
+            },
+            "register derived with topicRef under the unregistered constraint type",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.xrefct.event.v1~x.test13._.leaf.v1~",
+            False,
+            "validate should fail - x-gts-ref constraint type is not registered",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_InheritedChain_RootMissing(HttpRunner):
+    """Inherited topicRef, case (a): the ref target's root/constraint type is missing.
+
+    Chain: event base E (declares topicRef x-gts-ref = users root type) ->
+    audit type A (sets topicRef to a deep users type, NOT validated) ->
+    user type U (inherits A's topicRef, no own x-gts-traits). Validating U MUST
+    fail because the referenced users type chain — starting at its root, which
+    is also the x-gts-ref constraint type — is not registered at all.
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref inherited: root/constraint type missing fails"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # NOTE: the users type chain is intentionally NOT registered.
+        _register(
+            "gts://gts.x.test13.xrefia.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.xrefia.users.v1~",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register event base with x-gts-ref to users root type",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.xrefia.event.v1~x.test13._.audit.v1~",
+            "gts://gts.x.test13.xrefia.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.xrefia.users.v1~"
+                        "x.test13._.tenant.v1~"
+                        "x.test13._.admin.v1~"
+                    ),
+                },
+            },
+            "register audit type setting a deep topicRef (audit is not validated)",
+        ),
+        _register_derived(
+            (
+                "gts://gts.x.test13.xrefia.event.v1~"
+                "x.test13._.audit.v1~"
+                "x.test13._.user.v1~"
+            ),
+            "gts://gts.x.test13.xrefia.event.v1~x.test13._.audit.v1~",
+            {"type": "object"},
+            "register user type inheriting the audit topicRef (no own traits)",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.xrefia.event.v1~"
+                "x.test13._.audit.v1~"
+                "x.test13._.user.v1~"
+            ),
+            False,
+            "validate should fail - inherited topicRef root type does not exist",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_InheritedChain_LeafMissing(HttpRunner):
+    """Inherited topicRef, case (b): the ref target's leaf link is missing.
+
+    The users root and an intermediate link are registered, but the deep leaf
+    type used as the inherited topicRef value is NOT. Validating U MUST fail:
+    every link of the referenced value's derivation chain must exist, not just
+    its ancestors.
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref inherited: leaf link missing fails"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Register the users root and ONE intermediate link, but not the leaf.
+        _register(
+            "gts://gts.x.test13.xrefib.users.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register users root type",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.xrefib.users.v1~x.test13._.tenant.v1~",
+            "gts://gts.x.test13.xrefib.users.v1~",
+            {"type": "object"},
+            "register users intermediate type (tenant); leaf left unregistered",
+        ),
+        _register(
+            "gts://gts.x.test13.xrefib.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.xrefib.users.v1~",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register event base with x-gts-ref to users root type",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.xrefib.event.v1~x.test13._.audit.v1~",
+            "gts://gts.x.test13.xrefib.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.xrefib.users.v1~"
+                        "x.test13._.tenant.v1~"
+                        "x.test13._.admin.v1~"
+                    ),
+                },
+            },
+            "register audit type setting a deep topicRef (audit is not validated)",
+        ),
+        _register_derived(
+            (
+                "gts://gts.x.test13.xrefib.event.v1~"
+                "x.test13._.audit.v1~"
+                "x.test13._.user.v1~"
+            ),
+            "gts://gts.x.test13.xrefib.event.v1~x.test13._.audit.v1~",
+            {"type": "object"},
+            "register user type inheriting the audit topicRef (no own traits)",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.xrefib.event.v1~"
+                "x.test13._.audit.v1~"
+                "x.test13._.user.v1~"
+            ),
+            False,
+            "validate should fail - inherited topicRef leaf type does not exist",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_InheritedChain_FullyResolved(HttpRunner):
+    """Inherited topicRef, case (c): the entire ref target chain exists.
+
+    The users root, its intermediate link, and the deep leaf used as the
+    inherited topicRef value are all registered. Validating U MUST pass. The
+    referenced value carries two derivation segments beyond its root to show
+    the chain-existence check applies at arbitrary depth.
+    """
+
+    config = Config(
+        "OP#13 x-gts-ref inherited: full chain resolves"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Register the full users type chain: root -> tenant -> admin (leaf).
+        _register(
+            "gts://gts.x.test13.xrefic.users.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register users root type",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.xrefic.users.v1~x.test13._.tenant.v1~",
+            "gts://gts.x.test13.xrefic.users.v1~",
+            {"type": "object"},
+            "register users intermediate type (tenant)",
+        ),
+        _register_derived(
+            (
+                "gts://gts.x.test13.xrefic.users.v1~"
+                "x.test13._.tenant.v1~"
+                "x.test13._.admin.v1~"
+            ),
+            "gts://gts.x.test13.xrefic.users.v1~x.test13._.tenant.v1~",
+            {"type": "object"},
+            "register users leaf type (admin) - the topicRef target",
+        ),
+        _register(
+            "gts://gts.x.test13.xrefic.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.xrefic.users.v1~",
+                        },
+                    },
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register event base with x-gts-ref to users root type",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.xrefic.event.v1~x.test13._.audit.v1~",
+            "gts://gts.x.test13.xrefic.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.xrefic.users.v1~"
+                        "x.test13._.tenant.v1~"
+                        "x.test13._.admin.v1~"
+                    ),
+                },
+            },
+            "register audit type setting a deep topicRef (audit is not validated)",
+        ),
+        _register_derived(
+            (
+                "gts://gts.x.test13.xrefic.event.v1~"
+                "x.test13._.audit.v1~"
+                "x.test13._.user.v1~"
+            ),
+            "gts://gts.x.test13.xrefic.event.v1~x.test13._.audit.v1~",
+            {"type": "object"},
+            "register user type inheriting the audit topicRef (no own traits)",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.xrefic.event.v1~"
+                "x.test13._.audit.v1~"
+                "x.test13._.user.v1~"
+            ),
+            True,
+            "validate should pass - inherited topicRef chain fully registered",
+        ),
     ]

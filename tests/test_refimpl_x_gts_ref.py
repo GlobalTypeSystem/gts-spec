@@ -1166,6 +1166,291 @@ class TestCaseXGtsRef_RootLocalReference(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_WildcardPattern(HttpRunner):
+    """x-gts-ref: arbitrary wildcard patterns (not just ``gts.*``).
+
+    §9.6: the constraint value may be any well-formed GTS wildcard pattern
+    (§10), e.g. ``gts.x.testref_wild.am.*``. The field value must be a
+    syntactically valid GTS id that matches the pattern, and — in the reference
+    implementation — must resolve to at least one registered GTS type/instance
+    (existence is uniform across all constraint forms).
+    """
+    config = Config("x-gts-ref: arbitrary wildcard pattern").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Two target types under the gts.x.testref_wild.am.* family.
+        Step(
+            RunRequest("register am.user target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wild.am.user.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"kind": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register am.role target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wild.am.role.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"kind": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # A concrete instance of am.user (the value a good ref resolves to).
+        Step(
+            RunRequest("register am.user instance")
+            .post("/entities")
+            .with_json({
+                "kind": "user",
+                "id": "gts.x.testref_wild.am.user.v1~x.vendor._.bob.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Holder schema: ref constrained by the wildcard family pattern.
+        Step(
+            RunRequest("register holder schema with wildcard x-gts-ref")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wild._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_wild.am.*",
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Positive: ref matches the pattern AND is a registered entity.
+        Step(
+            RunRequest("register valid holder instance - registered match")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wild._.holder.v1~x.vendor._.ok.v1",
+                "ref": "gts.x.testref_wild.am.user.v1~x.vendor._.bob.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder - wildcard value resolves, should pass")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_wild._.holder.v1~x.vendor._.ok.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        # Negative 1: matches the pattern but the value is never registered.
+        Step(
+            RunRequest("register holder instance - matches pattern, unregistered value")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1",
+                "ref": "gts.x.testref_wild.am.user.v1~x.vendor._.nobody.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder - unregistered wildcard value should fail")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+        # Negative 2: valid GTS id but does not match the wildcard family.
+        Step(
+            RunRequest("register holder instance - value outside the pattern")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wild._.holder.v1~x.vendor._.wrong.v1",
+                "ref": "gts.x.testref_wild.other.thing.v1~x.vendor._.x.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder - value outside wildcard family should fail")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_wild._.holder.v1~x.vendor._.wrong.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+        # Negative 3: value is not a syntactically valid GTS identifier.
+        Step(
+            RunRequest("register holder instance - non-GTS value")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wild._.holder.v1~x.vendor._.badid.v1",
+                "ref": "not a gts id",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder - non-GTS value should fail")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_wild._.holder.v1~x.vendor._.badid.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
+    """x-gts-ref: ``...v1~*`` wildcard covers the base type and its descendants.
+
+    Per §3.5/§10, ``gts....stream.v1~*`` matches the type ``...stream.v1~``
+    itself as well as any entity derived from it. Combined with the reference
+    implementation's existence check, a value matching this pattern must resolve
+    to a registered type/instance.
+    """
+    config = Config("x-gts-ref: tilde wildcard pattern").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Base stream type + one registered derived stream type.
+        Step(
+            RunRequest("register stream base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wild.events.stream.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register derived stream schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wild.events.stream.v1~x.vendor._.orders.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$ref": "gts://gts.x.testref_wild.events.stream.v1~"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Holder schema constrained by the ~* wildcard.
+        Step(
+            RunRequest("register holder schema with tilde wildcard x-gts-ref")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wild.events.streamholder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "streamRef"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "streamRef": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_wild.events.stream.v1~*",
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Positive: ref is the base type itself (matches ~* and is registered).
+        Step(
+            RunRequest("register holder instance - base type ref")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wild.events.streamholder.v1~x.vendor._.a.v1",
+                "streamRef": "gts.x.testref_wild.events.stream.v1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder - base type ref should pass")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_wild.events.streamholder.v1~x.vendor._.a.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        # Positive: ref is a registered derived type (matches ~*).
+        Step(
+            RunRequest("register holder instance - derived type ref")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wild.events.streamholder.v1~x.vendor._.b.v1",
+                "streamRef": "gts.x.testref_wild.events.stream.v1~x.vendor._.orders.v1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder - registered derived ref should pass")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_wild.events.streamholder.v1~x.vendor._.b.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        # Negative: matches ~* but the derived value is not registered.
+        Step(
+            RunRequest("register holder instance - unregistered derived ref")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wild.events.streamholder.v1~x.vendor._.c.v1",
+                "streamRef": "gts.x.testref_wild.events.stream.v1~x.vendor._.ghost.v1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder - unregistered derived ref should fail")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": "gts.x.testref_wild.events.streamholder.v1~x.vendor._.c.v1"
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_JsonPointer().test_start()
@@ -1174,3 +1459,5 @@ if __name__ == "__main__":
     TestCaseXGtsRef_AnyOf().test_start()
     TestCaseXGtsRef_AllOf().test_start()
     TestCaseXGtsRef_NestedCombinators().test_start()
+    TestCaseXGtsRef_WildcardPattern().test_start()
+    TestCaseXGtsRef_TildeWildcardPattern().test_start()
