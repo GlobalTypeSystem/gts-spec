@@ -1024,6 +1024,17 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
 
     teststeps = [
         Step(
+            RunRequest("register implicit object target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_implicit._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
             RunRequest("register implicit object x-gts-ref schema")
             .post("/entities")
             .with_json({
@@ -1062,6 +1073,22 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
             .assert_contains("body.error", "does not match pattern")
+        ),
+        _validate_type_schema(
+            "gts.x.testref_implicit._.holder.v1~",
+            True,
+            "validate implicit object holder schema",
+        ),
+        Step(
+            RunRequest("register local ref target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_local._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
         ),
         Step(
             RunRequest("register local ref x-gts-ref schema")
@@ -1111,6 +1138,44 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
             "gts.x.testref_local._.holder.v1~",
             True,
             "validate local reference holder schema",
+        ),
+    ]
+
+
+class TestCaseXGtsRef_LocalRefMissingTarget(HttpRunner):
+    config = Config("x-gts-ref: local ref missing target").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register local ref schema with missing target")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_local_missing._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {"$$ref": "#/definitions/TargetRef"},
+                },
+                "definitions": {
+                    "TargetRef": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_local_missing._.target.v1~",
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_local_missing._.holder.v1~",
+            False,
+            "reject local reference holder schema with missing target",
         ),
     ]
 
