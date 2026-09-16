@@ -1380,7 +1380,7 @@ Note: local JSON Pointer references (e.g. `"$ref": "#/definitions/Foo"` under Dr
 
 Implementation note: When `$ref` is expressed as `gts://...`, implementations should trim the `gts://` prefix and treat the remainder as the canonical GTS identifier for resolution, validation, comparison, and registry keys. The `gts://` prefix exists only to make `$ref` URI-compatible.
 
-The post-`gts://` content must therefore parse as a valid GTS identifier with no wildcards; otherwise the schema upload should be rejected.
+The post-`gts://` content must therefore parse as a valid GTS identifier with no wildcards; otherwise the schema upload should be rejected. Explicit type-schema validation succeeds only when every GTS `$ref` resolves to a registered GTS Type Schema.
 
 **JSON instances (well-known vs anonymous)**
 

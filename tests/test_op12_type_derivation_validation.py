@@ -2593,6 +2593,87 @@ class TestCaseTestOp12_ConstViolatesMinimum(HttpRunner):
     ]
 
 
+class TestCaseOp12_DerivedSchemaRefTargetMissing(HttpRunner):
+    """Explicit validation must resolve references in a derived schema."""
+
+    config = Config("OP#12 - Derived schema reference target missing").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refmissing.base.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register derivation base",
+        ),
+        _register(
+            (
+                "gts://gts.x.test12.refmissing.base.v1~"
+                "x.test12._.host.v1~"
+            ),
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.refmissing.target.v1~"},
+                ],
+            },
+            "register derived schema referencing missing type",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refmissing.base.v1~x.test12._.host.v1~",
+            False,
+            "validate should fail - GTS reference target is missing",
+        ),
+    ]
+
+
+class TestCaseOp12_DerivedSchemaRefPartialTargetMissing(HttpRunner):
+    """Every segment of a referenced GTS type chain must exist."""
+
+    config = Config("OP#12 - Partial reference target missing").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refpartial.target.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register first segment of referenced type chain",
+        ),
+        _register(
+            "gts://gts.x.test12.refpartial.host.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register derivation base",
+        ),
+        _register(
+            "gts://gts.x.test12.refpartial.host.v1~x.test12._.derived.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {
+                        "$$ref": (
+                            "gts://gts.x.test12.refpartial.target.v1~"
+                            "x.test12._.missing.v1~"
+                        )
+                    },
+                ],
+            },
+            "register derived schema referencing missing second segment",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refpartial.host.v1~x.test12._.derived.v1~",
+            False,
+            "validate should fail - second reference segment is missing",
+        ),
+    ]
+
+
 class TestCaseValidateEntity_ValidInstance(HttpRunner):
     """Validate Entity: Valid instance through unified endpoint"""
     config = Config("Validate Entity - Valid Instance").base_url(
