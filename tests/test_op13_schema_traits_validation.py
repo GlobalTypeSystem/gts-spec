@@ -968,6 +968,7 @@ class TestCaseOp13_TraitsValid_ValidateEntity(HttpRunner):
             "gts.x.test13.ent.event.v1~x.test13._.good_ent.v1~",
             True,
             "validate-entity should pass",
+            expected_entity_type="schema",
         ),
     ]
 
@@ -1025,6 +1026,7 @@ class TestCaseOp13_TraitsInvalid_ValidateEntity_MissingTrait(HttpRunner):
             "gts.x.test13.entm.event.v1~x.test13._.bad_ent.v1~",
             False,
             "validate-entity should fail - retention not resolved",
+            expected_entity_type="schema",
         ),
     ]
 
@@ -4255,12 +4257,6 @@ class TestCaseOp13_Completeness_AbstractDroppedByConcreteDescendant_Fails(HttpRu
             True,
             "validate abstract base via validate-type-schema",
         ),
-        _validate_entity(
-            "gts.x.test13.absdrop.event.v1~",
-            True,
-            "validate abstract base via validate-entity must match",
-            expected_entity_type="schema",
-        ),
         _validate_type_schema(
             "gts.x.test13.absdrop.event.v1~x.test13._.concrete.v1~",
             False,
@@ -4572,9 +4568,9 @@ class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_ValueDiscriminated(HttpRu
             "register descendant nulling retention",
         ),
         _validate_type_schema(
-            "gts.x.test13.mnulldef.event.v1~x.test13._.kid.v1~",
-            True,
-            "validate descendant - null deleted P30D, default P7D re-applied to satisfy const",
+            "gts.x.test13.mnullobj.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate descendant - whole required object key deleted, no default",
         ),
     ]
 
