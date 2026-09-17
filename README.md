@@ -1464,8 +1464,8 @@ Implementation notes:
 - Treating `x-gts-ref` like JSON Schema string constraints:
   - For a wildcard pattern (e.g. `gts.*`, `gts.cf.core.am.*`), validate that the field value is a well-formed GTS ID (OP#1) and matches the pattern (§10).
   - For a specific literal prefix (e.g. `gts.x.core.modules.capability.v1~`), enforce it similarly to a `startsWith(...)` check against the provided GTS prefix (sections 8.1/8.2), and validate that the value is a well-formed GTS ID.
-  - When the value is a relative path like `./$id` or `./description`, resolve it as a JSON Pointer relative to the schema root. If the pointer doesn't resolve to a GTS string or another `x-gts-ref` field, an error must be reported.
-  - For nested paths (e.g., `./properties/id`), resolve the pointer accordinly to the field path in the JSON Schema document.
+  - When the value is a relative path like `/$id` or `/description`, resolve it as a JSON Pointer relative to the schema root. If the pointer doesn't resolve to a GTS string or another `x-gts-ref` field, an error must be reported.
+  - For nested paths (e.g., `/properties/id`), resolve the pointer accordinly to the field path in the JSON Schema document.
   - Resolve matching values against the registry and recursively validate the referenced entities and their dependency closures; a registered but invalid target does not satisfy `x-gts-ref`.
 
 
