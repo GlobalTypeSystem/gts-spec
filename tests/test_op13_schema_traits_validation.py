@@ -1,4 +1,7 @@
+import pytest
+
 from .conftest import get_gts_base_url
+from .helpers.http_client import get_session
 from .helpers.http_run_helpers import (
     register as _register,
     register_derived as _register_derived,
@@ -13,6 +16,43 @@ from httprunner import HttpRunner, Config
 # Note (v0.12): ADR-0003 keys trait-completeness on x-gts-abstract (not "leaf").
 # Refimpls remain permissive at POST /entities — completeness is verified at
 # POST /validate-type-schema. New ADR-0003/0004 cases below follow that pattern.
+
+
+@pytest.fixture(scope="module", autouse=True)
+def seed_shared_topic_ref_registry():
+    entities = (
+        {
+            "$id": "gts://gts.x.test13.events.topic.v1~",
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "type": "object",
+            "required": ["id", "name"],
+            "properties": {
+                "id": {"type": "string"},
+                "name": {"type": "string"},
+            },
+        },
+        {
+            "id": "gts.x.test13.events.topic.v1~x.test13._.orders.v1",
+            "name": "orders",
+        },
+        {
+            "id": "gts.x.test13.events.topic.v1~x.core._.default.v1",
+            "name": "default",
+        },
+        {
+            "id": "gts.x.test13.events.topic.v1~x.test13._.custom.v1",
+            "name": "custom",
+        },
+        {
+            "id": "gts.x.test13.events.topic.v1~x.test13._.audit.v1",
+            "name": "audit",
+        },
+    )
+    for entity in entities:
+        response = get_session().post(
+            f"{get_gts_base_url()}/entities", json=entity, timeout=30
+        )
+        assert response.status_code == 200
 
 
 # ---------------------------------------------------------------------------
