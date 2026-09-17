@@ -1448,6 +1448,8 @@ pytest ./tests
 
 Use `x-gts-ref` in GTS schemas (JSON schemas) to declare that a string field is a GTS entity reference, not an arbitrary string. The `x-gts-ref` value MUST itself be a valid GTS identifier, a GTS wildcard pattern (§10), or a relative JSON Pointer; anything else makes the schema invalid.
 
+`x-gts-ref` has keyword semantics only when it is a member of a JSON Schema object at a schema location. A property with that name inside arbitrary JSON data held by `default`, `const`, `enum`, or `examples` is data, not an `x-gts-ref` keyword. Likewise, a key named `x-gts-ref` directly under `properties` is a property name; the schema value associated with that name is still traversed normally and may itself contain the `x-gts-ref` keyword. Implementations MUST traverse schema-valued applicator keywords according to the declared JSON Schema dialect and MUST NOT discover `x-gts-ref` by recursively scanning arbitrary JSON values.
+
 Allowed values:
 - `"x-gts-ref": "<gts-pattern>"` — **wildcard**. Any GTS wildcard pattern (§10); e.g. `gts.*`, `gts.cf.core.am.*`, or `gts.x.core.events.topic.v1~*`. The field value MUST be a syntactically valid GTS identifier (see OP#1) that matches the pattern.
 - `"x-gts-ref": "<gts-prefix>"` — **specific reference**, where `<gts-prefix>` is a concrete GTS identifier such as `gts.x.core.events.topic.v1~`. The field value MUST be a syntactically valid GTS identifier that begins with `<gts-prefix>` (a `startsWith` match, see §8.1/8.2). A prefix ending in `~` matches the identifier itself **and** any identifier derived from it: `gts.cf.core.iam.user.v1~` is equivalent to matching `gts.cf.core.iam.user.v1~` **or** `gts.cf.core.iam.user.v1~*` (see §3.5, §10).
