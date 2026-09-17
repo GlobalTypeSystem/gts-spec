@@ -367,6 +367,21 @@ class TestCaseXGtsRef_WrongGtsFormat(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
         ),
+        Step(
+            RunRequest("reject legacy dot-slash x-gts-ref pointer")
+            .post("/entities?validation=true")
+            .with_json({
+                "$$id": "gts://gts.x.testref_malformed._.pointer.v6~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string", "x-gts-ref": "./$$id"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
         # Register schema correct reference
         Step(
             RunRequest("register pointer schema")
