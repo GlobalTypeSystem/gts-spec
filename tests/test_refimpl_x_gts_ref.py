@@ -1202,15 +1202,11 @@ class TestCaseXGtsRef_AnnotationDataIgnored(HttpRunner):
                 "properties": {
                     "payload": {
                         "type": "object",
-                        "default": {
-                            "x-gts-ref": "gts.x.testref_annotation._.missing.v1~"
-                        },
+                        "default": {"x-gts-ref": "not-a-gts-id"},
                         "const": {
                             "x-gts-ref": "gts.x.testref_annotation._.missing.v1~"
                         },
-                        "examples": [{
-                            "x-gts-ref": "gts.x.testref_annotation._.missing.v1~"
-                        }],
+                        "examples": [{"x-gts-ref": 42}],
                     },
                 },
             })
