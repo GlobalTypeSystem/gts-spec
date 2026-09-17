@@ -3229,6 +3229,75 @@ class TestCaseOp13_Completeness_AbstractType_UnresolvedRequired_Succeeds(HttpRun
     ]
 
 
+class TestCaseOp13_Completeness_AbstractPreservesRequiredInConstValue(HttpRunner):
+    """Skipping completeness must not rewrite data stored inside const."""
+
+    config = Config(
+        "OP#13 ADR-0003: abstract preserves required key in const value"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_abstract(
+            "gts://gts.x.test13.compabsconst.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "config": {"const": {"required": ["a"]}},
+                    },
+                    "required": ["unresolved"],
+                },
+                "x-gts-traits": {"config": {"required": ["a"]}},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract type with required key inside trait const data",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.compabsconst.event.v1~",
+            True,
+            "validate abstract - completeness skipped without rewriting const data",
+        ),
+    ]
+
+
+class TestCaseOp13_Completeness_AbstractPreservesRequiredPropertySchema(HttpRunner):
+    """Ignoring required must not drop a trait property with that name."""
+
+    config = Config(
+        "OP#13 ADR-0003: abstract preserves property named required"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_abstract(
+            "gts://gts.x.test13.compabsprop.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"required": {"type": "string"}},
+                    "required": ["unresolved"],
+                },
+                "x-gts-traits": {"required": 42},
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract type with invalid property named required",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.compabsprop.event.v1~",
+            False,
+            "reject wrong type for property named required",
+        ),
+    ]
+
+
 class TestCaseOp13_TraitsInvalid_AbstractProvidedValueWrongType_Fails(HttpRunner):
     """Abstractness skips completeness, not validation of provided values."""
 
