@@ -1183,6 +1183,82 @@ class TestCaseXGtsRef_LocalRefMissingTarget(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_AnnotationDataIgnored(HttpRunner):
+    config = Config("x-gts-ref: annotation data is not a subschema").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with x-gts-ref-shaped annotation data")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_annotation._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "payload": {
+                        "type": "object",
+                        "default": {
+                            "x-gts-ref": "gts.x.testref_annotation._.missing.v1~"
+                        },
+                        "const": {
+                            "x-gts-ref": "gts.x.testref_annotation._.missing.v1~"
+                        },
+                        "examples": [{
+                            "x-gts-ref": "gts.x.testref_annotation._.missing.v1~"
+                        }],
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_annotation._.holder.v1~",
+            True,
+            "accept x-gts-ref-shaped values in annotation data",
+        ),
+    ]
+
+
+class TestCaseXGtsRef_PropertyNamedKeyword(HttpRunner):
+    config = Config("x-gts-ref: property named like the keyword").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with a property named x-gts-ref")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_property_name._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "x-gts-ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_property_name._.missing.v1~",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_property_name._.holder.v1~",
+            False,
+            "reject missing target under a property named x-gts-ref",
+        ),
+    ]
+
+
 class TestCaseXGtsRef_RootLocalReference(HttpRunner):
     """A bare ``$ref: "#"`` must traverse the complete root schema.
 
