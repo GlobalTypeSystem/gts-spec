@@ -3,6 +3,7 @@ from .helpers.http_run_helpers import (
     register as _register,
     register_derived as _register_derived,
     register_derived_redeclared as _register_derived_redeclared,
+    register_instance as _register_instance,
     validate_type_schema as _validate_type_schema,
 )
 from httprunner import HttpRunner, Config, Step, RunRequest
@@ -4470,6 +4471,46 @@ class TestCaseOp12_SchemaRefTargetDependencyMissing(HttpRunner):
             "gts.x.test12.reftransitive.host.v1~",
             False,
             "validate host - referenced target has a missing dependency",
+        ),
+    ]
+
+
+class TestCaseOp12_ValidateTypeSchemaRejectsInstanceID(HttpRunner):
+    """Reject an existing GTS Instance passed to the Type Schema validator.
+
+    The registry contains both the instance and its valid Type Schema, so this is
+    not a missing-entity or invalid-instance test. It verifies that
+    ``POST /validate-type-schema`` checks the referenced entity's kind and does
+    not validate an Instance as though it were a Type Schema (or silently
+    validate the Instance's declared type instead). The request itself is valid,
+    so the endpoint returns HTTP 200 with ``ok: false``.
+    """
+
+    config = Config("OP#12 - Reject instance on type-schema endpoint").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    instance_id = "gts.x.test12.kind.event.v1~x.test12._.example.v1"
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.kind.event.v1~",
+            {"type": "object", "properties": {"name": {"type": "string"}}},
+            "register instance type",
+        ),
+        _register_instance(
+            {"id": instance_id, "name": "example"},
+            "register valid instance",
+        ),
+        Step(
+            RunRequest("reject instance ID as type schema")
+            .post("/validate-type-schema")
+            .with_json({"type_id": instance_id})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
         ),
     ]
 
