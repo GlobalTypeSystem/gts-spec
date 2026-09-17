@@ -267,11 +267,13 @@ def main(argv=None):
     if args.gts_base_url:
         pytest_args.extend(["--gts-base-url", args.gts_base_url])
     exit_code = pytest.main(pytest_args, plugins=[recorder])
+    if exit_code != pytest.ExitCode.OK:
+        return -1
     recorder.validate_unvalidated_entities()
     written = write_examples(args.output, recorder.results)
     recorder.print_summary()
     print(f"Generated {written} examples in {args.output}")
-    return exit_code
+    return 0
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import pytest
 from .generate_examples import (
     EntityRecorder,
     identify_entity,
+    main,
     validation_error,
     write_examples,
 )
@@ -181,6 +182,23 @@ def test_unvalidated_entity_without_bool_verdict_stays_unknown(monkeypatch):
 
     assert recorder.results == {}
     assert recorder.status == {type_id: "unknown"}
+
+
+def test_main_returns_minus_one_without_writing_when_pytest_fails(
+    monkeypatch, tmp_path
+):
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("example post-processing must not run after test failure")
+
+    monkeypatch.setattr("tests.generate_examples.pytest.main", lambda *args, **kwargs: 1)
+    monkeypatch.setattr(
+        EntityRecorder, "validate_unvalidated_entities", unexpected_call
+    )
+    monkeypatch.setattr("tests.generate_examples.write_examples", unexpected_call)
+
+    output = tmp_path / "examples"
+    assert main(["--output", str(output), "tests/test_generate_examples.py"]) == -1
+    assert not output.exists()
 
 
 def test_write_examples_uses_validity_and_entity_kind_directories(tmp_path):
