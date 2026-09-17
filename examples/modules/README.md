@@ -23,5 +23,5 @@ This folder contains a simple self-contained examples for a pluggable SaaS servi
   - `"gts.*"` (or any wildcard, e.g. `"gts.x.core.modules.capability.*"`, `"...v1~*"`) — the value must be a syntactically valid GTS ID that matches the pattern.
   - `"gts.<prefix>..."` — a concrete identifier: the value must be a valid GTS ID that matches it, where a `~`-terminated prefix matches the exact type and any entity derived from it (`gts.x...v1~` ≡ `gts.x...v1~` or `gts.x...v1~*`).
   - `"./$id"` — self-reference to the current JSON Schema’s `$id`.
-  - Existence checking (whether the referenced entity is registered) is implementation-specific. The GTS reference implementation exercised by `./tests` requires at least one registered GTS type/instance to match the value — uniformly for concrete identifiers and every wildcard, including `gts.*`.
+  - At least one registered, valid GTS type/instance must match the value, uniformly for concrete identifiers and every wildcard, including `gts.*`. Validation recursively includes the matched entity's own ancestors and references.
 - These examples are illustrative and can be used to test parsing, validation, and reference resolution in GTS-aware tooling.
