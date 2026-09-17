@@ -1,7 +1,10 @@
 """Tests for x-gts-ref validation: prefix enforcement, JSON Pointer resolution, and combinator semantics."""
 
 from .conftest import get_gts_base_url
-from .helpers.http_run_helpers import validate_type_schema as _validate_type_schema
+from .helpers.http_run_helpers import (
+    validate_instance as _validate_instance,
+    validate_type_schema as _validate_type_schema,
+)
 from httprunner import HttpRunner, Config, Step, RunRequest
 
 
@@ -1194,6 +1197,17 @@ class TestCaseXGtsRef_RootLocalReference(HttpRunner):
 
     teststeps = [
         Step(
+            RunRequest("register root local reference target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_root._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
             RunRequest("register root local reference schema")
             .post("/entities")
             .with_json({
@@ -1242,9 +1256,9 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
 
     §9.6: the constraint value may be any well-formed GTS wildcard pattern
     (§10), e.g. ``gts.x.testref_wild.am.*``. The field value must be a
-    syntactically valid GTS id that matches the pattern, and — in the reference
-    implementation — must resolve to at least one registered GTS type/instance
-    (existence is uniform across all constraint forms).
+    syntactically valid GTS id that matches the pattern and must resolve to at
+    least one registered, valid GTS type/instance (validation is uniform across
+    all constraint forms and recursively covers dependencies).
     """
     config = Config("x-gts-ref: arbitrary wildcard pattern").base_url(get_gts_base_url())
 
@@ -1401,8 +1415,8 @@ class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
 
     Per §3.5/§10, ``gts....stream.v1~*`` matches the type ``...stream.v1~``
     itself as well as any entity derived from it. Combined with the reference
-    implementation's existence check, a value matching this pattern must resolve
-    to a registered type/instance.
+    transitive validation rule, a value matching this pattern must resolve to a
+    registered, valid type/instance.
     """
     config = Config("x-gts-ref: tilde wildcard pattern").base_url(get_gts_base_url())
 
@@ -1518,6 +1532,248 @@ class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseXGtsRef_ReferencedInstanceMustBeValid(HttpRunner):
+    config = Config("x-gts-ref: referenced instance must be valid").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register x-gts-ref target type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_validity._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register invalid x-gts-ref target instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_validity._.target.v1~x.vendor._.invalid.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate x-gts-ref target instance")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": (
+                    "gts.x.testref_validity._.target.v1~"
+                    "x.vendor._.invalid.v1"
+                ),
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("register x-gts-ref holder type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_validity._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_validity._.target.v1~",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_validity._.holder.v1~",
+            True,
+            "validate holder type - referenced constraint type is valid",
+        ),
+        Step(
+            RunRequest("register holder referencing invalid instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
+                "ref": "gts.x.testref_validity._.target.v1~x.vendor._.invalid.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("validate holder referencing invalid instance")
+            .post("/validate-instance")
+            .with_json({
+                "instance_id": (
+                    "gts.x.testref_validity._.holder.v1~"
+                    "x.vendor._.invalid.v1"
+                ),
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseXGtsRef_ConstraintTypeMustBeValid(HttpRunner):
+    config = Config("x-gts-ref: constraint type must be valid").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register invalid x-gts-ref constraint type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_constraint._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                    "required": ["retention"],
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register holder using invalid x-gts-ref constraint type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_constraint._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_constraint._.target.v1~",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_constraint._.target.v1~",
+            False,
+            "validate constraint type - required trait is unresolved",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_constraint._.holder.v1~",
+            False,
+            "validate holder - x-gts-ref constraint type is invalid",
+        ),
+    ]
+
+
+class TestCaseXGtsRef_WildcardReferencedInstanceMustBeValid(HttpRunner):
+    config = Config("x-gts-ref wildcard: referenced instance must be valid").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register wildcard target type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wildvalidity.target.item.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register invalid wildcard target instance")
+            .post("/entities")
+            .with_json({
+                "id": (
+                    "gts.x.testref_wildvalidity.target.item.v1~"
+                    "x.vendor._.invalid.v1"
+                ),
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register wildcard holder type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wildvalidity._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_wildvalidity.target.*",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildvalidity._.holder.v1~",
+            True,
+            "validate wildcard holder type",
+        ),
+        Step(
+            RunRequest("register wildcard holder referencing invalid instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_wildvalidity._.holder.v1~x.vendor._.invalid.v1",
+                "ref": (
+                    "gts.x.testref_wildvalidity.target.item.v1~"
+                    "x.vendor._.invalid.v1"
+                ),
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            (
+                "gts.x.testref_wildvalidity.target.item.v1~"
+                "x.vendor._.invalid.v1"
+            ),
+            False,
+            "validate wildcard target instance - name is missing",
+        ),
+        _validate_instance(
+            "gts.x.testref_wildvalidity._.holder.v1~x.vendor._.invalid.v1",
+            False,
+            "validate holder - wildcard target instance is invalid",
         ),
     ]
 

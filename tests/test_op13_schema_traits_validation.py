@@ -5,6 +5,7 @@ from .helpers.http_run_helpers import (
     register_abstract as _register_abstract,
     register_instance as _register_instance,
     validate_entity as _validate_entity,
+    validate_instance as _validate_instance,
     validate_type_schema as _validate_type_schema,
 )
 from httprunner import HttpRunner, Config
@@ -1972,6 +1973,11 @@ class TestCaseOp13_TraitsInvalid_CyclingRef_SelfRef(HttpRunner):
             "register derived with traits",
         ),
         _validate_type_schema(
+            "gts.x.test13.cyc.selfref.v1~",
+            True,
+            "validate standalone recursive trait schema",
+        ),
+        _validate_type_schema(
             (
                 "gts.x.test13.cyc.selfevt.v1~"
                 "x.test13._.cyc_self_leaf.v1~"
@@ -2074,6 +2080,16 @@ class TestCaseOp13_TraitsInvalid_CyclingRef_TwoNode(HttpRunner):
             "register derived with traits",
         ),
         _validate_type_schema(
+            "gts.x.test13.cyc2.trait_a.v1~",
+            True,
+            "validate standalone recursive trait schema A",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.cyc2.trait_b.v1~",
+            True,
+            "validate standalone recursive trait schema B",
+        ),
+        _validate_type_schema(
             (
                 "gts.x.test13.cyc2.event.v1~"
                 "x.test13._.cyc2_leaf.v1~"
@@ -2125,14 +2141,14 @@ class TestCaseOp13_TraitsSchema_DescendantOmitsAncestorDecl_AggregatedViaAllOf(H
                     "type": "object",
                     "additionalProperties": False,
                     "properties": {
-                        "retention": {"type": "string"},
+                        "retention": {"type": "string", "default": "P30D"},
                     },
                     "required": ["retention"],
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register base with trait-schema",
+            "register valid base with trait-schema default",
         ),
         _register_derived(
             "gts://gts.x.test13.aggomit.event.v1~x.test13._.kid.v1~",
@@ -2154,9 +2170,9 @@ class TestCaseOp13_TraitsSchema_DescendantOmitsAncestorDecl_AggregatedViaAllOf(H
 class TestCaseOp13_TraitsSchema_DescendantAddsNewField(HttpRunner):
     """ADR-0002: descendant adds a new trait field; aggregated via allOf.
 
-    Base declares `retention`. Descendant declares only `supportLevel`
-    (without restating retention). Effective trait-schema requires both;
-    descendant supplies both values; passes.
+    Base declares `retention` with a default. Descendant declares only
+    `supportLevel` (without restating retention). Both types are independently
+    valid, and the descendant satisfies the aggregated effective trait-schema.
     """
 
     config = Config("OP#13 ADR-0002: descendant adds new trait field").base_url(
@@ -2174,14 +2190,14 @@ class TestCaseOp13_TraitsSchema_DescendantAddsNewField(HttpRunner):
                 "x-gts-traits-schema": {
                     "type": "object",
                     "properties": {
-                        "retention": {"type": "string"},
+                        "retention": {"type": "string", "default": "P30D"},
                     },
                     "required": ["retention"],
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register base with retention",
+            "register valid base with default retention",
         ),
         _register_derived(
             "gts://gts.x.test13.aggadd.event.v1~x.test13._.kid.v1~",
@@ -2203,9 +2219,172 @@ class TestCaseOp13_TraitsSchema_DescendantAddsNewField(HttpRunner):
             "register derived adding supportLevel only",
         ),
         _validate_type_schema(
+            "gts.x.test13.aggadd.event.v1~",
+            True,
+            "validate base - default resolves retention",
+        ),
+        _validate_type_schema(
             "gts.x.test13.aggadd.event.v1~x.test13._.kid.v1~",
             True,
-            "validate derived - aggregated allOf accepts both fields",
+            "validate derived - valid base and aggregated traits",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitsSchema_DescendantCannotAddFieldToClosedBase(HttpRunner):
+    """An ancestor's closed trait schema rejects descendant fields.
+
+    The base is independently valid because its required retention trait has a
+    default. Its `additionalProperties: false` branch remains part of the
+    effective allOf and rejects the descendant's new `supportLevel` property.
+    """
+
+    config = Config("OP#13 ADR-0002: closed base blocks new trait field").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.aggaddclosed.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {
+                        "retention": {"type": "string", "default": "P30D"},
+                    },
+                    "required": ["retention"],
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register valid closed base with default retention",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.aggaddclosed.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.aggaddclosed.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "supportLevel": {"type": "string"},
+                    },
+                    "required": ["supportLevel"],
+                },
+                "x-gts-traits": {
+                    "retention": "P30D",
+                    "supportLevel": "premium",
+                },
+            },
+            "register derived adding supportLevel to closed base",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.aggaddclosed.event.v1~",
+            True,
+            "validate closed base - default resolves retention",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.aggaddclosed.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate derived - closed base rejects supportLevel",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitsSchema_DescendantOfInvalidBaseFails(HttpRunner):
+    """A derived type is invalid when an ancestor type is invalid.
+
+    The derived type supplies all values required by its own effective trait
+    schema, but its non-abstract base has an unresolved required trait. Explicit
+    validation is transitive, so both the base and derived type fail.
+    """
+
+    config = Config("OP#13: descendant of invalid base fails").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.aggaddbad.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "retention": {"type": "string"},
+                    },
+                    "required": ["retention"],
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register invalid base with unresolved retention",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.aggaddbad.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.aggaddbad.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "supportLevel": {"type": "string"},
+                    },
+                    "required": ["supportLevel"],
+                },
+                "x-gts-traits": {
+                    "retention": "P30D",
+                    "supportLevel": "premium",
+                },
+            },
+            "register locally complete derived type over invalid base",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.aggaddbad.event.v1~",
+            False,
+            "validate base - required retention is unresolved",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.aggaddbad.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate derived - ancestor base is invalid",
+        ),
+        _register_instance(
+            {
+                "id": (
+                    "gts.x.test13.aggaddbad.event.v1~"
+                    "x.test13._.kid.v1~x.test13._.example.v1"
+                ),
+            },
+            "register structurally valid instance of invalid derived type",
+        ),
+        _validate_instance(
+            (
+                "gts.x.test13.aggaddbad.event.v1~"
+                "x.test13._.kid.v1~x.test13._.example.v1"
+            ),
+            False,
+            "validate well-known instance - its type dependency is invalid",
+        ),
+        _register_instance(
+            {
+                "id": "123e4567-e89b-42d3-a456-426614174000",
+                "type": "gts.x.test13.aggaddbad.event.v1~x.test13._.kid.v1~",
+            },
+            "register anonymous instance of invalid derived type",
+        ),
+        _validate_instance(
+            "123e4567-e89b-42d3-a456-426614174000",
+            False,
+            "validate anonymous instance - its type dependency is invalid",
         ),
     ]
 
@@ -2815,7 +2994,7 @@ class TestCaseOp13_TraitsSchema_RedundantAncestorRefAllowed(HttpRunner):
             },
             "register standalone ancestor trait-schema type",
         ),
-        _register(
+        _register_abstract(
             "gts://gts.x.test13.aggrr.event.v1~",
             {
                 "type": "object",
@@ -2915,7 +3094,7 @@ class TestCaseOp13_TraitsSchema_StandaloneRefPattern_3Level(HttpRunner):
             },
             "register standalone trait-schema type",
         ),
-        _register(
+        _register_abstract(
             "gts://gts.x.test13.aggrp.event.v1~",
             {
                 "type": "object",
@@ -2938,7 +3117,8 @@ class TestCaseOp13_TraitsSchema_StandaloneRefPattern_3Level(HttpRunner):
                     "required": ["supportLevel"],
                 },
             },
-            "register mid adding supportLevel inline",
+            "register abstract mid adding supportLevel inline",
+            top_level={"x-gts-abstract": True},
         ),
         _register_derived(
             (
@@ -3005,6 +3185,107 @@ class TestCaseOp13_Completeness_AbstractType_UnresolvedRequired_Succeeds(HttpRun
             "gts.x.test13.compabs.event.v1~",
             True,
             "validate abstract - completeness skipped",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitsInvalid_AbstractProvidedValueWrongType_Fails(HttpRunner):
+    """Abstractness skips completeness, not validation of provided values."""
+
+    config = Config("OP#13 ADR-0003: abstract invalid provided value fails").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_abstract(
+            "gts://gts.x.test13.compabsval.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retentionDays": {"type": "integer"}},
+                    "required": ["retentionDays"],
+                },
+                "x-gts-traits": {"retentionDays": "thirty"},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract type with invalid provided trait value",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.compabsval.event.v1~",
+            False,
+            "validate abstract - provided value must satisfy trait schema",
+        ),
+    ]
+
+
+class TestCaseOp13_Completeness_NonAbstractExplicitValue_Succeeds(HttpRunner):
+    """A non-abstract type may resolve a required trait explicitly."""
+
+    config = Config("OP#13 ADR-0003: explicit value satisfies required").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.compval.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                    "required": ["retention"],
+                },
+                "x-gts-traits": {"retention": "P30D"},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register non-abstract type with explicit required trait",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.compval.event.v1~",
+            True,
+            "validate non-abstract - explicit value resolves retention",
+        ),
+    ]
+
+
+class TestCaseOp13_Completeness_NonAbstractUnresolvedRequired_Fails(HttpRunner):
+    """A non-abstract type must resolve every required trait."""
+
+    config = Config("OP#13 ADR-0003: non-abstract unresolved required fails").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.compmiss.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                    "required": ["retention"],
+                },
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register non-abstract type with unresolved required trait",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.compmiss.event.v1~",
+            False,
+            "validate non-abstract - retention has no value or default",
         ),
     ]
 
@@ -4415,23 +4696,17 @@ class TestCaseOp13_Completeness_DefaultIntroducedByIntermediate_SatisfiesLeaf(Ht
 # ---------------------------------------------------------------------------
 
 
-class TestCaseOp13_Merge_TypeChange_ObjectReplacedByScalar(HttpRunner):
+class TestCaseOp13_Merge_TypeChange_ObjectReplacedByScalar_AbstractBase(HttpRunner):
     """ADR-0004 / RFC 7396: a non-object patch value replaces wholesale (no recursion).
 
     Abstract base sets an object-valued `routing`; the trait-schema constrains
-    `routing` to a string. This test asserts the DESCENDANT only and never
-    validates the base directly (the base's own value violation is covered by
-    TestCaseOp13_TraitsInvalid_AbstractValueWrongType; the abstract exemption
-    covers completeness, not value validation).
-    The non-abstract descendant sets `routing` to a scalar string. Per RFC 7396
-    a non-object member value replaces the target entirely (it does NOT merge
-    into the ancestor object), so the effective `routing` is the string and
-    validation passes. Were the registry to recurse, `routing` would remain an
-    object and fail `type: string` — so the True result discriminates replace
-    from merge across a type change.
+    `routing` to a string. The base is invalid because abstractness skips
+    completeness but does not permit an explicitly invalid value. Although the
+    descendant replaces the object with a string, transitive validation fails
+    because its abstract ancestor is invalid.
     """
 
-    config = Config("OP#13 ADR-0004: object trait replaced by scalar (no recursion)").base_url(
+    config = Config("OP#13 ADR-0004: abstract object trait replaced by scalar").base_url(
         get_gts_base_url()
     )
 
@@ -4452,7 +4727,7 @@ class TestCaseOp13_Merge_TypeChange_ObjectReplacedByScalar(HttpRunner):
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register abstract base - routing is an object (base not validated here)",
+            "register abstract base - routing is an object",
         ),
         _register_derived(
             "gts://gts.x.test13.mtchg.event.v1~x.test13._.kid.v1~",
@@ -4464,9 +4739,136 @@ class TestCaseOp13_Merge_TypeChange_ObjectReplacedByScalar(HttpRunner):
             "register descendant replacing routing with a scalar string",
         ),
         _validate_type_schema(
+            "gts.x.test13.mtchg.event.v1~",
+            False,
+            "validate abstract base - provided routing has wrong type",
+        ),
+        _validate_type_schema(
             "gts.x.test13.mtchg.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate descendant - abstract ancestor is invalid",
+        ),
+    ]
+
+
+class TestCaseOp13_Merge_TypeChange_ObjectReplacedByScalar_ValidBase(HttpRunner):
+    """Object-to-scalar replacement is isolated from ancestor validity.
+
+    The valid base permits object or string routing and supplies an object. The
+    descendant narrows routing to string and supplies a scalar. Replacing the
+    object makes the descendant valid; retaining or recursively merging the
+    object violates the descendant's string constraint.
+    """
+
+    config = Config("OP#13 ADR-0004: valid object trait replaced by scalar").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.mtchgvalid.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"routing": {"type": ["object", "string"]}},
+                    "required": ["routing"],
+                },
+                "x-gts-traits": {"routing": {"topic": "t", "partitionKey": "k"}},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register valid base with object routing",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.mtchgvalid.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.mtchgvalid.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"routing": {"type": "string"}},
+                },
+                "x-gts-traits": {"routing": "flat-string"},
+            },
+            "register descendant replacing routing with a scalar string",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mtchgvalid.event.v1~",
+            True,
+            "validate base - object routing is allowed",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mtchgvalid.event.v1~x.test13._.kid.v1~",
             True,
             "validate descendant - scalar replaced the object wholesale",
+        ),
+    ]
+
+
+class TestCaseOp13_Merge_TypeChange_ClosedObjectInvalidBase(HttpRunner):
+    """A nested closed trait object rejects undeclared base values.
+
+    The base permits object or string routing, but its object form declares only
+    `topic` and sets `additionalProperties: false`. Its supplied `partitionKey`
+    makes the base invalid. Replacing routing with a valid scalar in the
+    descendant cannot repair that invalid ancestor.
+    """
+
+    config = Config("OP#13 ADR-0004: closed routing object invalid base").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.mtchgclosed.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "routing": {
+                            "type": ["object", "string"],
+                            "additionalProperties": False,
+                            "properties": {"topic": {"type": "string"}},
+                        },
+                    },
+                    "required": ["routing"],
+                },
+                "x-gts-traits": {"routing": {"topic": "t", "partitionKey": "k"}},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register invalid base with prohibited partitionKey",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.mtchgclosed.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.mtchgclosed.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"routing": {"type": "string"}},
+                },
+                "x-gts-traits": {"routing": "flat-string"},
+            },
+            "register descendant replacing routing with a scalar string",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mtchgclosed.event.v1~",
+            False,
+            "validate base - partitionKey is an additional property",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mtchgclosed.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate descendant - closed-object base is invalid",
         ),
     ]
 
@@ -4526,24 +4928,16 @@ class TestCaseOp13_Merge_NullDelete_WholeObjectKey_Fails(HttpRunner):
     ]
 
 
-class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_ValueDiscriminated(HttpRunner):
-    """ADR-0004 + ADR-0003: null-delete reverts to default — value-discriminated.
+class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_AbstractBase(HttpRunner):
+    """ADR-0004 + ADR-0003: null-delete on an invalid abstract base.
 
-    Strengthens Merge_NullDelete_FallsBackToDefault, which could pass even if an
-    implementation treated `null` as a no-op (the ancestor value also satisfied
-    the schema). Here the trait-schema locks `retention` with `const: P7D` and a
-    matching `default: P7D`. The abstract base sets `retention: P30D`; this test
-    asserts the DESCENDANT only and never validates the base directly (validating
-    the base would fail the const - see TestCaseOp13_TraitsInvalid_AbstractValueViolatesConst;
-    the abstract exemption covers completeness, not value validation). The
-    non-abstract descendant writes `retention: null`. If `null` truly deletes,
-    materialization re-applies
-    the default `P7D`, which satisfies `const` → passes. If the registry ignored
-    `null`, the inherited `P30D` would violate `const: P7D` → fail. The True
-    result therefore proves the key was deleted and the default re-applied.
+    The trait-schema locks `retention` with `const: P7D` and a matching default.
+    The abstract base supplies `retention: P30D`, so it is invalid: abstractness
+    skips completeness but not validation of provided values. The descendant
+    deletes P30D, but transitive validation still fails on the invalid ancestor.
     """
 
-    config = Config("OP#13 ADR-0004: null-delete reverts to default (discriminated)").base_url(
+    config = Config("OP#13 ADR-0004: abstract null-delete reverts to default").base_url(
         get_gts_base_url()
     )
 
@@ -4566,7 +4960,7 @@ class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_ValueDiscriminated(HttpRu
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register abstract base - retention P30D (base not validated here)",
+            "register abstract base - retention P30D",
         ),
         _register_derived(
             "gts://gts.x.test13.mnulldef.event.v1~x.test13._.kid.v1~",
@@ -4578,9 +4972,76 @@ class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_ValueDiscriminated(HttpRu
             "register descendant nulling retention",
         ),
         _validate_type_schema(
-            "gts.x.test13.mnullobj.event.v1~x.test13._.kid.v1~",
+            "gts.x.test13.mnulldef.event.v1~",
             False,
-            "validate descendant - whole required object key deleted, no default",
+            "validate abstract base - provided retention violates const",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mnulldef.event.v1~x.test13._.kid.v1~",
+            False,
+            "validate descendant - abstract ancestor is invalid",
+        ),
+    ]
+
+
+class TestCaseOp13_Merge_NullDelete_FallsBackToDefault_ValidBase(HttpRunner):
+    """Null deletion and default materialization with a valid dependency chain.
+
+    The valid base supplies `retention: P30D`. The descendant narrows the trait
+    with `const: P7D` and a matching default, then deletes the inherited value.
+    Correct deletion materializes P7D; treating null as a no-op retains P30D and
+    violates the descendant constraint.
+    """
+
+    config = Config("OP#13 ADR-0004: valid null-delete reverts to default").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.mnulldefvalid.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "retention": {"type": "string"},
+                    },
+                    "required": ["retention"],
+                },
+                "x-gts-traits": {"retention": "P30D"},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register valid base with retention P30D",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.mnulldefvalid.event.v1~x.test13._.kid.v1~",
+            "gts://gts.x.test13.mnulldefvalid.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "retention": {"const": "P7D", "default": "P7D"},
+                    },
+                },
+                "x-gts-traits": {"retention": None},
+            },
+            "register descendant nulling retention",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mnulldefvalid.event.v1~",
+            True,
+            "validate base - retention P30D satisfies its schema",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.mnulldefvalid.event.v1~x.test13._.kid.v1~",
+            True,
+            "validate descendant - null deletion materializes P7D",
         ),
     ]
 
@@ -4770,15 +5231,14 @@ class TestCaseOp13_Merge_ConstLock_Depth3_MidRestatesLeafViolates(HttpRunner):
 
 
 class TestCaseOp13_Merge_3Layer_DistinctKeysAccumulate(HttpRunner):
-    """ADR-0004: distinct keys set at different layers accumulate root → leaf.
+    """A non-abstract incomplete intermediate invalidates its descendant.
 
-    Each of three layers sets a different required trait property. RFC 7396 merge
-    accumulates them (no layer clobbers a key it does not mention), so the leaf's
-    effective traits object carries all three and satisfies the effective
-    trait-schema's `required`. Validates True.
+    The abstract base sets `a`; the non-abstract mid adds `b` but leaves `c`
+    unresolved and is therefore invalid. The leaf adds `c` and is locally
+    complete, but transitive validation fails on its invalid intermediate.
     """
 
-    config = Config("OP#13 ADR-0004: distinct keys accumulate across 3 layers").base_url(
+    config = Config("OP#13 ADR-0004: incomplete mid invalidates leaf").base_url(
         get_gts_base_url()
     )
 
@@ -4786,7 +5246,7 @@ class TestCaseOp13_Merge_3Layer_DistinctKeysAccumulate(HttpRunner):
         super().test_start()
 
     teststeps = [
-        _register(
+        _register_abstract(
             "gts://gts.x.test13.macc.event.v1~",
             {
                 "type": "object",
@@ -4803,7 +5263,7 @@ class TestCaseOp13_Merge_3Layer_DistinctKeysAccumulate(HttpRunner):
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register base setting a (b, c still unresolved)",
+            "register abstract base setting a",
         ),
         _register_derived(
             "gts://gts.x.test13.macc.event.v1~x.test13._.mid.v1~",
@@ -4812,8 +5272,7 @@ class TestCaseOp13_Merge_3Layer_DistinctKeysAccumulate(HttpRunner):
                 "type": "object",
                 "x-gts-traits": {"b": "vb"},
             },
-            "register mid setting b",
-            top_level={"x-gts-abstract": True},
+            "register non-abstract mid setting b but not c",
         ),
         _register_derived(
             (
@@ -4825,11 +5284,94 @@ class TestCaseOp13_Merge_3Layer_DistinctKeysAccumulate(HttpRunner):
                 "type": "object",
                 "x-gts-traits": {"c": "vc"},
             },
-            "register leaf setting c - now a, b, c all present",
+            "register locally complete leaf setting c",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.macc.event.v1~x.test13._.mid.v1~",
+            False,
+            "validate mid - non-abstract type has unresolved c",
         ),
         _validate_type_schema(
             (
                 "gts.x.test13.macc.event.v1~"
+                "x.test13._.mid.v1~x.test13._.leaf.v1~"
+            ),
+            False,
+            "validate leaf - intermediate ancestor is invalid",
+        ),
+    ]
+
+
+class TestCaseOp13_Merge_3Layer_AbstractDistinctKeysAccumulate(HttpRunner):
+    """Distinct keys accumulate through valid abstract intermediate types.
+
+    The abstract base and mid may remain incomplete while setting `a` and `b`.
+    The concrete leaf adds `c`; its effective traits contain all three required
+    values, and every ancestor is valid.
+    """
+
+    config = Config("OP#13 ADR-0004: abstract chain accumulates distinct keys").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_abstract(
+            "gts://gts.x.test13.maccabs.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "a": {"type": "string"},
+                        "b": {"type": "string"},
+                        "c": {"type": "string"},
+                    },
+                    "required": ["a", "b", "c"],
+                },
+                "x-gts-traits": {"a": "va"},
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract base setting a",
+        ),
+        _register_derived(
+            "gts://gts.x.test13.maccabs.event.v1~x.test13._.mid.v1~",
+            "gts://gts.x.test13.maccabs.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"b": "vb"},
+            },
+            "register abstract mid setting b",
+            top_level={"x-gts-abstract": True},
+        ),
+        _register_derived(
+            (
+                "gts://gts.x.test13.maccabs.event.v1~"
+                "x.test13._.mid.v1~x.test13._.leaf.v1~"
+            ),
+            "gts://gts.x.test13.maccabs.event.v1~x.test13._.mid.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"c": "vc"},
+            },
+            "register concrete leaf setting c",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.maccabs.event.v1~",
+            True,
+            "validate abstract base - unresolved b and c are allowed",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.maccabs.event.v1~x.test13._.mid.v1~",
+            True,
+            "validate abstract mid - unresolved c is allowed",
+        ),
+        _validate_type_schema(
+            (
+                "gts.x.test13.maccabs.event.v1~"
                 "x.test13._.mid.v1~x.test13._.leaf.v1~"
             ),
             True,
@@ -5477,11 +6019,10 @@ class TestCaseOp13_Traits_RegexEcma262(HttpRunner):
 #     a well-formed GTS id that matches the constraint (a `~`-terminated
 #     constraint matches the exact id and any derived id).
 #
-# The specification leaves existence checking to the implementation. The GTS
-# reference implementation exercised here enforces it UNIFORMLY for both forms,
-# INCLUDING the bare "gts.*" wildcard: at least one registered GTS type/instance
-# MUST match the referenced value (a `~`-terminated value matches the exact type
-# and any descendant), or validation fails.
+# Existence and transitive validity are enforced UNIFORMLY for both forms,
+# INCLUDING the bare "gts.*" wildcard: at least one registered, valid GTS
+# type/instance MUST match the referenced value (a `~`-terminated value matches
+# the exact type and any descendant), or validation fails.
 #
 # The inherited cases (a/b/c) below also exercise trait inheritance: an
 # intermediate "audit" type supplies topicRef via x-gts-traits and is itself

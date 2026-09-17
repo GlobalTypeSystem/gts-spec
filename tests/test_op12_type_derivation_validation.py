@@ -2630,6 +2630,119 @@ class TestCaseOp12_DerivedSchemaRefTargetMissing(HttpRunner):
     ]
 
 
+class TestCaseOp12_DerivedSchemaRefTargetInvalid(HttpRunner):
+    """Explicit validation must recursively validate referenced GTS types."""
+
+    config = Config("OP#12 - Derived schema reference target invalid").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refinvalid.target.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                    "required": ["retention"],
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register invalid referenced type with unresolved trait",
+        ),
+        _register(
+            "gts://gts.x.test12.refinvalid.host.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register valid derivation base",
+        ),
+        _register(
+            "gts://gts.x.test12.refinvalid.host.v1~x.test12._.derived.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.refinvalid.target.v1~"},
+                ],
+            },
+            "register derived schema referencing invalid type",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refinvalid.target.v1~",
+            False,
+            "validate referenced type - required retention is unresolved",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refinvalid.host.v1~x.test12._.derived.v1~",
+            False,
+            "validate derived - referenced type is invalid",
+        ),
+    ]
+
+
+class TestCaseOp12_SchemaRefTargetHasInvalidAncestor(HttpRunner):
+    """Transitive $ref validation follows the target's ancestor chain."""
+
+    config = Config("OP#12 - Referenced type has invalid ancestor").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refchain.target.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                    "required": ["retention"],
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register invalid target base with unresolved trait",
+        ),
+        _register_derived(
+            "gts://gts.x.test12.refchain.target.v1~x.test12._.leaf.v1~",
+            "gts://gts.x.test12.refchain.target.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"retention": "P30D"},
+            },
+            "register locally complete target descendant",
+        ),
+        _register(
+            "gts://gts.x.test12.refchain.host.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {
+                        "$$ref": (
+                            "gts://gts.x.test12.refchain.target.v1~"
+                            "x.test12._.leaf.v1~"
+                        )
+                    },
+                ],
+            },
+            "register host referencing target descendant",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refchain.target.v1~x.test12._.leaf.v1~",
+            False,
+            "validate target descendant - its ancestor is invalid",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refchain.host.v1~",
+            False,
+            "validate host - referenced target has invalid ancestor",
+        ),
+    ]
+
+
 class TestCaseOp12_DerivedSchemaRefPartialTargetMissing(HttpRunner):
     """Every segment of a referenced GTS type chain must exist."""
 

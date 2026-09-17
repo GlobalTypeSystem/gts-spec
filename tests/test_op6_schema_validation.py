@@ -550,9 +550,9 @@ class TestCaseTestOp6SchemaValidation_DoubleDollarRefNotMapped(HttpRunner):
 
     _BASE = "gts.x.test6.dref.base.v1~"
     _DER_REF = "gts.x.test6.dref.base.v1~x.test6._.der_ref.v1~"
-    _DER_DD = "gts.x.test6.dref.base.v1~x.test6._.der_dd.v1~"
+    _DER_DD = "gts.x.test6.dref_dd.standalone.v1~"
     _INST_REF = "gts.x.test6.dref.base.v1~x.test6._.der_ref.v1~x.y._.i1.v1.0"
-    _INST_DD = "gts.x.test6.dref.base.v1~x.test6._.der_dd.v1~x.y._.i2.v1.0"
+    _INST_DD = "gts.x.test6.dref_dd.standalone.v1~x.y._.i2.v1.0"
 
     teststeps = [
         # Base type requires base_field.

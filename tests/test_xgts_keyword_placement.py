@@ -29,6 +29,7 @@ and may freely use `$ref` / `allOf` internally — covered by OP#13 tests).
 from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
     register as _register,
+    validate_type_schema as _validate_type_schema,
 )
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -86,6 +87,11 @@ class TestCaseTraits_TopLevelAccepted(HttpRunner):
             })
             .validate()
             .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testkp.traitsok.base.v1~x.testkp._.derived.v1~",
+            True,
+            "validate top-level trait keywords through both endpoints",
         ),
     ]
 
