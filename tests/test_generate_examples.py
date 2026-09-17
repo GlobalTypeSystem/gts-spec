@@ -130,6 +130,40 @@ def test_registration_marks_entity_unknown_until_verdict():
     assert recorder.status == {type_id: "valid"}
 
 
+def test_rejected_registration_is_not_recorded():
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.rejected.v1~"
+
+    recorder._record_entity(
+        {"$id": f"gts://{type_id}"},
+        "http://gts.example/entities",
+        Response({}, ok=False),
+    )
+
+    assert recorder.entities == {}
+    assert recorder.entity_urls == {}
+    assert recorder.status == {}
+
+
+def test_rejected_reregistration_preserves_accepted_body_and_verdict():
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.thing.v1~"
+    original = {"$id": f"gts://{type_id}", "title": "original"}
+    changed = {"$id": f"gts://{type_id}", "title": "rejected replacement"}
+    url = "http://gts.example/entities"
+
+    recorder._record_entity(original, url, Response({}, ok=True))
+    recorder._record_validation(
+        "/validate-type-schema", {"type_id": type_id}, Response({"ok": True})
+    )
+    recorder._record_entity(changed, url, Response({}, ok=False))
+
+    assert recorder.entities[type_id] == ("types", original)
+    assert recorder.entity_urls[type_id] == url
+    assert recorder.status[type_id] == "valid"
+    assert recorder.results[(True, "types", type_id)] == (original, None)
+
+
 def test_unvalidated_entity_without_bool_verdict_stays_unknown(monkeypatch):
     recorder = EntityRecorder()
     type_id = "gts.x.demo._.mystery.v1~"

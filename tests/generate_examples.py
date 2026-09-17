@@ -69,14 +69,12 @@ class EntityRecorder:
         entity_id, kind = identify_entity(body)
         if entity_id is None:
             return
-        # POST /entities only means the entity was accepted for registration:
-        # the server always responds 200 and the response body carries no
-        # validation verdict. The recorder therefore never reads validity from
-        # this response -- it records the submitted body, remembers where it was
-        # posted, and marks the entity "unknown" until an explicit validation
-        # verdict is observed (during the tests or in the end-of-run pass).
-        # A verdict already decided earlier must not be downgraded by a later
-        # re-registration.
+        # A rejected registration did not change the server's stored entity, so
+        # it must not change the recorder's corresponding body or validation state.
+        if response is not None and not response.ok:
+            return
+        # An accepted POST /entities carries no validation verdict. Record the
+        # submitted body and leave it unknown until explicit validation.
         self.entities[entity_id] = (kind, body)
         if url is not None:
             self.entity_urls[entity_id] = url
