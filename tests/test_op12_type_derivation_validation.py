@@ -4430,5 +4430,49 @@ class TestCaseOp12_Redeclared_ThreeLevelChainCompatible(HttpRunner):
     ]
 
 
+class TestCaseOp12_SchemaRefTargetDependencyMissing(HttpRunner):
+    """Explicit validation must recursively resolve a referenced type's $refs."""
+
+    config = Config("OP#12 - Referenced schema dependency missing").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.reftransitive.target.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.reftransitive.missing.v1~"},
+                ],
+            },
+            "register target schema referencing a missing dependency",
+        ),
+        _register(
+            "gts://gts.x.test12.reftransitive.host.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.reftransitive.target.v1~"},
+                ],
+            },
+            "register host schema referencing the target",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.reftransitive.target.v1~",
+            False,
+            "validate target - its reference dependency is missing",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.reftransitive.host.v1~",
+            False,
+            "validate host - referenced target has a missing dependency",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp12TypeDerivationValidation_DerivedSchemaFullyMatches().test_start()
