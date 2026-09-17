@@ -6239,6 +6239,43 @@ class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
     ]
 
 
+class TestCaseOp13_TraitRef_RelativeConstraintTypeMissing(HttpRunner):
+    """A relative trait x-gts-ref must resolve to a registered constraint type."""
+
+    config = Config(
+        "OP#13 x-gts-ref: relative constraint type missing fails"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.xrefrel.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "constraintType": "gts.x.test13.xrefrel.topic.v1~",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "/constraintType",
+                        },
+                    },
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register trait schema with relative missing constraint type",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.xrefrel.event.v1~",
+            False,
+            "validate should fail - resolved trait constraint type is not registered",
+        ),
+    ]
+
+
 class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
     """§9.6 specific ref: the x-gts-ref CONSTRAINT type must itself exist.
 
