@@ -6426,9 +6426,10 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
 
     The first request deliberately omits ``validate=true``, so the schema is
     accepted after syntax checks even though its concrete x-gts-ref target is
-    not registered. The second request submits identical content with explicit
-    validation and must fail. That failure belongs only to the second request:
-    the schema committed by the first request must remain retrievable unchanged.
+    not registered. A GET proves that registration committed the schema before
+    an identical request with explicit validation fails. That later failure
+    belongs only to the rejected request: the schema committed by the first
+    request must remain retrievable unchanged.
     """
 
     config = Config(
@@ -6462,6 +6463,18 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
             .assert_equal("body.id", "gts.x.test13.xrefpreserve.event.v1~")
             .assert_equal("body.is_type_schema", True)
         ),
+        # Verify the first response represented a committed registration, not
+        # merely a successful-looking response with no stored entity.
+        Step(
+            RunRequest("confirm unvalidated schema was committed")
+            .get("/entities/gts.x.test13.xrefpreserve.event.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.id", "gts.x.test13.xrefpreserve.event.v1~")
+            .assert_equal("body.content.type", "object")
+            .assert_equal("body.content.properties.topicRef.type", "string")
+        ),
         # The identical body is valid syntactically, but validate=true reaches
         # the existence check and rejects its missing constraint type.
         Step(
@@ -6488,6 +6501,58 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
             .assert_equal("body.id", "gts.x.test13.xrefpreserve.event.v1~")
             .assert_equal("body.content.type", "object")
             .assert_equal("body.content.properties.topicRef.type", "string")
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_ValidatedRegistrationFailureIsNotStored(HttpRunner):
+    """A first-time registration rejected by validation must commit nothing."""
+
+    config = Config(
+        "OP#13 x-gts-ref: rejected validated registration is not stored"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    schema = {
+        "$$id": "gts://gts.x.test13.xrefreject.event.v1~",
+        "$$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "topicRef": {
+                "type": "string",
+                "x-gts-ref": "gts.x.test13.xrefreject.topic.v1~",
+            },
+        },
+    }
+    teststeps = [
+        # This is registration and validation in one request. Because validation
+        # fails, the registration must be atomic and commit no new entity.
+        Step(
+            RunRequest("reject first registration with an unregistered x-gts-ref target")
+            .post("/entities?validate=true")
+            .with_json(schema)
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", True)
+            .assert_contains(
+                "body.error", "gts.x.test13.xrefreject.topic.v1~"
+            )
+        ),
+        # A missing entity is represented by the existing GET contract as HTTP
+        # 200 with ok=false and null content, rather than by HTTP 404.
+        Step(
+            RunRequest("confirm rejected schema was never committed")
+            .get("/entities/gts.x.test13.xrefreject.event.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.content", None)
+            .assert_contains(
+                "body.error", "gts.x.test13.xrefreject.event.v1~"
+            )
         ),
     ]
 
