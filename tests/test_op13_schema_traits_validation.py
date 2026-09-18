@@ -6421,6 +6421,50 @@ class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
     ]
 
 
+class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
+    config = Config(
+        "OP#13 x-gts-ref: rejected identical revalidation preserves stored schema"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    schema = {
+        "$$id": "gts://gts.x.test13.xrefpreserve.event.v1~",
+        "$$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {
+            "topicRef": {
+                "type": "string",
+                "x-gts-ref": "gts.x.test13.xrefpreserve.topic.v1~",
+            },
+        },
+    }
+    teststeps = [
+        Step(
+            RunRequest("register schema with an unregistered x-gts-ref target")
+            .post("/entities")
+            .with_json(schema)
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("reject identical schema when explicit validation checks its target")
+            .post("/entities?validate=true")
+            .with_json(schema)
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+        Step(
+            RunRequest("previously accepted schema remains registered")
+            .get("/entities/gts.x.test13.xrefpreserve.event.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+    ]
+
+
 class TestCaseOp13_TraitRef_InheritedChain_RootMissing(HttpRunner):
     """Inherited topicRef, case (a): the ref target's root/constraint type is missing.
 
