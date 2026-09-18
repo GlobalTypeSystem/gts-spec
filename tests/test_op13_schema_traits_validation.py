@@ -11,7 +11,19 @@ from .helpers.http_run_helpers import (
     validate_instance as _validate_instance,
     validate_type_schema as _validate_type_schema,
 )
-from httprunner import HttpRunner, Config
+from httprunner import HttpRunner, Config, RunRequest, Step
+
+
+def _register_bulk(schema_body, label):
+    return Step(
+        RunRequest(label)
+        .post("/entities/bulk")
+        .with_json([schema_body])
+        .validate()
+        .assert_equal("status_code", 200)
+        .assert_equal("body.ok", True)
+    )
+
 
 # Note (v0.12): ADR-0003 keys trait-completeness on x-gts-abstract (not "leaf").
 # Refimpls remain permissive at POST /entities — completeness is verified at
@@ -6285,9 +6297,10 @@ class TestCaseOp13_TraitRef_RelativeConstraintPointerMissing(HttpRunner):
         super().test_start()
 
     teststeps = [
-        _register(
-            "gts://gts.x.test13.xrefrelmissing.event.v1~",
+        _register_bulk(
             {
+                "$$id": "gts://gts.x.test13.xrefrelmissing.event.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "x-gts-traits-schema": {
                     "type": "object",
@@ -6300,7 +6313,7 @@ class TestCaseOp13_TraitRef_RelativeConstraintPointerMissing(HttpRunner):
                 },
                 "properties": {"id": {"type": "string"}},
             },
-            "register trait schema with a missing relative constraint pointer",
+            "bulk register trait schema with a missing relative constraint pointer",
         ),
         _validate_type_schema(
             "gts.x.test13.xrefrelmissing.event.v1~",
@@ -6319,9 +6332,10 @@ class TestCaseOp13_TraitRef_RelativeConstraintPointerNonString(HttpRunner):
         super().test_start()
 
     teststeps = [
-        _register(
-            "gts://gts.x.test13.xrefrelnonstring.event.v1~",
+        _register_bulk(
             {
+                "$$id": "gts://gts.x.test13.xrefrelnonstring.event.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "x-gts-traits-schema": {
                     "type": "object",
@@ -6335,7 +6349,7 @@ class TestCaseOp13_TraitRef_RelativeConstraintPointerNonString(HttpRunner):
                 },
                 "properties": {"id": {"type": "string"}},
             },
-            "register trait schema whose relative constraint resolves to an array",
+            "bulk register trait schema whose relative constraint resolves to an array",
         ),
         _validate_type_schema(
             "gts.x.test13.xrefrelnonstring.event.v1~",
