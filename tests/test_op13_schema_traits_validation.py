@@ -6422,6 +6422,15 @@ class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
+    """A failed registration-with-validation must not remove committed state.
+
+    The first request deliberately omits ``validate=true``, so the schema is
+    accepted after syntax checks even though its concrete x-gts-ref target is
+    not registered. The second request submits identical content with explicit
+    validation and must fail. That failure belongs only to the second request:
+    the schema committed by the first request must remain retrievable unchanged.
+    """
+
     config = Config(
         "OP#13 x-gts-ref: rejected identical revalidation preserves stored schema"
     ).base_url(get_gts_base_url())
@@ -6441,26 +6450,44 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
         },
     }
     teststeps = [
+        # This request commits the schema. Without explicit validation, the
+        # concrete target is checked for syntax but not registry existence.
         Step(
             RunRequest("register schema with an unregistered x-gts-ref target")
             .post("/entities")
             .with_json(schema)
             .validate()
             .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.id", "gts.x.test13.xrefpreserve.event.v1~")
+            .assert_equal("body.is_type_schema", True)
         ),
+        # The identical body is valid syntactically, but validate=true reaches
+        # the existence check and rejects its missing constraint type.
         Step(
             RunRequest("reject identical schema when explicit validation checks its target")
             .post("/entities?validate=true")
             .with_json(schema)
             .validate()
             .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", True)
+            .assert_contains(
+                "body.error", "gts.x.test13.xrefpreserve.topic.v1~"
+            )
         ),
+        # Rejection of the second request must not undo the successful first
+        # request. GET returning the original shape proves committed state was
+        # preserved rather than merely returning a stale success envelope.
         Step(
             RunRequest("previously accepted schema remains registered")
             .get("/entities/gts.x.test13.xrefpreserve.event.v1~")
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", True)
+            .assert_equal("body.id", "gts.x.test13.xrefpreserve.event.v1~")
+            .assert_equal("body.content.type", "object")
+            .assert_equal("body.content.properties.topicRef.type", "string")
         ),
     ]
 
