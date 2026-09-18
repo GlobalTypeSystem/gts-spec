@@ -1343,9 +1343,8 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
 
     §9.6: the constraint value may be any well-formed GTS wildcard pattern
     (§10), e.g. ``gts.x.testref_wild.am.*``. The field value must be a
-    syntactically valid GTS id that matches the pattern and must resolve to at
-    least one registered, valid GTS type/instance (validation is uniform across
-    all constraint forms and recursively covers dependencies).
+    syntactically valid GTS id that matches the pattern. Registry presence and
+    target validity then follow the selected gts-ref-validation mode.
     """
     config = Config("x-gts-ref: arbitrary wildcard pattern").base_url(get_gts_base_url())
 
@@ -1442,15 +1441,23 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate holder - unregistered wildcard value should fail")
-            .post("/validate-instance")
-            .with_json({
-                "instance_id": "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1"
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_instance(
+            "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1",
+            True,
+            "none mode accepts matching unregistered wildcard value",
+            gts_ref_validation="none",
+        ),
+        _validate_instance(
+            "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1",
+            False,
+            "presence mode rejects matching unregistered wildcard value",
+            gts_ref_validation="presence",
+        ),
+        _validate_instance(
+            "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1",
+            False,
+            "full mode rejects matching unregistered wildcard value",
+            gts_ref_validation="full",
         ),
         # Negative 2: valid GTS id but does not match the wildcard family.
         Step(
@@ -1463,15 +1470,11 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate holder - value outside wildcard family should fail")
-            .post("/validate-instance")
-            .with_json({
-                "instance_id": "gts.x.testref_wild._.holder.v1~x.vendor._.wrong.v1"
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_instance(
+            "gts.x.testref_wild._.holder.v1~x.vendor._.wrong.v1",
+            False,
+            "none mode still rejects value outside wildcard family",
+            gts_ref_validation="none",
         ),
         # Negative 3: value is not a syntactically valid GTS identifier.
         Step(
@@ -1501,9 +1504,8 @@ class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
     """x-gts-ref: ``...v1~*`` wildcard covers the base type and its descendants.
 
     Per §3.5/§10, ``gts....stream.v1~*`` matches the type ``...stream.v1~``
-    itself as well as any entity derived from it. Combined with the reference
-    transitive validation rule, a value matching this pattern must resolve to a
-    registered, valid type/instance.
+    itself as well as any entity derived from it. Registry lookup and target
+    validity follow the selected gts-ref-validation mode.
     """
     config = Config("x-gts-ref: tilde wildcard pattern").base_url(get_gts_base_url())
 
@@ -1623,8 +1625,8 @@ class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
     ]
 
 
-class TestCaseXGtsRef_ReferencedInstanceMustBeValid(HttpRunner):
-    config = Config("x-gts-ref: referenced instance must be valid").base_url(
+class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
+    config = Config("x-gts-ref: referenced instance validation modes").base_url(
         get_gts_base_url()
     )
 
@@ -1692,7 +1694,7 @@ class TestCaseXGtsRef_ReferencedInstanceMustBeValid(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_validity._.holder.v1~",
             True,
-            "validate holder type - referenced constraint type is valid",
+            "validate holder type - referenced constraint type is present",
         ),
         Step(
             RunRequest("register holder referencing invalid instance")
@@ -1704,24 +1706,34 @@ class TestCaseXGtsRef_ReferencedInstanceMustBeValid(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        Step(
-            RunRequest("validate holder referencing invalid instance")
-            .post("/validate-instance")
-            .with_json({
-                "instance_id": (
-                    "gts.x.testref_validity._.holder.v1~"
-                    "x.vendor._.invalid.v1"
-                ),
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
+        _validate_instance(
+            "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
+            True,
+            "none mode ignores referenced instance presence and validity",
+            gts_ref_validation="none",
+        ),
+        _validate_instance(
+            "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
+            True,
+            "presence mode accepts present invalid referenced instance",
+            gts_ref_validation="presence",
+        ),
+        _validate_instance(
+            "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
+            False,
+            "full mode rejects invalid referenced instance",
+            gts_ref_validation="full",
+        ),
+        _validate_instance(
+            "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
+            False,
+            "default mode remains full",
         ),
     ]
 
 
-class TestCaseXGtsRef_ConstraintTypeMustBeValid(HttpRunner):
-    config = Config("x-gts-ref: constraint type must be valid").base_url(
+class TestCaseXGtsRef_ConstraintValidationModes(HttpRunner):
+    config = Config("x-gts-ref: constraint validation modes").base_url(
         get_gts_base_url()
     )
 
@@ -1769,14 +1781,32 @@ class TestCaseXGtsRef_ConstraintTypeMustBeValid(HttpRunner):
         ),
         _validate_type_schema(
             "gts.x.testref_constraint._.holder.v1~",
+            True,
+            "none mode ignores constraint target presence and validity",
+            gts_ref_validation="none",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_constraint._.holder.v1~",
+            True,
+            "presence mode accepts present invalid constraint target",
+            gts_ref_validation="presence",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_constraint._.holder.v1~",
             False,
-            "validate holder - x-gts-ref constraint type is invalid",
+            "full mode rejects invalid constraint target",
+            gts_ref_validation="full",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_constraint._.holder.v1~",
+            False,
+            "default mode remains full",
         ),
     ]
 
 
-class TestCaseXGtsRef_WildcardReferencedInstanceMustBeValid(HttpRunner):
-    config = Config("x-gts-ref wildcard: referenced instance must be valid").base_url(
+class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
+    config = Config("x-gts-ref wildcard validation modes").base_url(
         get_gts_base_url()
     )
 
@@ -1785,7 +1815,42 @@ class TestCaseXGtsRef_WildcardReferencedInstanceMustBeValid(HttpRunner):
 
     teststeps = [
         Step(
-            RunRequest("register wildcard target type")
+            RunRequest("register holder whose wildcard has no registry match")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wildpresence._.empty_holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_wildpresence.empty.*",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildpresence._.empty_holder.v1~",
+            True,
+            "none mode accepts wildcard constraint with no registry match",
+            gts_ref_validation="none",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildpresence._.empty_holder.v1~",
+            False,
+            "presence mode rejects wildcard constraint with no registered match",
+            gts_ref_validation="presence",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildpresence._.empty_holder.v1~",
+            False,
+            "full mode rejects wildcard constraint with no registered match",
+            gts_ref_validation="full",
+        ),
+        Step(
+            RunRequest("register invalid wildcard target type")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_wildvalidity.target.item.v1~",
@@ -1796,9 +1861,19 @@ class TestCaseXGtsRef_WildcardReferencedInstanceMustBeValid(HttpRunner):
                     "id": {"type": "string"},
                     "name": {"type": "string"},
                 },
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "required": ["retention"],
+                    "properties": {"retention": {"type": "string"}},
+                },
             })
             .validate()
             .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildvalidity.target.item.v1~",
+            False,
+            "validate wildcard target type - required trait is unresolved",
         ),
         Step(
             RunRequest("register invalid wildcard target instance")
@@ -1834,7 +1909,37 @@ class TestCaseXGtsRef_WildcardReferencedInstanceMustBeValid(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_wildvalidity._.holder.v1~",
             True,
-            "validate wildcard holder type",
+            "none mode ignores wildcard target validity",
+            gts_ref_validation="none",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildvalidity._.holder.v1~",
+            True,
+            "presence mode accepts a registered invalid wildcard match",
+            gts_ref_validation="presence",
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildvalidity._.holder.v1~",
+            False,
+            "full mode rejects wildcard with only invalid registered matches",
+            gts_ref_validation="full",
+        ),
+        Step(
+            RunRequest("register valid wildcard target type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_wildvalidity.target.valid.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            "gts.x.testref_wildvalidity._.holder.v1~",
+            True,
+            "full mode accepts wildcard with at least one valid registered match",
+            gts_ref_validation="full",
         ),
         Step(
             RunRequest("register wildcard holder referencing invalid instance")
@@ -1859,8 +1964,128 @@ class TestCaseXGtsRef_WildcardReferencedInstanceMustBeValid(HttpRunner):
         ),
         _validate_instance(
             "gts.x.testref_wildvalidity._.holder.v1~x.vendor._.invalid.v1",
+            True,
+            "none mode ignores referenced wildcard target validity",
+            gts_ref_validation="none",
+        ),
+        _validate_instance(
+            "gts.x.testref_wildvalidity._.holder.v1~x.vendor._.invalid.v1",
+            True,
+            "presence mode accepts present invalid wildcard target",
+            gts_ref_validation="presence",
+        ),
+        _validate_instance(
+            "gts.x.testref_wildvalidity._.holder.v1~x.vendor._.invalid.v1",
             False,
-            "validate holder - wildcard target instance is invalid",
+            "full mode rejects invalid wildcard target value",
+            gts_ref_validation="full",
+        ),
+    ]
+
+
+class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
+    config = Config("x-gts-ref registration validation modes").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register invalid constraint target")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_regmode._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "required": ["retention"],
+                    "properties": {"retention": {"type": "string"}},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("none mode registers holder with missing constraint target")
+            .post("/entities?validate=true&gts-ref-validation=none")
+            .with_json({
+                "$$id": "gts://gts.x.testref_regmode._.none.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_regmode._.missing.v1~",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest("presence mode rejects missing constraint target")
+            .post("/entities?validate=true&gts-ref-validation=presence")
+            .with_json({
+                "$$id": "gts://gts.x.testref_regmode._.presence_missing.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_regmode._.missing.v1~",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("presence mode registers holder with invalid constraint target")
+            .post("/entities?validate=true&gts-ref-validation=presence")
+            .with_json({
+                "$$id": "gts://gts.x.testref_regmode._.presence.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_regmode._.target.v1~",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest("full mode rejects invalid constraint target")
+            .post("/entities?validate=true&gts-ref-validation=full")
+            .with_json({
+                "$$id": "gts://gts.x.testref_regmode._.full.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.testref_regmode._.target.v1~",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("reject unknown gts-ref-validation mode")
+            .post("/validate-type-schema?gts-ref-validation=unknown")
+            .with_json({"type_id": "gts.x.testref_regmode._.target.v1~"})
+            .validate()
+            .assert_equal("status_code", 422)
         ),
     ]
 

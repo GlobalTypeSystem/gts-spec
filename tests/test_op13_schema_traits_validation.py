@@ -78,11 +78,11 @@ class TestCaseOp13_Seed_TopicRefRegistry(HttpRunner):
     Many trait tests below annotate a `topicRef` trait with
     `x-gts-ref: "gts.x.test13.events.topic.v1~"` and supply concrete topic
     references as trait values. Under §9.6 a *specific* (non-wildcard)
-    `x-gts-ref` is existence-enforced: the constraint type and the full
-    derivation chain of the referenced value MUST be registered, or validation
-    fails. This class registers the topic type and every topic instance those
-    tests reference so their `x-gts-ref` values resolve. It runs first (file
-    order) and the entries persist for the rest of the session's registry.
+    `x-gts-ref` is existence-enforced: the concrete constraint type and each
+    referenced value MUST be registered, or validation fails. Their validity is
+    outside x-gts-ref validation. This class registers the topic type and every
+    topic instance those tests reference so their `x-gts-ref` values resolve. It
+    runs first (file order), and the entries persist for the rest of the session.
     """
 
     config = Config("OP#13 - Seed topicRef registry").base_url(get_gts_base_url())
@@ -371,9 +371,9 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
     Per §9.7.5 the completeness check (standard JSON Schema validation of the
     materialized traits) is skipped for x-gts-abstract types; the separate
     "reference resolution of trait values" rule does NOT exempt abstract types.
-    So an abstract type whose trait x-gts-ref names a constraint type that is not
-    registered MUST still fail on explicit validation - even though a descendant
-    may later supply its own x-gts-ref value.
+    An unregistered constraint therefore passes in ``none`` mode and fails in
+    ``presence`` and ``full`` modes, even though a descendant may later supply
+    its own x-gts-ref value.
     """
     config = Config(
         "OP#13 x-gts-ref: abstract still validates missing constraint type"
@@ -404,9 +404,21 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
         ),
         _validate_type_schema(
             "gts.x.test13.absref.event.v1~",
+            True,
+            "none mode ignores abstract constraint target presence",
+            gts_ref_validation="none",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absref.event.v1~",
             False,
-            "validate should fail - abstract still enforces x-gts-ref constraint "
-            "type existence (completeness is skipped, reference resolution is not)",
+            "presence mode rejects missing abstract constraint target",
+            gts_ref_validation="presence",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absref.event.v1~",
+            False,
+            "full mode rejects missing abstract constraint target",
+            gts_ref_validation="full",
         ),
     ]
 
@@ -468,12 +480,10 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintResolved(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_AbstractRefValueUnregistered(HttpRunner):
-    """Abstract type that DOES declare an x-gts-ref trait value pointing to an
-    unregistered entity MUST fail, even though the constraint type exists and the
-    type is abstract.
+    """Exercise all modes for an abstract type's unregistered trait target.
 
-    Reference resolution applies to a value the abstract type declares itself;
-    the abstract completeness exemption does not cover x-gts-ref value existence.
+    Abstract completeness does not change the selected x-gts-ref validation
+    mode: ``none`` skips lookup, while ``presence`` and ``full`` require it.
     """
     config = Config(
         "OP#13 x-gts-ref: abstract resolves declared trait ref values"
@@ -522,9 +532,105 @@ class TestCaseOp13_TraitRef_AbstractRefValueUnregistered(HttpRunner):
         ),
         _validate_type_schema(
             "gts.x.test13.absrefv.event.v1~",
+            True,
+            "none mode ignores missing abstract trait target",
+            gts_ref_validation="none",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absrefv.event.v1~",
             False,
-            "validate should fail - abstract still resolves the x-gts-ref trait "
-            "value it declares (referenced topic instance is not registered)",
+            "presence mode rejects missing abstract trait target",
+            gts_ref_validation="presence",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absrefv.event.v1~",
+            False,
+            "full mode rejects missing abstract trait target",
+            gts_ref_validation="full",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_AbstractRefValueValidationModes(HttpRunner):
+    """Exercise all modes for a present but invalid abstract trait target."""
+
+    config = Config(
+        "OP#13 x-gts-ref: present invalid trait target by mode"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.absrefpresent.topic.v1~",
+            {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                },
+            },
+            "register topic constraint type",
+        ),
+        _register_instance(
+            {
+                "id": (
+                    "gts.x.test13.absrefpresent.topic.v1~"
+                    "x.test13._.invalid.v1"
+                ),
+            },
+            "register invalid topic instance without required name",
+        ),
+        _validate_instance(
+            (
+                "gts.x.test13.absrefpresent.topic.v1~"
+                "x.test13._.invalid.v1"
+            ),
+            False,
+            "validate topic target - required name is missing",
+        ),
+        _register_abstract(
+            "gts://gts.x.test13.absrefpresent.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.test13.absrefpresent.topic.v1~",
+                        },
+                    },
+                },
+                "x-gts-traits": {
+                    "topicRef": (
+                        "gts.x.test13.absrefpresent.topic.v1~"
+                        "x.test13._.invalid.v1"
+                    ),
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register abstract type referring to present invalid topic",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absrefpresent.event.v1~",
+            True,
+            "none mode ignores invalid abstract trait target",
+            gts_ref_validation="none",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absrefpresent.event.v1~",
+            True,
+            "presence mode accepts present invalid abstract trait target",
+            gts_ref_validation="presence",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.absrefpresent.event.v1~",
+            False,
+            "full mode rejects invalid abstract trait target",
+            gts_ref_validation="full",
         ),
     ]
 
@@ -6140,10 +6246,10 @@ class TestCaseOp13_Traits_RegexEcma262(HttpRunner):
 #     a well-formed GTS id that matches the constraint (a `~`-terminated
 #     constraint matches the exact id and any derived id).
 #
-# Existence and transitive validity are enforced UNIFORMLY for both forms,
-# INCLUDING the bare "gts.*" wildcard: at least one registered, valid GTS
-# type/instance MUST match the referenced value (a `~`-terminated value matches
-# the exact type and any descendant), or validation fails.
+# Operand/value syntax and matching are always enforced. Registry lookup is
+# skipped by `none`; `presence` requires registered constraint and value targets;
+# and `full` additionally validates required targets. For wildcard constraints,
+# `presence` needs one registered match and `full` needs one valid match.
 #
 # The inherited cases (a/b/c) below also exercise trait inheritance: an
 # intermediate "audit" type supplies topicRef via x-gts-traits and is itself
@@ -6154,12 +6260,11 @@ class TestCaseOp13_Traits_RegexEcma262(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
-    """§9.6 wildcard (reference impl): 'gts.*' still requires the value to exist.
+    """§9.6 wildcard: exercise registry existence under the default full mode.
 
-    Existence checking is uniform across all GTS constraint forms, including the
-    bare 'gts.*' wildcard. A topicRef whose value is a well-formed GTS id that
-    matches the pattern but is never registered MUST fail; a value that resolves
-    to a registered entity MUST pass.
+    A topicRef whose value is a well-formed GTS id that matches the pattern but
+    is never registered fails; a value identifying a registered valid entity
+    passes.
     """
 
     config = Config(
