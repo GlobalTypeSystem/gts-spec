@@ -6260,7 +6260,7 @@ class TestCaseOp13_TraitRef_RelativeConstraintTypeMissing(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "/constraintType",
+                            "x-gts-ref": "/x-gts-traits-schema/constraintType",
                         },
                     },
                 },
