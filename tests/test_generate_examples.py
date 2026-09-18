@@ -117,6 +117,26 @@ def test_recorder_validates_registered_entities_missing_explicit_validation(monk
     assert recorder.results[(True, "instances", instance_id)] == ({"id": instance_id}, None)
 
 
+def test_recorder_keeps_only_latest_validation_verdict():
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.thing.v1~"
+    body = {"$id": f"gts://{type_id}"}
+
+    recorder._record_entity(body)
+    recorder._record_validation(
+        "/validate-type-schema", {"type_id": type_id}, Response({"ok": True})
+    )
+    recorder._record_validation(
+        "/validate-type-schema",
+        {"type_id": type_id},
+        Response({"ok": False, "error": "missing dependency"}),
+    )
+
+    assert recorder.results == {
+        (False, "types", type_id): (body, "missing dependency")
+    }
+
+
 def test_registration_marks_entity_unknown_until_verdict():
     recorder = EntityRecorder()
     type_id = "gts.x.demo._.thing.v1~"
@@ -213,8 +233,15 @@ def test_write_examples_uses_validity_and_entity_kind_directories(tmp_path):
         ),
     }
 
+    stale_path = (
+        tmp_path / "valid/instances/gts.x.demo._.thing.v1~x.demo._.example.v1.json"
+    )
+    stale_path.parent.mkdir(parents=True)
+    stale_path.write_text("stale", encoding="utf-8")
+
     assert write_examples(tmp_path, results) == 2
     assert (tmp_path / "valid/types/gts.x.demo._.thing.v1~.schema.json").is_file()
+    assert not stale_path.exists()
     invalid_path = (
         tmp_path / "invalid/instances/gts.x.demo._.thing.v1~x.demo._.example.v1.jsonc"
     )

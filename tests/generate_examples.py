@@ -155,6 +155,7 @@ class EntityRecorder:
                 if entity_type == "schema"
                 else "instances" if entity_type == "instance" else entity[0]
             )
+        self.results.pop((not result["ok"], kind, entity_id), None)
         self.results[(result["ok"], kind, entity_id)] = (
             entity[1],
             validation_error(result) if not result["ok"] else None,
@@ -230,6 +231,14 @@ def write_examples(output_dir, results):
         destination = (
             output_dir / validity / kind / output_filename(entity_id, kind, valid)
         )
+        obsolete_validity = "invalid" if valid else "valid"
+        obsolete = (
+            output_dir
+            / obsolete_validity
+            / kind
+            / output_filename(entity_id, kind, not valid)
+        )
+        obsolete.unlink(missing_ok=True)
         destination.parent.mkdir(parents=True, exist_ok=True)
         content = (
             json.dumps(body, indent=2, ensure_ascii=False) + "\n"

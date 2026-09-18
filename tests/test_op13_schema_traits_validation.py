@@ -6276,6 +6276,75 @@ class TestCaseOp13_TraitRef_RelativeConstraintTypeMissing(HttpRunner):
     ]
 
 
+class TestCaseOp13_TraitRef_RelativeConstraintPointerMissing(HttpRunner):
+    config = Config(
+        "OP#13 x-gts-ref: relative constraint pointer missing fails"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.xrefrelmissing.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "/x-gts-traits-schema/missingConstraintType",
+                        },
+                    },
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register trait schema with a missing relative constraint pointer",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.xrefrelmissing.event.v1~",
+            False,
+            "validate should fail - relative trait constraint pointer is missing",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitRef_RelativeConstraintPointerNonString(HttpRunner):
+    config = Config(
+        "OP#13 x-gts-ref: relative constraint pointer non-string fails"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test13.xrefrelnonstring.event.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "examples": ["not-a-constraint-type"],
+                    "properties": {
+                        "topicRef": {
+                            "type": "string",
+                            "x-gts-ref": "/x-gts-traits-schema/examples",
+                        },
+                    },
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register trait schema whose relative constraint resolves to an array",
+        ),
+        _validate_type_schema(
+            "gts.x.test13.xrefrelnonstring.event.v1~",
+            False,
+            "validate should fail - relative trait constraint target is not a string",
+        ),
+    ]
+
+
 class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
     """§9.6 specific ref: the x-gts-ref CONSTRAINT type must itself exist.
 
