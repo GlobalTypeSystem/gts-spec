@@ -1865,6 +1865,108 @@ class TestCaseXGtsRef_WildcardReferencedInstanceMustBeValid(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_TupleAdditionalItems(HttpRunner):
+    config = Config("x-gts-ref: Draft-07 tuple additionalItems").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register tuple overflow target type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_tuple._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {"id": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register tuple overflow target instance")
+            .post("/entities")
+            .with_json({
+                "id": (
+                    "gts.x.testref_tuple._.target.v1~"
+                    "x.vendor._.registered.v1"
+                ),
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register tuple additionalItems holder type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_tuple._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "constraintType": "gts.x.testref_tuple._.target.v1~",
+                "required": ["id", "refs"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "refs": {
+                        "type": "array",
+                        "items": [{"type": "string"}],
+                        "additionalItems": {
+                            "type": "string",
+                            "x-gts-ref": "/constraintType",
+                        },
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register holder with valid tuple overflow reference")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_tuple._.holder.v1~x.vendor._.valid.v1",
+                "refs": [
+                    "tuple-prefix",
+                    (
+                        "gts.x.testref_tuple._.target.v1~"
+                        "x.vendor._.registered.v1"
+                    ),
+                ],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_tuple._.holder.v1~x.vendor._.valid.v1",
+            True,
+            "validate registered tuple overflow reference",
+        ),
+        Step(
+            RunRequest("register holder with missing tuple overflow reference")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_tuple._.holder.v1~x.vendor._.invalid.v1",
+                "refs": [
+                    "tuple-prefix",
+                    (
+                        "gts.x.testref_tuple._.target.v1~"
+                        "x.vendor._.missing.v1"
+                    ),
+                ],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_tuple._.holder.v1~x.vendor._.invalid.v1",
+            False,
+            "reject missing tuple overflow reference",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_JsonPointer().test_start()
