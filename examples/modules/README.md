@@ -19,9 +19,9 @@ This folder contains a simple self-contained examples for a pluggable SaaS servi
 
 ## Notes
 
-- `x-gts-ref` marks that a string field must be a valid GTS identifier (see §9.6). The constraint value is itself a valid GTS identifier, a GTS wildcard pattern (§10), or a relative JSON Pointer:
+- `x-gts-ref` marks that a string field must be a valid GTS identifier (see §9.6). The operand is a valid concrete GTS identifier, a GTS wildcard pattern (§10), or exactly the reserved string `/$id`; all other slash-prefixed forms are prohibited:
   - `"gts.*"` (or any wildcard, e.g. `"gts.x.core.modules.capability.*"`, `"...v1~*"`) — the value must be a syntactically valid GTS ID that matches the pattern.
   - `"gts.<prefix>..."` — a concrete identifier: the value must be a valid GTS ID that matches it, where a `~`-terminated prefix matches the exact type and any entity derived from it (`gts.x...v1~` ≡ `gts.x...v1~` or `gts.x...v1~*`).
-  - `"/$id"` — self-reference to the current JSON Schema’s `$id`.
+  - `"/$id"` — self-reference rooted at the leaf GTS Type Schema selected for validation, including when the constraint is inherited from a base schema.
   - Registry lookup follows the selected `gts-ref-validation` mode (§9.6): `none` checks syntax and matching only; `presence` requires registered constraint/value targets without validating them; and `full` requires valid targets. A wildcard constraint requires at least one registered match under `presence` and at least one registered, valid match under `full`. REST validation defaults to `full` when the parameter is omitted.
 - These examples are illustrative and can be used to test parsing, validation, and reference resolution in GTS-aware tooling.

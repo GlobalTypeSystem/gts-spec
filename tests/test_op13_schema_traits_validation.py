@@ -6356,20 +6356,23 @@ class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
     ]
 
 
-class TestCaseOp13_TraitRef_RelativeConstraintTypeMissing(HttpRunner):
-    """A relative trait x-gts-ref must resolve to a registered constraint type."""
+class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
+    """Trait x-gts-ref operands may not use pointers other than /$id."""
 
-    config = Config(
-        "OP#13 x-gts-ref: relative constraint type missing fails"
-    ).base_url(get_gts_base_url())
+    config = Config("OP#13 x-gts-ref: reject trait pointers").base_url(
+        get_gts_base_url()
+    )
 
     def test_start(self):
         super().test_start()
 
     teststeps = [
-        _register(
-            "gts://gts.x.test13.xrefrel.event.v1~",
-            {
+        Step(
+            RunRequest("reject trait pointer to concrete constraint metadata")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test13.xrefrel.event.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "x-gts-traits-schema": {
                     "type": "object",
@@ -6381,29 +6384,15 @@ class TestCaseOp13_TraitRef_RelativeConstraintTypeMissing(HttpRunner):
                         },
                     },
                 },
-                "properties": {"id": {"type": "string"}},
-            },
-            "register trait schema with relative missing constraint type",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
-        _validate_type_schema(
-            "gts.x.test13.xrefrel.event.v1~",
-            False,
-            "validate should fail - resolved trait constraint type is not registered",
-        ),
-    ]
-
-
-class TestCaseOp13_TraitRef_RelativeConstraintPointerMissing(HttpRunner):
-    config = Config(
-        "OP#13 x-gts-ref: relative constraint pointer missing fails"
-    ).base_url(get_gts_base_url())
-
-    def test_start(self):
-        super().test_start()
-
-    teststeps = [
-        _register_bulk(
-            {
+        Step(
+            RunRequest("reject missing trait pointer")
+            .post("/entities")
+            .with_json({
                 "$$id": "gts://gts.x.test13.xrefrelmissing.event.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
@@ -6416,29 +6405,15 @@ class TestCaseOp13_TraitRef_RelativeConstraintPointerMissing(HttpRunner):
                         },
                     },
                 },
-                "properties": {"id": {"type": "string"}},
-            },
-            "bulk register trait schema with a missing relative constraint pointer",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
-        _validate_type_schema(
-            "gts.x.test13.xrefrelmissing.event.v1~",
-            False,
-            "validate should fail - relative trait constraint pointer is missing",
-        ),
-    ]
-
-
-class TestCaseOp13_TraitRef_RelativeConstraintPointerNonString(HttpRunner):
-    config = Config(
-        "OP#13 x-gts-ref: relative constraint pointer non-string fails"
-    ).base_url(get_gts_base_url())
-
-    def test_start(self):
-        super().test_start()
-
-    teststeps = [
-        _register_bulk(
-            {
+        Step(
+            RunRequest("reject trait pointer to non-string metadata")
+            .post("/entities")
+            .with_json({
                 "$$id": "gts://gts.x.test13.xrefrelnonstring.event.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
@@ -6452,14 +6427,10 @@ class TestCaseOp13_TraitRef_RelativeConstraintPointerNonString(HttpRunner):
                         },
                     },
                 },
-                "properties": {"id": {"type": "string"}},
-            },
-            "bulk register trait schema whose relative constraint resolves to an array",
-        ),
-        _validate_type_schema(
-            "gts.x.test13.xrefrelnonstring.event.v1~",
-            False,
-            "validate should fail - relative trait constraint target is not a string",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
     ]
 

@@ -1,4 +1,4 @@
-"""Tests for x-gts-ref validation: prefix enforcement, JSON Pointer resolution, and combinator semantics."""
+"""Tests for x-gts-ref matching, /$id semantics, and combinator traversal."""
 
 from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
@@ -9,7 +9,7 @@ from httprunner import HttpRunner, Config, Step, RunRequest
 
 
 class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
-    """x-gts-ref: prefix enforcement and self-reference (./$id)"""
+    """x-gts-ref: prefix enforcement and /$id self-reference."""
     config = Config("x-gts-ref: prefix and self-ref").base_url(get_gts_base_url())
 
     def test_start(self):
@@ -68,7 +68,7 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
         ),
-        # Register a module schema that references capability IDs by prefix and enforces ./$/id on its own type field
+        # Register a module schema that references capability IDs by prefix and enforces /$id on its own type field
         Step(
             RunRequest("register module schema with x-gts-ref prefix and self-ref")
             .post("/entities")
@@ -167,93 +167,347 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
     ]
 
 
-class TestCaseXGtsRef_JsonPointer(HttpRunner):
-    """x-gts-ref: JSON Pointer-style resolution: ./description, ./title, and nested ./properties/anchor/const"""
-    config = Config("x-gts-ref: json-pointer resolution").base_url(get_gts_base_url())
+class TestCaseXGtsRef_UnsupportedPointers(HttpRunner):
+    """Every slash-prefixed x-gts-ref operand except /$id is prohibited."""
+
+    config = Config("x-gts-ref: reject unsupported pointers").base_url(
+        get_gts_base_url()
+    )
 
     def test_start(self):
-        """Run x-gts-ref JSON Pointer resolution test steps."""
         super().test_start()
 
     teststeps = [
-        # Register schema with description/title, and nested anchor.const
         Step(
-            RunRequest("register pointer schema")
+            RunRequest("reject pointer to a concrete GTS const")
             .post("/entities")
             .with_json({
-                "$$id": "gts://gts.x.testref.json_pointer.pointer.v1~",
+                "$$id": "gts://gts.x.testref_pointer._.const.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
-                "title": "PTR-TITLE",
-                "description": "PTR-DESC",
                 "type": "object",
                 "properties": {
-                    "id": {"type": "string", "x-gts-ref": "/$$id"},
-                    "type": {"type": "string", "x-gts-ref": "/properties/id"},
+                    "anchor": {
+                        "type": "string",
+                        "const": "gts.x.testref_pointer._.target.v1~",
+                    },
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "/properties/anchor/const",
+                    },
                 },
-                "required": ["id"],
-                "additionalProperties": False
             })
             .validate()
-            .assert_equal("status_code", 200)
-        ),
-        # Register a valid instance that satisfies all x-gts-ref pointers
-        Step(
-            RunRequest("register valid pointer instance")
-            .post("/entities")
-            .with_json({
-                "type": "gts.x.testref.json_pointer.pointer.v1~",
-                "id": "gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register valid pointer instance")
-            .post("/entities")
-            .with_json({
-                "id": "gts.x.testref.json_pointer.capability.v1~",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("validate valid pointer instance")
-            .post("/validate-instance")
-            .with_json({
-                "instance_id": "gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1"
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", True)
-        ),
-        Step(
-            RunRequest("get valid pointer instance")
-            .get("/entities/gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1")
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.content.type", "gts.x.testref.json_pointer.pointer.v1~")
-            .assert_equal("body.content.id", "gts.x.testref.json_pointer.pointer.v1~x.vendor._.ptr_ok.v1")
-        ),
-        # Register invalid instance (wrong refDesc)
-        Step(
-            RunRequest("register invalid pointer instance - wrong refDesc")
-            .post("/entities")
-            .with_json({
-                "type": "gts.x.testref.json_pointer.pointer.v1~",
-                "id": "gts.x.testref.json_pointer.wrong_pointer.v1~x.vendor._.ptr_bad_desc.v1",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("validate invalid pointer instance - wrong refDesc should fail")
-            .post("/validate-instance")
-            .with_json({
-                "instance_id": "gts.x.testref.json_pointer.wrong_pointer.v1~x.vendor._.ptr_bad_desc.v1"
-            })
-            .validate()
-            .assert_equal("status_code", 200)
+            .assert_equal("status_code", 422)
             .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("reject pointer chaining even when reference checks are disabled")
+            .post("/entities?validate=true&gts-ref-validation=none")
+            .with_json({
+                "$$id": "gts://gts.x.testref_pointer._.chain.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "anchor": {"type": "string", "x-gts-ref": "/$$id"},
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "/properties/anchor",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseXGtsRef_SelectedLeafSelfRef(HttpRunner):
+    """/$id remains rooted at the selected leaf through schema composition."""
+
+    config = Config("x-gts-ref: /$$id uses derived type schema id").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    base_id = "gts.x.testref_selfref._.document.v1~"
+    derived_id = base_id + "x.testref_selfref._.invoice.v1~"
+    sibling_id = base_id + "x.testref_selfref._.credit_note.v1~"
+    further_id = derived_id + "x.testref_selfref._.priority_invoice.v1~"
+    no_ref_id = base_id + "x.testref_selfref._.standalone.v1~"
+    referenced_instance_id = derived_id + "x.testref_selfref._.invoice_001.v1"
+    further_instance_id = further_id + "x.testref_selfref._.priority_001.v1"
+
+    teststeps = [
+        Step(
+            RunRequest("register base with /$id constraint")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{base_id}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "entityRef"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "entityRef": {"type": "string", "x-gts-ref": "/$$id"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register derived selected leaf")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{derived_id}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$ref": f"gts://{base_id}"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register sibling type")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{sibling_id}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$ref": f"gts://{base_id}"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register referenced instance of selected leaf")
+            .post("/entities")
+            .with_json({
+                "id": referenced_instance_id,
+                "entityRef": derived_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register selected leaf instance referring to leaf type")
+            .post("/entities")
+            .with_json({
+                "id": derived_id + "x.testref_selfref._.type_ref.v1",
+                "entityRef": derived_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            derived_id + "x.testref_selfref._.type_ref.v1",
+            True,
+            "accept selected leaf type under inherited /$id",
+        ),
+        Step(
+            RunRequest("register selected leaf instance referring to leaf instance")
+            .post("/entities")
+            .with_json({
+                "id": derived_id + "x.testref_selfref._.instance_ref.v1",
+                "entityRef": referenced_instance_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            derived_id + "x.testref_selfref._.instance_ref.v1",
+            True,
+            "accept instance rooted at selected leaf under inherited /$id",
+        ),
+        Step(
+            RunRequest("register selected leaf instance referring to base")
+            .post("/entities")
+            .with_json({
+                "id": derived_id + "x.testref_selfref._.base_ref.v1",
+                "entityRef": base_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            derived_id + "x.testref_selfref._.base_ref.v1",
+            False,
+            "reject base type because /$id is rebound to selected leaf",
+        ),
+        Step(
+            RunRequest("register selected leaf instance referring to sibling")
+            .post("/entities")
+            .with_json({
+                "id": derived_id + "x.testref_selfref._.sibling_ref.v1",
+                "entityRef": sibling_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            derived_id + "x.testref_selfref._.sibling_ref.v1",
+            False,
+            "reject sibling type under selected-leaf /$id",
+        ),
+        Step(
+            RunRequest("register selected leaf instance with malformed reference")
+            .post("/entities")
+            .with_json({
+                "id": derived_id + "x.testref_selfref._.malformed_ref.v1",
+                "entityRef": "not-a-gts-id",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            derived_id + "x.testref_selfref._.malformed_ref.v1",
+            False,
+            "reject malformed identifier under inherited /$id",
+        ),
+        Step(
+            RunRequest("register type further derived from selected leaf")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{further_id}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{"$$ref": f"gts://{derived_id}"}],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register instance of further-derived type")
+            .post("/entities")
+            .with_json({
+                "id": further_instance_id,
+                "entityRef": further_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            further_instance_id,
+            True,
+            "accept further-derived instance rooted at its selected leaf",
+        ),
+        Step(
+            RunRequest("register invoice referring to further-derived type")
+            .post("/entities")
+            .with_json({
+                "id": derived_id + "x.testref_selfref._.further_type_ref.v1",
+                "entityRef": further_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            derived_id + "x.testref_selfref._.further_type_ref.v1",
+            True,
+            "accept further-derived type under invoice-rooted /$id",
+        ),
+        Step(
+            RunRequest("register invoice referring to further-derived instance")
+            .post("/entities")
+            .with_json({
+                "id": derived_id + "x.testref_selfref._.further_instance_ref.v1",
+                "entityRef": further_instance_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            derived_id + "x.testref_selfref._.further_instance_ref.v1",
+            True,
+            "accept further-derived instance under invoice-rooted /$id",
+        ),
+        Step(
+            RunRequest("register further-derived instance referring to ancestor")
+            .post("/entities")
+            .with_json({
+                "id": further_id + "x.testref_selfref._.ancestor_ref.v1",
+                "entityRef": derived_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            further_id + "x.testref_selfref._.ancestor_ref.v1",
+            False,
+            "reject ancestor when /$id is rebound to further-derived leaf",
+        ),
+        Step(
+            RunRequest("register chained type without authored schema reference")
+            .post("/entities")
+            .with_json({
+                "$$id": f"gts://{no_ref_id}",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "entityRef"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "entityRef": {"type": "string"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register standalone chained instance with arbitrary string")
+            .post("/entities")
+            .with_json({
+                "id": no_ref_id + "x.testref_selfref._.arbitrary.v1",
+                "entityRef": "not-a-gts-id",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            no_ref_id + "x.testref_selfref._.arbitrary.v1",
+            True,
+            "do not import /$id through chained identifier alone",
+        ),
+        Step(
+            RunRequest("register schema with inline composed /$id constraint")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_selfref._.inline.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{
+                    "type": "object",
+                    "required": ["id", "entityRef"],
+                    "properties": {
+                        "id": {"type": "string"},
+                        "entityRef": {"type": "string", "x-gts-ref": "/$$id"},
+                    },
+                }],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register inline composed self reference instance")
+            .post("/entities")
+            .with_json({
+                "id": (
+                    "gts.x.testref_selfref._.inline.v1~"
+                    "x.testref_selfref._.self.v1"
+                ),
+                "entityRef": "gts.x.testref_selfref._.inline.v1~",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            (
+                "gts.x.testref_selfref._.inline.v1~"
+                "x.testref_selfref._.self.v1"
+            ),
+            True,
+            "accept inline allOf /$id rooted at outer selected schema",
         ),
     ]
 
@@ -310,7 +564,7 @@ class TestCaseXGtsRef_WrongGtsFormat(HttpRunner):
             .assert_contains("body.error", "x-gts-ref validation failed")
             .assert_contains("body.error", "a.b.c")
         ),
-        # Register schema pointer to non-GTS const
+        # Reject unsupported pointer even when its target is not a GTS ID
         Step(
             RunRequest("register pointer schema")
             .post("/entities?validation=true")
@@ -330,10 +584,8 @@ class TestCaseXGtsRef_WrongGtsFormat(HttpRunner):
             .validate()
             .assert_equal("status_code", 422)
             .assert_equal("body.ok", False)
-            .assert_contains("body.error", "x-gts-ref validation failed")
-            .assert_contains("body.error", "a.b.c")
         ),
-        # Register schema pointer to non-GTS const, without validation
+        # Pointer syntax is rejected during registration without validation
         Step(
             RunRequest("register pointer schema")
             .post("/entities")
@@ -353,19 +605,6 @@ class TestCaseXGtsRef_WrongGtsFormat(HttpRunner):
             .validate()
             .assert_equal("status_code", 422)
             .assert_equal("body.ok", False)
-            .assert_contains("body.error", "alidation failed")
-            .assert_contains("body.error", "a.b.c")
-        ),
-        # Validate previous pointer to non-GTS const
-        Step(
-            RunRequest("validate pointer schema")
-            .post("/validate-instance")
-            .with_json({
-                "instance_id": "gts.x.testref_malformed._.pointer.v4~x.vendor._.ptr_ok.v1"
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
         ),
         Step(
             RunRequest("reject legacy dot-slash x-gts-ref pointer")
@@ -382,7 +621,7 @@ class TestCaseXGtsRef_WrongGtsFormat(HttpRunner):
             .assert_equal("status_code", 422)
             .assert_equal("body.ok", False)
         ),
-        # Register schema correct reference
+        # Reject unsupported pointer even when it resolves to a valid GTS ID
         Step(
             RunRequest("register pointer schema")
             .post("/entities?validation=true")
@@ -400,7 +639,8 @@ class TestCaseXGtsRef_WrongGtsFormat(HttpRunner):
                 "additionalProperties": False
             })
             .validate()
-            .assert_equal("status_code", 200)
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
         ),
     ]
 
@@ -2130,7 +2370,6 @@ class TestCaseXGtsRef_TupleAdditionalItems(HttpRunner):
                 "$$id": "gts://gts.x.testref_tuple._.holder.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
-                "constraintType": "gts.x.testref_tuple._.target.v1~",
                 "required": ["id", "refs"],
                 "properties": {
                     "id": {"type": "string"},
@@ -2139,7 +2378,7 @@ class TestCaseXGtsRef_TupleAdditionalItems(HttpRunner):
                         "items": [{"type": "string"}],
                         "additionalItems": {
                             "type": "string",
-                            "x-gts-ref": "/constraintType",
+                            "x-gts-ref": "gts.x.testref_tuple._.target.v1~",
                         },
                     },
                 },
@@ -2253,7 +2492,6 @@ class TestCaseXGtsRef_PrefixItems(HttpRunner):
                 "$$id": "gts://gts.x.testref_prefixitems._.holder.v1~",
                 "$$schema": "https://json-schema.org/draft/2020-12/schema",
                 "type": "object",
-                "constraintType": "gts.x.testref_prefixitems._.target.v1~",
                 "required": ["id", "refs"],
                 "properties": {
                     "id": {"type": "string"},
@@ -2262,7 +2500,7 @@ class TestCaseXGtsRef_PrefixItems(HttpRunner):
                         "prefixItems": [{"type": "string"}],
                         "items": {
                             "type": "string",
-                            "x-gts-ref": "/constraintType",
+                            "x-gts-ref": "gts.x.testref_prefixitems._.target.v1~",
                         },
                     },
                 },
@@ -2334,7 +2572,8 @@ class TestCaseXGtsRef_PrefixItems(HttpRunner):
 
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
-    TestCaseXGtsRef_JsonPointer().test_start()
+    TestCaseXGtsRef_UnsupportedPointers().test_start()
+    TestCaseXGtsRef_SelectedLeafSelfRef().test_start()
     TestCaseXGtsRef_WrongGtsFormat().test_start()
     TestCaseXGtsRef_OneOf().test_start()
     TestCaseXGtsRef_AnyOf().test_start()
