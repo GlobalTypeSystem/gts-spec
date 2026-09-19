@@ -26,6 +26,11 @@ class EntityRecorder:
         self.entities = {}
         self.results = {}
         self.entity_urls = {}
+        # Explicit per-entity validation state: "unknown" | "valid" | "invalid".
+        # A registered entity starts "unknown" and is promoted to valid/invalid
+        # the first time a validation verdict for it is seen (during the tests
+        # or in the explicit end-of-run pass).
+        self.status = {}
         self._original_request = None
 
     def pytest_configure(self, config):
@@ -64,32 +69,57 @@ class EntityRecorder:
         entity_id, kind = identify_entity(body)
         if entity_id is None:
             return
-        # Preserve the last successfully registered body. A rejected
-        # resubmission (e.g. 409 on changed content under an immutable
-        # registry) must not overwrite the object the server actually holds,
-        # otherwise the rejected replacement would be exported as valid.
-        rejected = response is not None and not response.ok
-        if rejected and entity_id in self.entities:
+        # A rejected registration did not change the server's stored entity, so
+        # it must not change the recorder's corresponding body or validation state.
+        if response is not None and not response.ok:
             return
+        # An accepted POST /entities carries no validation verdict. Record the
+        # submitted body and leave it unknown until explicit validation.
         self.entities[entity_id] = (kind, body)
-        if url is not None and response is not None and response.ok:
+        if url is not None:
             self.entity_urls[entity_id] = url
+        self.status.setdefault(entity_id, "unknown")
 
     def validate_unvalidated_entities(self):
-        validated_entity_ids = {entity_id for _, _, entity_id in self.results}
-        for entity_id in sorted(self.entity_urls.keys() - validated_entity_ids):
-            kind, _ = self.entities[entity_id]
-            path = (
-                "/validate-type-schema" if kind == "types" else "/validate-instance"
-            )
-            field = "type_id" if kind == "types" else "instance_id"
-            body = {field: entity_id}
+        """Explicitly validate every entity still in the "unknown" state.
+
+        These were registered during the test run but never had a validation
+        response observed for them, so their validity is unknown. Each is resolved
+        through the unified ``/validate-entity`` endpoint so the SERVER decides
+        whether the entity is a type-schema or an instance (via ``entity_type`` in
+        the response). The recorder never infers schema-vs-instance from the JSON
+        itself. The response promotes the entity to "valid"/"invalid" via
+        ``_record_validation``.
+        """
+        unknown_ids = sorted(
+            entity_id
+            for entity_id, state in self.status.items()
+            if state == "unknown" and entity_id in self.entity_urls
+        )
+        for entity_id in unknown_ids:
+            body = {"entity_id": entity_id}
             response = get_session().post(
-                urljoin(self.entity_urls[entity_id], path),
+                urljoin(self.entity_urls[entity_id], "/validate-entity"),
                 json=body,
                 timeout=30,
             )
-            self._record_validation(path, body, response)
+            self._record_validation("/validate-entity", body, response)
+
+    def print_summary(self):
+        """Print each entity's final valid/invalid/unknown state for reference."""
+        print("\n=== Entity validation summary ===")
+        for entity_id in sorted(self.status, key=lambda eid: (self.entities[eid][0], eid)):
+            kind, _ = self.entities[entity_id]
+            state = self.status[entity_id]
+            print(f"  [{state.upper():>7}] {kind:<9} {entity_id}")
+
+        counts = {"valid": 0, "invalid": 0, "unknown": 0}
+        for state in self.status.values():
+            counts[state] = counts.get(state, 0) + 1
+        print(
+            f"  -> {counts['valid']} valid, {counts['invalid']} invalid, "
+            f"{counts['unknown']} unknown"
+        )
 
     def _record_validation(self, path, body, response):
         result = parse_response(response)
@@ -109,17 +139,29 @@ class EntityRecorder:
         if entity is None:
             return
 
-        kind, _ = entity
-        if path == "/validate-entity":
+        # Classification is authoritative from the endpoint/response, never from
+        # the recorder's own inspection of the JSON:
+        #   - /validate-type-schema -> type-schema
+        #   - /validate-instance    -> instance
+        #   - /validate-entity      -> server-reported entity_type
+        if path == "/validate-type-schema":
+            kind = "types"
+        elif path == "/validate-instance":
+            kind = "instances"
+        else:
+            entity_type = result.get("entity_type")
             kind = (
                 "types"
-                if result.get("entity_type") == "schema"
-                else "instances" if result.get("entity_type") == "instance" else kind
+                if entity_type == "schema"
+                else "instances" if entity_type == "instance" else entity[0]
             )
+        self.results.pop((not result["ok"], kind, entity_id), None)
         self.results[(result["ok"], kind, entity_id)] = (
             entity[1],
             validation_error(result) if not result["ok"] else None,
         )
+        # Promote the entity out of the "unknown" state now that a verdict exists.
+        self.status[entity_id] = "valid" if result["ok"] else "invalid"
 
 
 def parse_json_body(kwargs):
@@ -189,6 +231,14 @@ def write_examples(output_dir, results):
         destination = (
             output_dir / validity / kind / output_filename(entity_id, kind, valid)
         )
+        obsolete_validity = "invalid" if valid else "valid"
+        obsolete = (
+            output_dir
+            / obsolete_validity
+            / kind
+            / output_filename(entity_id, kind, not valid)
+        )
+        obsolete.unlink(missing_ok=True)
         destination.parent.mkdir(parents=True, exist_ok=True)
         content = (
             json.dumps(body, indent=2, ensure_ascii=False) + "\n"
@@ -226,10 +276,13 @@ def main(argv=None):
     if args.gts_base_url:
         pytest_args.extend(["--gts-base-url", args.gts_base_url])
     exit_code = pytest.main(pytest_args, plugins=[recorder])
+    if exit_code != pytest.ExitCode.OK:
+        return -1
     recorder.validate_unvalidated_entities()
     written = write_examples(args.output, recorder.results)
+    recorder.print_summary()
     print(f"Generated {written} examples in {args.output}")
-    return exit_code
+    return 0
 
 
 if __name__ == "__main__":

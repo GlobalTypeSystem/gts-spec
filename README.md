@@ -1,5 +1,5 @@
-<!-- gts-spec-version: 0.13 -->
-> **VERSION**: GTS specification draft, version 0.13
+<!-- gts-spec-version: 0.14 -->
+> **VERSION**: GTS specification draft, version 0.14
 
 # Global Type System (GTS) Specification
 
@@ -116,6 +116,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 | 0.11 | Introduce term **GTS Type Schema** as the canonical definition of a GTS Type; remove the standalone `Schema` term from Terminology; rewrite `GTS Type` entry to name the abstract registered entity; rename `GTS Type Registry` → `GTS Registry` (registry now scopes both Type Schemas and well-known Instances). **Conformance tests for reference implementations** also updated: rename API endpoints `/validate-type` → `/validate-type-schema` and `/types` → `/type-schemas`; rename OpenAPI components `TypeRegister` → `TypeSchemaRegister`, `ValidateTypeRequest` → `ValidateTypeSchemaRequest`; rename request field `TypeSchemaRegister.schema` → `TypeSchemaRegister.type_schema`; rename helper `validate_type` → `validate_type_schema`. |
 | 0.12 | BREAKING: reframe GTS Type Schemas as a dialect-agnostic JSON Schema extension; the prior `$defs MUST NOT` and post-Draft-07-keyword restrictions are dropped; derivation compatibility and the finality guard use the chained `$id` alone, `allOf`+`$ref` recommended but not required (ADR-0001). `x-gts-traits-schema` becomes a JSON Schema subschema (object/`true`/`false`); the registry chain-aggregates declarations along the `$id` chain via `allOf` (ADR-0002). Trait completeness is keyed on `x-gts-abstract` and enforced on non-abstract types against the materialized effective traits object (ADR-0003). Trait-value merge follows JSON Merge Patch (RFC 7396); cross-descendant locking moves to standard JSON Schema `const` in `x-gts-traits-schema` (ADR-0004). The four document-level keywords (`x-gts-final`, `x-gts-abstract`, `x-gts-traits-schema`, `x-gts-traits`) MUST appear at the schema top level and are rejected (fail fast) when nested in a subschema (§9.7.1, §9.11). |
 | 0.13 | CORRECTION: Define compatibility through accepted-instance-set inclusion (§4.3) and separate **Type Derivation Compatibility** (§4.1, one-way) from **Type Schema Evolution Compatibility** (§4.2). This corrects OP#8 verdicts for unchanged inputs — notably for open content models, enums, and `const` identifier fields; implementations targeting 0.12 may need to update their compatibility checker. OP#8 reports the tri-state `compatible`, `incompatible`, or `unknown` for each relation, preserving an inconclusive check instead of conflating it with incompatibility. Tolerant-reader, casting, and default-materialization guarantees MUST be reported separately (§4.3). Content models are classified on the resolved effective schema, not on `additionalProperties` alone (§4.4). §4 restructured and renumbered; later sections unchanged. OP#8 conformance tests updated. |
+| 0.14 | BREAKING: generalize and tighten `x-gts-ref` matching (§9.6). The operand may be any GTS wildcard pattern (§10), not just `gts.*` — e.g. `gts.cf.core.am.*` or `...v1~*` — a concrete GTS identifier, or the reserved string `/$id`; every other slash-prefixed value is prohibited and registration MUST reject it. `/$id` resolves to the canonical top-level identifier of the leaf GTS Type Schema selected for validation and retains that root through inherited or composed constraints. Reference lookup and target validation policy remain implementation-specific; an implementation may expose modes such as `gts-ref-validation=none|presence|full`. `presence` requires registered targets without validating them, while `full` requires valid targets; for wildcard constraints, at least one registered target must satisfy the selected mode. Clarify that a `~`-terminated concrete reference matches the exact identifier and any derived identifier (`gts.x...v1~` ≡ `gts.x...v1~` or `gts.x...v1~*`), that abstract types still enforce the selected `x-gts-ref` mode, and that explicit validation requires GTS `$ref` targets to resolve. Reference conformance tests updated. |
 
 ## Terminology
 
@@ -1379,7 +1380,7 @@ Note: local JSON Pointer references (e.g. `"$ref": "#/definitions/Foo"` under Dr
 
 Implementation note: When `$ref` is expressed as `gts://...`, implementations should trim the `gts://` prefix and treat the remainder as the canonical GTS identifier for resolution, validation, comparison, and registry keys. The `gts://` prefix exists only to make `$ref` URI-compatible.
 
-The post-`gts://` content must therefore parse as a valid GTS identifier with no wildcards; otherwise the schema upload should be rejected.
+The post-`gts://` content must therefore parse as a valid GTS identifier with no wildcards; otherwise the schema upload should be rejected. Explicit type-schema validation succeeds only when every GTS `$ref` resolves to a registered, valid GTS Type Schema. Validity is transitive: the referenced Type Schema's own ancestors and references must also be valid.
 
 **JSON instances (well-known vs anonymous)**
 
@@ -1423,9 +1424,11 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 
 - **OP#13 - Schema Traits Validation**: Validate schema traits (`x-gts-traits-schema` / `x-gts-traits`). See section 9.7 for full semantics and validation rules.
 
+**Transitive validation rule:** A GTS Type or Instance is valid only if every entity on which its validation depends is also valid. Implementations MUST recursively validate the complete dependency closure, including a Type's `$id` ancestors and GTS `$ref` targets and an Instance's Type. A dependency's own ancestors and `$ref` targets are subject to the same rule; implementations MUST handle cycles without infinite recursion. Whether entities selected through `x-gts-ref` join this dependency closure is controlled by the implementation-specific policy in §9.6. Under the suggested policy, only `full` reference validation checks their validity; `none` and `presence` do not.
+
 ### 9.3 - GTS entities registration
 
-Implement simple GTS instances in-memory registry with optional GTS entities validation on registration. If "validation" parameter enabled, the entity registration action must ensure that all the GTS references are valid - identitfiers must match GTS pattern, refererred entities must be registered, the x-gts-ref references must be valid (see below)
+Implement a simple in-memory GTS entity registry with optional validation on registration. When validation is enabled, identifiers MUST satisfy their GTS syntax and matching rules, validation dependencies such as `$id` ancestors and GTS `$ref` targets MUST satisfy the transitive validation rule, and `x-gts-ref` constraints and values MUST satisfy the implementation's selected reference-validation policy under §9.6.
 
 ### 9.4 - CLI support
 
@@ -1443,20 +1446,36 @@ pytest ./tests
 
 ### 9.6 - `x-gts-ref` support
 
-Use `x-gts-ref` in GTS schemas (JSON schemas) to declare that a string field is a GTS entity reference, not an arbitrary string; validators must enforce this.
+Use `x-gts-ref` in GTS schemas (JSON schemas) to declare that a string field is a GTS entity reference, not an arbitrary string. The `x-gts-ref` operand MUST be a valid concrete GTS identifier, a GTS wildcard pattern (§10), or exactly the reserved string `/$id`; anything else makes the schema invalid. No other JSON Pointer or slash-prefixed form is supported.
+
+`x-gts-ref` has keyword semantics only when it is a member of a JSON Schema object at a schema location. A property with that name inside arbitrary JSON data held by `default`, `const`, `enum`, or `examples` is data, not an `x-gts-ref` keyword. Likewise, a key named `x-gts-ref` directly under `properties` is a property name; the schema value associated with that name is still traversed normally and may itself contain the `x-gts-ref` keyword. Implementations MUST traverse schema-valued applicator keywords according to the declared JSON Schema dialect and MUST NOT discover `x-gts-ref` by recursively scanning arbitrary JSON values.
 
 Allowed values:
-- `"x-gts-ref": "gts.*"` — field must be a valid GTS identifier (see OP#1); optionally resolve against a registry if available.
-- `"x-gts-ref": "/$id"` — relative self-reference; field value must equal the current schema’s `$id` without the `gts://` prefix ("/" refers to the JSON Schema document root, `$id` is its identifier). The referred field must be a GTS string or another `x-gts-ref` field.
+- `"x-gts-ref": "<gts-pattern>"` — **wildcard**. Any GTS wildcard pattern (§10); e.g. `gts.*`, `gts.cf.core.am.*`, or `gts.x.core.events.topic.v1~*`. The field value MUST be a syntactically valid GTS identifier (see OP#1) that matches the pattern.
+- `"x-gts-ref": "<gts-prefix>"` — **specific reference**, where `<gts-prefix>` is a concrete GTS identifier such as `gts.x.core.events.topic.v1~`. The field value MUST be a syntactically valid GTS identifier that begins with `<gts-prefix>` (a `startsWith` match, see §8.1/8.2). A prefix ending in `~` matches the identifier itself **and** any identifier derived from it: `gts.cf.core.iam.user.v1~` is equivalent to matching `gts.cf.core.iam.user.v1~` **or** `gts.cf.core.iam.user.v1~*` (see §3.5, §10).
+- `"x-gts-ref": "/$id"` — **selected-type self-reference**. Resolves to the top-level `$id` of the leaf (right-most derived) GTS Type Schema being validated, without `gts://`. This remains the root when the constraint is inherited through `$ref` or `allOf`. Rooted matching applies: the leaf and its descendants match; its ancestors and siblings do not. Use `const` for exact equality, or a literal GTS ID to keep the reference rooted at a specific base type.
+
+For example, if base type `A~` declares `x-gts-ref: "/$id"` and leaf type `A~B~` imports that constraint, validation against `A~B~` resolves the operand to `A~B~`. Values `A~B~` and `A~B~C` match; ancestor `A~` and sibling `A~D~` do not.
+
+Reference lookup and target validation are implementation-specific policy choices. Implementations are encouraged to expose a selectable policy; for example, an implementation might provide `gts-ref-validation=none|presence|full` with the following semantics:
+
+| Example mode | `x-gts-ref` behavior |
+|---|---|
+| `none` | Validate the `x-gts-ref` operand syntax and, when a field or materialized trait value is present, require a syntactically valid GTS identifier that matches the operand. Do not query the registry for either the operand or the value. |
+| `presence` | Apply `none`; additionally, a concrete operand identifies a registered GTS entity, a wildcard operand (including `gts.*`) matches at least one registered GTS entity, and each field or materialized trait value identifies a registered GTS entity by its exact identifier. Target validity is not checked. |
+| `full` | Apply `presence`; additionally, a concrete operand and each entity identified by a field or materialized trait value are valid under the transitive validation rule. A wildcard operand has at least one registered, valid matching entity; other matching entities may be invalid. |
+
 
 See examples in `./examples/modules` for typical patterns.
 
 Implementation notes:
 
 - Treating `x-gts-ref` like JSON Schema string constraints:
-  - When the value is a literal starting with `gts.` (e.g., `gts.x.core.modules.capability.v1~`), it can be enforced similarly to a `startsWith(...)` check by validating the instance value against the provided GTS prefix (sections 8.1/8.2). Implementations must also validate the GTS ID.
-  - When the value is a relative path like `./$id` or `./description`, resolve it as a JSON Pointer relative to the schema root. If the pointer doesn't resolve to a GTS string or another `x-gts-ref` field, an error must be reported.
-  - For nested paths (e.g., `./properties/id`), resolve the pointer accordinly to the field path in the JSON Schema document.
+  - For a wildcard pattern (e.g. `gts.*`, `gts.cf.core.am.*`), validate that the field value is a well-formed GTS ID (OP#1) and matches the pattern (§10).
+  - For a specific literal prefix (e.g. `gts.x.core.modules.capability.v1~`), enforce it similarly to a `startsWith(...)` check against the provided GTS prefix (sections 8.1/8.2), and validate that the value is a well-formed GTS ID.
+  - Treat `/$id` as a reserved operand, not as general JSON Pointer support. Resolve it directly from the canonical top-level `$id` of the selected leaf GTS Type Schema and strip `gts://` before matching.
+  - Reject every other slash-prefixed operand during registration. Implementations MUST NOT resolve schema-local paths or chain through another `x-gts-ref` value.
+  - Registry lookup and target validation for `x-gts-ref` are implementation-specific. Implementations may use policies such as `none`, `presence`, and `full` described above; operand syntax and the pointer prohibition are mandatory in every mode.
 
 
 ### 9.7 - GTS Type Schema Traits (`x-gts-traits-schema` / `x-gts-traits`)
@@ -1642,8 +1661,9 @@ Given an inheritance chain `S₀ → S₁ → … → Sₙ`:
   - See [`adr/0004-x-gts-traits-merge-strategy.md`](adr/0004-x-gts-traits-merge-strategy.md) for the rationale.
 
 - **Validation**
-  - **Completeness check** (OP#13, type-level): For types whose `x-gts-abstract` is not `true`, the registry MUST verify that the *materialized* effective traits object validates against the effective trait-schema using standard JSON Schema validation. "Materialized" means: defaults declared in the effective trait-schema for properties not present in the chain-merged effective traits object are substituted in before validation. If validation fails — in particular, if a `required` property of the effective trait-schema has no chain-assigned value and no default — the type fails OP#13 validation. Completeness is a property of the **type** itself, not of any instance: it is always enforced on the explicit validation endpoints (`/validate-type-schema`, `/validate-entity`), and is additionally enforced at registration **when validation is enabled** (`?validate=true`), per the common pattern described in §9.11.5. For types with `x-gts-abstract: true`, this completeness check is skipped; descendants are expected to close any unresolved required traits. See [`adr/0003-x-gts-traits-completeness.md`](adr/0003-x-gts-traits-completeness.md) for the rationale.
+  - **Completeness check** (OP#13, type-level): For types whose `x-gts-abstract` is not `true`, the registry MUST verify that the *materialized* effective traits object validates against the effective trait-schema using standard JSON Schema validation. "Materialized" means: defaults declared in the effective trait-schema for properties not present in the chain-merged effective traits object are substituted in before validation. If validation fails — in particular, if a `required` property of the effective trait-schema has no chain-assigned value and no default — the type fails OP#13 validation. Completeness is a property of the **type** itself, not of any instance: it is always enforced on the explicit validation endpoints (`/validate-type-schema`, `/validate-entity`), and is additionally enforced at registration **when validation is enabled** (`?validate=true`), per the common pattern described in §9.11.5. For types with `x-gts-abstract: true`, this completeness check is skipped: an abstract type MAY declare required trait properties without supplying defaults or `x-gts-traits` values, and descendants are expected to close them. Any trait value an abstract type does provide MUST still satisfy the effective trait-schema; abstractness permits incompleteness, not invalid values. See [`adr/0003-x-gts-traits-completeness.md`](adr/0003-x-gts-traits-completeness.md) for the rationale.
   - If the effective trait schema cannot be satisfied (e.g., contradictory constraints introduced across the chain), schema validation MUST fail.
+  - **Reference resolution of trait values** (`x-gts-ref`): when a trait property in the effective trait-schema is annotated with `x-gts-ref` (§9.6), the corresponding value in the *materialized* effective traits object MUST satisfy the implementation's selected reference-validation policy. This applies to the value in force at validation time regardless of which layer supplied it — a value inherited from an ancestor's `x-gts-traits` (or from a trait-schema `default`) is checked exactly as if the validated type had declared it directly. Operand syntax and value syntax/matching are always enforced; an implementation using the suggested modes additionally enforces registry presence for `presence` and `full`, and target validity only for `full`. **Unlike the completeness check above, reference checking is NOT skipped for `x-gts-abstract` types**: an abstract type still applies the selected policy even though a descendant may later override its value. This check runs during type and entity validation, and during registration when validation is enabled.
 
 **Example — descendant override and `const` lock:**
 

@@ -3,6 +3,7 @@ from .helpers.http_run_helpers import (
     register as _register,
     register_derived as _register_derived,
     register_derived_redeclared as _register_derived_redeclared,
+    register_instance as _register_instance,
     validate_type_schema as _validate_type_schema,
 )
 from httprunner import HttpRunner, Config, Step, RunRequest
@@ -2593,6 +2594,200 @@ class TestCaseTestOp12_ConstViolatesMinimum(HttpRunner):
     ]
 
 
+class TestCaseOp12_DerivedSchemaRefTargetMissing(HttpRunner):
+    """Explicit validation must resolve references in a derived schema."""
+
+    config = Config("OP#12 - Derived schema reference target missing").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refmissing.base.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register derivation base",
+        ),
+        _register(
+            (
+                "gts://gts.x.test12.refmissing.base.v1~"
+                "x.test12._.host.v1~"
+            ),
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.refmissing.target.v1~"},
+                ],
+            },
+            "register derived schema referencing missing type",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refmissing.base.v1~x.test12._.host.v1~",
+            False,
+            "validate should fail - GTS reference target is missing",
+        ),
+    ]
+
+
+class TestCaseOp12_DerivedSchemaRefTargetInvalid(HttpRunner):
+    """Explicit validation must recursively validate referenced GTS types."""
+
+    config = Config("OP#12 - Derived schema reference target invalid").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refinvalid.target.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                    "required": ["retention"],
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register invalid referenced type with unresolved trait",
+        ),
+        _register(
+            "gts://gts.x.test12.refinvalid.host.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register valid derivation base",
+        ),
+        _register(
+            "gts://gts.x.test12.refinvalid.host.v1~x.test12._.derived.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.refinvalid.target.v1~"},
+                ],
+            },
+            "register derived schema referencing invalid type",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refinvalid.target.v1~",
+            False,
+            "validate referenced type - required retention is unresolved",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refinvalid.host.v1~x.test12._.derived.v1~",
+            False,
+            "validate derived - referenced type is invalid",
+        ),
+    ]
+
+
+class TestCaseOp12_SchemaRefTargetHasInvalidAncestor(HttpRunner):
+    """Transitive $ref validation follows the target's ancestor chain."""
+
+    config = Config("OP#12 - Referenced type has invalid ancestor").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refchain.target.v1~",
+            {
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {"retention": {"type": "string"}},
+                    "required": ["retention"],
+                },
+                "properties": {"id": {"type": "string"}},
+            },
+            "register invalid target base with unresolved trait",
+        ),
+        _register_derived(
+            "gts://gts.x.test12.refchain.target.v1~x.test12._.leaf.v1~",
+            "gts://gts.x.test12.refchain.target.v1~",
+            {
+                "type": "object",
+                "x-gts-traits": {"retention": "P30D"},
+            },
+            "register locally complete target descendant",
+        ),
+        _register(
+            "gts://gts.x.test12.refchain.host.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {
+                        "$$ref": (
+                            "gts://gts.x.test12.refchain.target.v1~"
+                            "x.test12._.leaf.v1~"
+                        )
+                    },
+                ],
+            },
+            "register host referencing target descendant",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refchain.target.v1~x.test12._.leaf.v1~",
+            False,
+            "validate target descendant - its ancestor is invalid",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refchain.host.v1~",
+            False,
+            "validate host - referenced target has invalid ancestor",
+        ),
+    ]
+
+
+class TestCaseOp12_DerivedSchemaRefPartialTargetMissing(HttpRunner):
+    """Every segment of a referenced GTS type chain must exist."""
+
+    config = Config("OP#12 - Partial reference target missing").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.refpartial.target.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register first segment of referenced type chain",
+        ),
+        _register(
+            "gts://gts.x.test12.refpartial.host.v1~",
+            {"type": "object", "properties": {"id": {"type": "string"}}},
+            "register derivation base",
+        ),
+        _register(
+            "gts://gts.x.test12.refpartial.host.v1~x.test12._.derived.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {
+                        "$$ref": (
+                            "gts://gts.x.test12.refpartial.target.v1~"
+                            "x.test12._.missing.v1~"
+                        )
+                    },
+                ],
+            },
+            "register derived schema referencing missing second segment",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.refpartial.host.v1~x.test12._.derived.v1~",
+            False,
+            "validate should fail - second reference segment is missing",
+        ),
+    ]
+
+
 class TestCaseValidateEntity_ValidInstance(HttpRunner):
     """Validate Entity: Valid instance through unified endpoint"""
     config = Config("Validate Entity - Valid Instance").base_url(
@@ -4232,6 +4427,90 @@ class TestCaseOp12_Redeclared_ThreeLevelChainCompatible(HttpRunner):
             ),
             True,
             "validate 3-level redeclared leaf - transitively compatible",
+        ),
+    ]
+
+
+class TestCaseOp12_SchemaRefTargetDependencyMissing(HttpRunner):
+    """Explicit validation must recursively resolve a referenced type's $refs."""
+
+    config = Config("OP#12 - Referenced schema dependency missing").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.reftransitive.target.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.reftransitive.missing.v1~"},
+                ],
+            },
+            "register target schema referencing a missing dependency",
+        ),
+        _register(
+            "gts://gts.x.test12.reftransitive.host.v1~",
+            {
+                "type": "object",
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12.reftransitive.target.v1~"},
+                ],
+            },
+            "register host schema referencing the target",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.reftransitive.target.v1~",
+            False,
+            "validate target - its reference dependency is missing",
+        ),
+        _validate_type_schema(
+            "gts.x.test12.reftransitive.host.v1~",
+            False,
+            "validate host - referenced target has a missing dependency",
+        ),
+    ]
+
+
+class TestCaseOp12_ValidateTypeSchemaRejectsInstanceID(HttpRunner):
+    """Reject an existing GTS Instance passed to the Type Schema validator.
+
+    The registry contains both the instance and its valid Type Schema, so this is
+    not a missing-entity or invalid-instance test. It verifies that
+    ``POST /validate-type-schema`` checks the referenced entity's kind and does
+    not validate an Instance as though it were a Type Schema (or silently
+    validate the Instance's declared type instead). The request itself is valid,
+    so the endpoint returns HTTP 200 with ``ok: false``.
+    """
+
+    config = Config("OP#12 - Reject instance on type-schema endpoint").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    instance_id = "gts.x.test12.kind.event.v1~x.test12._.example.v1"
+    teststeps = [
+        _register(
+            "gts://gts.x.test12.kind.event.v1~",
+            {"type": "object", "properties": {"name": {"type": "string"}}},
+            "register instance type",
+        ),
+        _register_instance(
+            {"id": instance_id, "name": "example"},
+            "register valid instance",
+        ),
+        Step(
+            RunRequest("reject instance ID as type schema")
+            .post("/validate-type-schema")
+            .with_json({"type_id": instance_id})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
         ),
     ]
 

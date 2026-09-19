@@ -15,7 +15,7 @@ It is intentionally split by dialect:
 - `types/gts.x.advanced.schema.login_event.v1~.schema.json`
   - Abstract base type with:
     - top-level `x-gts-traits-schema`
-    - root JSON Pointer `x-gts-ref` (`"/$id"`)
+    - selected-type self-reference with the reserved `x-gts-ref` operand `"/$id"`
     - required format assertions (`uuid`, `email`, `date-time`, `date`, `time`,
       `uri`, `hostname`, `ipv4`, `ipv6`, `regex`)
 - `types/gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~.schema.json`

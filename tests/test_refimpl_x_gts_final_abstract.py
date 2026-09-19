@@ -821,7 +821,7 @@ class TestCaseInteraction_FinalWithTraitsFullyResolved(HttpRunner):
                     "type": "object",
                     "properties": {
                         "retention": {"type": "string", "default": "P30D"},
-                        "priority": {"type": "integer"},
+                        "priority": {"type": "integer", "default": 1},
                     },
                     "required": ["priority"],
                 },

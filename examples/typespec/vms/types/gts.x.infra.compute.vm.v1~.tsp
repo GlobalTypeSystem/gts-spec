@@ -51,7 +51,7 @@ model BaseVM {
    * Reference to gts.x.infra.compute.vm_state.v1~ type.
    * See states/ directory for available state definitions.
    */
-  @extension("x-gts-ref", "/gts.x.infra.compute.vm_state.v1~")
+  @extension("x-gts-ref", "gts.x.infra.compute.vm_state.v1~")
   powerState: string;
 
   /**

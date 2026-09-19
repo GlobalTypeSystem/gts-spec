@@ -3,7 +3,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "x-gts-abstract": true,
   "title": "Advanced Login Event (Base)",
-  "description": "Abstract base schema illustrating Draft-07 format assertions, root-pointer x-gts-ref, and trait schema declaration.",
+  "description": "Abstract base schema illustrating Draft-07 format assertions, selected-type x-gts-ref, and trait schema declaration.",
   "type": "object",
   "required": [
     "id",
