@@ -67,11 +67,11 @@
               "type": "string",
               "enum": [
                 "none",
-                "presence",
-                "full"
+                "any-present",
+                "any-valid"
               ],
               "title": "Ref Validation",
-              "default": "full"
+              "default": "any-valid"
             },
             "description": "x-gts-ref validation mode used when validate=true",
             "name": "gts-ref-validation",
@@ -452,11 +452,11 @@
               "type": "string",
               "enum": [
                 "none",
-                "presence",
-                "full"
+                "any-present",
+                "any-valid"
               ],
               "title": "Ref Validation",
-              "default": "full"
+              "default": "any-valid"
             },
             "description": "x-gts-ref validation mode",
             "name": "gts-ref-validation",
@@ -514,11 +514,11 @@
               "type": "string",
               "enum": [
                 "none",
-                "presence",
-                "full"
+                "any-present",
+                "any-valid"
               ],
               "title": "Ref Validation",
-              "default": "full"
+              "default": "any-valid"
             },
             "description": "x-gts-ref validation mode",
             "name": "gts-ref-validation",
@@ -576,11 +576,11 @@
               "type": "string",
               "enum": [
                 "none",
-                "presence",
-                "full"
+                "any-present",
+                "any-valid"
               ],
               "title": "Ref Validation",
-              "default": "full"
+              "default": "any-valid"
             },
             "description": "x-gts-ref validation mode",
             "name": "gts-ref-validation",

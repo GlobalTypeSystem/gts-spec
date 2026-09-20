@@ -372,7 +372,7 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
     materialized traits) is skipped for x-gts-abstract types; the separate
     "reference resolution of trait values" rule does NOT exempt abstract types.
     An unregistered constraint therefore passes in ``none`` mode and fails in
-    ``presence`` and ``full`` modes, even though a descendant may later supply
+    ``any-present`` and ``any-valid`` modes, even though a descendant may later supply
     its own x-gts-ref value.
     """
     config = Config(
@@ -411,14 +411,14 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
         _validate_type_schema(
             "gts.x.test13.absref.event.v1~",
             False,
-            "presence mode rejects missing abstract constraint target",
-            gts_ref_validation="presence",
+            "any-present mode rejects missing abstract constraint target",
+            gts_ref_validation="any-present",
         ),
         _validate_type_schema(
             "gts.x.test13.absref.event.v1~",
             False,
-            "full mode rejects missing abstract constraint target",
-            gts_ref_validation="full",
+            "any-valid mode rejects missing abstract constraint target",
+            gts_ref_validation="any-valid",
         ),
     ]
 
@@ -483,7 +483,7 @@ class TestCaseOp13_TraitRef_AbstractRefValueUnregistered(HttpRunner):
     """Exercise all modes for an abstract type's unregistered trait target.
 
     Abstract completeness does not change the selected x-gts-ref validation
-    mode: ``none`` skips lookup, while ``presence`` and ``full`` require it.
+    mode: ``none`` skips lookup, while ``any-present`` and ``any-valid`` require it.
     """
     config = Config(
         "OP#13 x-gts-ref: abstract resolves declared trait ref values"
@@ -539,14 +539,14 @@ class TestCaseOp13_TraitRef_AbstractRefValueUnregistered(HttpRunner):
         _validate_type_schema(
             "gts.x.test13.absrefv.event.v1~",
             False,
-            "presence mode rejects missing abstract trait target",
-            gts_ref_validation="presence",
+            "any-present mode rejects missing abstract trait target",
+            gts_ref_validation="any-present",
         ),
         _validate_type_schema(
             "gts.x.test13.absrefv.event.v1~",
             False,
-            "full mode rejects missing abstract trait target",
-            gts_ref_validation="full",
+            "any-valid mode rejects missing abstract trait target",
+            gts_ref_validation="any-valid",
         ),
     ]
 
@@ -623,14 +623,14 @@ class TestCaseOp13_TraitRef_AbstractRefValueValidationModes(HttpRunner):
         _validate_type_schema(
             "gts.x.test13.absrefpresent.event.v1~",
             True,
-            "presence mode accepts present invalid abstract trait target",
-            gts_ref_validation="presence",
+            "any-present mode accepts present invalid abstract trait target",
+            gts_ref_validation="any-present",
         ),
         _validate_type_schema(
             "gts.x.test13.absrefpresent.event.v1~",
             False,
-            "full mode rejects invalid abstract trait target",
-            gts_ref_validation="full",
+            "any-valid mode rejects invalid abstract trait target",
+            gts_ref_validation="any-valid",
         ),
     ]
 
@@ -6247,9 +6247,9 @@ class TestCaseOp13_Traits_RegexEcma262(HttpRunner):
 #     constraint matches the exact id and any derived id).
 #
 # Operand/value syntax and matching are always enforced. Registry lookup is
-# skipped by `none`; `presence` requires registered constraint and value targets;
-# and `full` additionally validates required targets. For wildcard constraints,
-# `presence` needs one registered match and `full` needs one valid match.
+# skipped by `none`; `any-present` requires registered constraint and value targets;
+# and `any-valid` additionally validates required targets. For wildcard constraints,
+# `any-present` needs one registered match and `any-valid` needs one valid match.
 #
 # The inherited cases (a/b/c) below also exercise trait inheritance: an
 # intermediate "audit" type supplies topicRef via x-gts-traits and is itself
@@ -6260,7 +6260,7 @@ class TestCaseOp13_Traits_RegexEcma262(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
-    """§9.6 wildcard: exercise registry existence under the default full mode.
+    """§9.6 wildcard: exercise registry existence under the default any-valid mode.
 
     A topicRef whose value is a well-formed GTS id that matches the pattern but
     is never registered fails; a value identifying a registered valid entity

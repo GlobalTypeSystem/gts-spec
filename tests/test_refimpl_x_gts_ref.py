@@ -1690,14 +1690,14 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
         _validate_instance(
             "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1",
             False,
-            "presence mode rejects matching unregistered wildcard value",
-            gts_ref_validation="presence",
+            "any-present mode rejects matching unregistered wildcard value",
+            gts_ref_validation="any-present",
         ),
         _validate_instance(
             "gts.x.testref_wild._.holder.v1~x.vendor._.ghost.v1",
             False,
-            "full mode rejects matching unregistered wildcard value",
-            gts_ref_validation="full",
+            "any-valid mode rejects matching unregistered wildcard value",
+            gts_ref_validation="any-valid",
         ),
         # Negative 2: valid GTS id but does not match the wildcard family.
         Step(
@@ -1955,19 +1955,19 @@ class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
         _validate_instance(
             "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
             True,
-            "presence mode accepts present invalid referenced instance",
-            gts_ref_validation="presence",
+            "any-present mode accepts present invalid referenced instance",
+            gts_ref_validation="any-present",
         ),
         _validate_instance(
             "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
             False,
-            "full mode rejects invalid referenced instance",
-            gts_ref_validation="full",
+            "any-valid mode rejects invalid referenced instance",
+            gts_ref_validation="any-valid",
         ),
         _validate_instance(
             "gts.x.testref_validity._.holder.v1~x.vendor._.invalid.v1",
             False,
-            "default mode remains full",
+            "default mode remains any-valid",
         ),
     ]
 
@@ -2028,19 +2028,19 @@ class TestCaseXGtsRef_ConstraintValidationModes(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_constraint._.holder.v1~",
             True,
-            "presence mode accepts present invalid constraint target",
-            gts_ref_validation="presence",
+            "any-present mode accepts present invalid constraint target",
+            gts_ref_validation="any-present",
         ),
         _validate_type_schema(
             "gts.x.testref_constraint._.holder.v1~",
             False,
-            "full mode rejects invalid constraint target",
-            gts_ref_validation="full",
+            "any-valid mode rejects invalid constraint target",
+            gts_ref_validation="any-valid",
         ),
         _validate_type_schema(
             "gts.x.testref_constraint._.holder.v1~",
             False,
-            "default mode remains full",
+            "default mode remains any-valid",
         ),
     ]
 
@@ -2080,14 +2080,14 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_wildpresence._.empty_holder.v1~",
             False,
-            "presence mode rejects wildcard constraint with no registered match",
-            gts_ref_validation="presence",
+            "any-present mode rejects wildcard constraint with no registered match",
+            gts_ref_validation="any-present",
         ),
         _validate_type_schema(
             "gts.x.testref_wildpresence._.empty_holder.v1~",
             False,
-            "full mode rejects wildcard constraint with no registered match",
-            gts_ref_validation="full",
+            "any-valid mode rejects wildcard constraint with no registered match",
+            gts_ref_validation="any-valid",
         ),
         Step(
             RunRequest("register invalid wildcard target type")
@@ -2155,14 +2155,14 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_wildvalidity._.holder.v1~",
             True,
-            "presence mode accepts a registered invalid wildcard match",
-            gts_ref_validation="presence",
+            "any-present mode accepts a registered invalid wildcard match",
+            gts_ref_validation="any-present",
         ),
         _validate_type_schema(
             "gts.x.testref_wildvalidity._.holder.v1~",
             False,
-            "full mode rejects wildcard with only invalid registered matches",
-            gts_ref_validation="full",
+            "any-valid mode rejects wildcard with only invalid registered matches",
+            gts_ref_validation="any-valid",
         ),
         Step(
             RunRequest("register valid wildcard target type")
@@ -2178,8 +2178,8 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_wildvalidity._.holder.v1~",
             True,
-            "full mode accepts wildcard with at least one valid registered match",
-            gts_ref_validation="full",
+            "any-valid mode accepts wildcard with at least one valid registered match",
+            gts_ref_validation="any-valid",
         ),
         Step(
             RunRequest("register wildcard holder referencing invalid instance")
@@ -2211,14 +2211,14 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
         _validate_instance(
             "gts.x.testref_wildvalidity._.holder.v1~x.vendor._.invalid.v1",
             True,
-            "presence mode accepts present invalid wildcard target",
-            gts_ref_validation="presence",
+            "any-present mode accepts present invalid wildcard target",
+            gts_ref_validation="any-present",
         ),
         _validate_instance(
             "gts.x.testref_wildvalidity._.holder.v1~x.vendor._.invalid.v1",
             False,
-            "full mode rejects invalid wildcard target value",
-            gts_ref_validation="full",
+            "any-valid mode rejects invalid wildcard target value",
+            gts_ref_validation="any-valid",
         ),
     ]
 
@@ -2267,8 +2267,8 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
             .assert_equal("body.ok", True)
         ),
         Step(
-            RunRequest("presence mode rejects missing constraint target")
-            .post("/entities?validate=true&gts-ref-validation=presence")
+            RunRequest("any-present mode rejects missing constraint target")
+            .post("/entities?validate=true&gts-ref-validation=any-present")
             .with_json({
                 "$$id": "gts://gts.x.testref_regmode._.presence_missing.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
@@ -2285,8 +2285,8 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
             .assert_equal("body.ok", False)
         ),
         Step(
-            RunRequest("presence mode registers holder with invalid constraint target")
-            .post("/entities?validate=true&gts-ref-validation=presence")
+            RunRequest("any-present mode registers holder with invalid constraint target")
+            .post("/entities?validate=true&gts-ref-validation=any-present")
             .with_json({
                 "$$id": "gts://gts.x.testref_regmode._.presence.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
@@ -2303,8 +2303,8 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
             .assert_equal("body.ok", True)
         ),
         Step(
-            RunRequest("full mode rejects invalid constraint target")
-            .post("/entities?validate=true&gts-ref-validation=full")
+            RunRequest("any-valid mode rejects invalid constraint target")
+            .post("/entities?validate=true&gts-ref-validation=any-valid")
             .with_json({
                 "$$id": "gts://gts.x.testref_regmode._.full.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
