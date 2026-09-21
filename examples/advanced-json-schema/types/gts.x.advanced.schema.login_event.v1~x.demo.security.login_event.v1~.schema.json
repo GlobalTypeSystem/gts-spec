@@ -14,9 +14,9 @@
           "const": "gts.x.advanced.schema.login_event.v1~x.demo.security.login_event.v1~"
         },
         "canonical_type": {
-          "description": "Shows x-gts-ref pointing to a local JSON Pointer target that resolves to a GTS ID string.",
+          "description": "Uses the selected derived type as the rooted GTS reference constraint.",
           "type": "string",
-          "x-gts-ref": "/allOf/1/properties/type/const"
+          "x-gts-ref": "/$id"
         },
         "payload": {
           "type": "object",

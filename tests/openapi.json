@@ -60,6 +60,22 @@
             },
             "name": "validate",
             "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "any-present",
+                "any-valid"
+              ],
+              "title": "Ref Validation",
+              "default": "any-valid"
+            },
+            "description": "x-gts-ref validation mode used when validate=true",
+            "name": "gts-ref-validation",
+            "in": "query"
           }
         ],
         "requestBody": {
@@ -429,6 +445,24 @@
       "post": {
         "summary": "Validate instance by GTS ID",
         "operationId": "validate_instance_validate_instance_post",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "any-present",
+                "any-valid"
+              ],
+              "title": "Ref Validation",
+              "default": "any-valid"
+            },
+            "description": "x-gts-ref validation mode",
+            "name": "gts-ref-validation",
+            "in": "query"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -473,6 +507,24 @@
       "post": {
         "summary": "Validate that a derived GTS Type Schema correctly extends its base chain",
         "operationId": "validate_type_schema_validate_type_schema_post",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "any-present",
+                "any-valid"
+              ],
+              "title": "Ref Validation",
+              "default": "any-valid"
+            },
+            "description": "x-gts-ref validation mode",
+            "name": "gts-ref-validation",
+            "in": "query"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -517,6 +569,24 @@
       "post": {
         "summary": "Validate entity (instance or type schema) by GTS Identifier",
         "operationId": "validate_entity_validate_entity_post",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "any-present",
+                "any-valid"
+              ],
+              "title": "Ref Validation",
+              "default": "any-valid"
+            },
+            "description": "x-gts-ref validation mode",
+            "name": "gts-ref-validation",
+            "in": "query"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

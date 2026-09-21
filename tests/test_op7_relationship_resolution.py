@@ -129,6 +129,7 @@ class TestCaseTestOp7SchemaGraph_BrokenReference(HttpRunner):
             .with_params(**{"gts_id": "gts.x.test7.broken.schema.v1.0~"})
             .validate()
             .assert_equal("status_code", 200)
+            .assert_equal("body.id", "gts.x.test7.broken.schema.v1.0~")
         ),
     ]
 

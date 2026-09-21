@@ -5,6 +5,7 @@ import pytest
 from .generate_examples import (
     EntityRecorder,
     identify_entity,
+    main,
     validation_error,
     write_examples,
 )
@@ -83,9 +84,14 @@ def test_recorder_validates_registered_entities_missing_explicit_validation(monk
     )
     calls = []
 
+    # The unvalidated entities are resolved through the unified /validate-entity
+    # endpoint; the server (mocked here) reports whether each is a schema or an
+    # instance via `entity_type`, so the recorder never classifies the JSON.
     def post(request_url, **kwargs):
         calls.append((request_url, kwargs))
-        return Response({"ok": True})
+        entity_id = kwargs["json"]["entity_id"]
+        entity_type = "schema" if entity_id.endswith("~") else "instance"
+        return Response({"ok": True, "entity_type": entity_type})
 
     fake_session = types.SimpleNamespace(post=post)
     monkeypatch.setattr(
@@ -96,12 +102,12 @@ def test_recorder_validates_registered_entities_missing_explicit_validation(monk
 
     assert calls == [
         (
-            "http://gts.example/validate-type-schema",
-            {"json": {"type_id": base_type_id}, "timeout": 30},
+            "http://gts.example/validate-entity",
+            {"json": {"entity_id": base_type_id}, "timeout": 30},
         ),
         (
-            "http://gts.example/validate-instance",
-            {"json": {"instance_id": instance_id}, "timeout": 30},
+            "http://gts.example/validate-entity",
+            {"json": {"entity_id": instance_id}, "timeout": 30},
         ),
     ]
     assert recorder.results[(True, "types", base_type_id)] == (
@@ -109,6 +115,110 @@ def test_recorder_validates_registered_entities_missing_explicit_validation(monk
         None,
     )
     assert recorder.results[(True, "instances", instance_id)] == ({"id": instance_id}, None)
+
+
+def test_recorder_keeps_only_latest_validation_verdict():
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.thing.v1~"
+    body = {"$id": f"gts://{type_id}"}
+
+    recorder._record_entity(body)
+    recorder._record_validation(
+        "/validate-type-schema", {"type_id": type_id}, Response({"ok": True})
+    )
+    recorder._record_validation(
+        "/validate-type-schema",
+        {"type_id": type_id},
+        Response({"ok": False, "error": "missing dependency"}),
+    )
+
+    assert recorder.results == {
+        (False, "types", type_id): (body, "missing dependency")
+    }
+
+
+def test_registration_marks_entity_unknown_until_verdict():
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.thing.v1~"
+    url = "http://gts.example/entities"
+
+    recorder._record_entity({"$id": f"gts://{type_id}"}, url, Response({}, ok=True))
+    assert recorder.status == {type_id: "unknown"}
+
+    recorder._record_validation(
+        "/validate-type-schema", {"type_id": type_id}, Response({"ok": True})
+    )
+    assert recorder.status == {type_id: "valid"}
+
+
+def test_rejected_registration_is_not_recorded():
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.rejected.v1~"
+
+    recorder._record_entity(
+        {"$id": f"gts://{type_id}"},
+        "http://gts.example/entities",
+        Response({}, ok=False),
+    )
+
+    assert recorder.entities == {}
+    assert recorder.entity_urls == {}
+    assert recorder.status == {}
+
+
+def test_rejected_reregistration_preserves_accepted_body_and_verdict():
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.thing.v1~"
+    original = {"$id": f"gts://{type_id}", "title": "original"}
+    changed = {"$id": f"gts://{type_id}", "title": "rejected replacement"}
+    url = "http://gts.example/entities"
+
+    recorder._record_entity(original, url, Response({}, ok=True))
+    recorder._record_validation(
+        "/validate-type-schema", {"type_id": type_id}, Response({"ok": True})
+    )
+    recorder._record_entity(changed, url, Response({}, ok=False))
+
+    assert recorder.entities[type_id] == ("types", original)
+    assert recorder.entity_urls[type_id] == url
+    assert recorder.status[type_id] == "valid"
+    assert recorder.results[(True, "types", type_id)] == (original, None)
+
+
+def test_unvalidated_entity_without_bool_verdict_stays_unknown(monkeypatch):
+    recorder = EntityRecorder()
+    type_id = "gts.x.demo._.mystery.v1~"
+    url = "http://gts.example/entities"
+
+    recorder._record_entity({"$id": f"gts://{type_id}"}, url, Response({}, ok=True))
+
+    # Server responds without a boolean `ok`, so the verdict stays unknown.
+    monkeypatch.setattr(
+        "tests.generate_examples.get_session",
+        lambda: types.SimpleNamespace(post=lambda *a, **k: Response({"pending": True})),
+    )
+
+    recorder.validate_unvalidated_entities()
+
+    assert recorder.results == {}
+    assert recorder.status == {type_id: "unknown"}
+
+
+def test_main_returns_minus_one_without_writing_when_pytest_fails(
+    monkeypatch, tmp_path
+):
+    def unexpected_call(*args, **kwargs):
+        raise AssertionError("example post-processing must not run after test failure")
+
+    monkeypatch.setattr("tests.generate_examples.pytest.main", lambda *args, **kwargs: 1)
+    monkeypatch.setattr(
+        EntityRecorder, "validate_unvalidated_entities", unexpected_call
+    )
+    monkeypatch.setattr("tests.generate_examples.write_examples", unexpected_call)
+
+    output = tmp_path / "examples"
+    assert main(["--output", str(output), "tests/test_generate_examples.py"]) == -1
+    assert not output.exists()
 
 
 def test_write_examples_uses_validity_and_entity_kind_directories(tmp_path):
@@ -123,8 +233,15 @@ def test_write_examples_uses_validity_and_entity_kind_directories(tmp_path):
         ),
     }
 
+    stale_path = (
+        tmp_path / "valid/instances/gts.x.demo._.thing.v1~x.demo._.example.v1.json"
+    )
+    stale_path.parent.mkdir(parents=True)
+    stale_path.write_text("stale", encoding="utf-8")
+
     assert write_examples(tmp_path, results) == 2
     assert (tmp_path / "valid/types/gts.x.demo._.thing.v1~.schema.json").is_file()
+    assert not stale_path.exists()
     invalid_path = (
         tmp_path / "invalid/instances/gts.x.demo._.thing.v1~x.demo._.example.v1.jsonc"
     )

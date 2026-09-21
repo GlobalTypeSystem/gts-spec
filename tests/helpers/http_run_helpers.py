@@ -4,7 +4,9 @@ Provides reusable Step builders for registering and validating schemas,
 instances, and entities via the GTS HTTP API.
 """
 
-from httprunner import Step, RunRequest
+from httprunner import Config, HttpRunner, RunRequest, RunTestCase, Step
+
+from ..conftest import get_gts_base_url
 
 
 def register(gts_id, schema_body, label="register schema"):
@@ -129,25 +131,39 @@ def register_instance(instance_body, label="register instance"):
     )
 
 
-def validate_type_schema(type_id, expect_ok, label="validate type schema"):
-    """Validate a derived GTS Type Schema via POST /validate-type-schema."""
-    step = (
-        RunRequest(label)
-        .post("/validate-type-schema")
-        .with_json({"type_id": type_id})
+def validate_type_schema(
+    type_id, expect_ok, label="validate type schema", gts_ref_validation=None
+):
+    """Validate a type schema through the specific and unified endpoints."""
+    specific = RunRequest(f"{label} via validate-type-schema").post(
+        "/validate-type-schema"
+    )
+    if gts_ref_validation is not None:
+        specific = specific.with_params(**{"gts-ref-validation": gts_ref_validation})
+    specific = (
+        specific.with_json({"type_id": type_id})
         .validate()
         .assert_equal("status_code", 200)
         .assert_equal("body.ok", expect_ok)
     )
-    return Step(step)
+    return _dual_validation_step(
+        type_id, expect_ok, label, "schema", specific, gts_ref_validation
+    )
 
 
-def validate_entity(entity_id, expect_ok, label="validate entity", expected_entity_type=None):
+def validate_entity(
+    entity_id,
+    expect_ok,
+    label="validate entity",
+    expected_entity_type=None,
+    gts_ref_validation=None,
+):
     """Validate an entity via POST /validate-entity."""
+    request = RunRequest(label).post("/validate-entity")
+    if gts_ref_validation is not None:
+        request = request.with_params(**{"gts-ref-validation": gts_ref_validation})
     step = (
-        RunRequest(label)
-        .post("/validate-entity")
-        .with_json({"entity_id": entity_id})
+        request.with_json({"entity_id": entity_id})
         .validate()
         .assert_equal("status_code", 200)
         .assert_equal("body.ok", expect_ok)
@@ -157,16 +173,46 @@ def validate_entity(entity_id, expect_ok, label="validate entity", expected_enti
     return Step(step)
 
 
-def validate_instance(instance_id, expect_ok, label="validate instance", expected_id=None):
-    """Validate an instance via POST /validate-instance."""
-    step = (
-        RunRequest(label)
-        .post("/validate-instance")
-        .with_json({"instance_id": instance_id})
+def validate_instance(
+    instance_id,
+    expect_ok,
+    label="validate instance",
+    expected_id=None,
+    gts_ref_validation=None,
+):
+    """Validate an instance through the specific and unified endpoints."""
+    specific = RunRequest(f"{label} via validate-instance").post(
+        "/validate-instance"
+    )
+    if gts_ref_validation is not None:
+        specific = specific.with_params(**{"gts-ref-validation": gts_ref_validation})
+    specific = (
+        specific.with_json({"instance_id": instance_id})
         .validate()
         .assert_equal("status_code", 200)
         .assert_equal("body.ok", expect_ok)
     )
     if expected_id is not None:
-        step = step.assert_equal("body.id", expected_id)
-    return Step(step)
+        specific = specific.assert_equal("body.id", expected_id)
+    return _dual_validation_step(
+        instance_id, expect_ok, label, "instance", specific, gts_ref_validation
+    )
+
+
+def _dual_validation_step(
+    entity_id, expect_ok, label, entity_type, specific, gts_ref_validation=None
+):
+    class DualValidation(HttpRunner):
+        config = Config("dual endpoint validation").base_url(get_gts_base_url())
+        teststeps = [
+            Step(specific),
+            validate_entity(
+                entity_id,
+                expect_ok,
+                f"{label} via validate-entity",
+                expected_entity_type=entity_type,
+                gts_ref_validation=gts_ref_validation,
+            ),
+        ]
+
+    return Step(RunTestCase(label).call(DualValidation))

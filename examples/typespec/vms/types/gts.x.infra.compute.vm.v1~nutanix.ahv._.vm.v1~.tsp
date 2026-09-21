@@ -31,7 +31,7 @@ model NutanixAHVVM {
   ramMb: int32;
 
   /** Reference to gts.x.infra.compute.vm_state.v1~ */
-  @extension("x-gts-ref", "/gts.x.infra.compute.vm_state.v1~")
+  @extension("x-gts-ref", "gts.x.infra.compute.vm_state.v1~")
   powerState: string;
 
   osType?: string;
