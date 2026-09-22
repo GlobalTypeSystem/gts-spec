@@ -6897,3 +6897,92 @@ class TestCaseOp13_TraitRef_InheritedChain_FullyResolved(HttpRunner):
             "validate should pass - inherited topicRef chain fully registered",
         ),
     ]
+
+
+def _register_2020_trait_type(type_id, pair, label):
+    """POST a Draft 2020-12 type whose x-gts-traits-schema uses prefixItems.
+
+    The helpers register draft-07; this posts the entity directly so the type
+    declares Draft 2020-12 and its trait schema exercises a post-Draft-07
+    keyword (`prefixItems`).
+    """
+    return Step(
+        RunRequest(label)
+        .post("/entities")
+        .with_json({
+            "$$id": type_id,
+            "$$schema": "https://json-schema.org/draft/2020-12/schema",
+            "type": "object",
+            "required": ["id"],
+            "properties": {"id": {"type": "string"}},
+            "x-gts-traits-schema": {
+                "type": "object",
+                "properties": {
+                    "pair": {
+                        "type": "array",
+                        "prefixItems": [{"type": "string"}],
+                    },
+                },
+            },
+            "x-gts-traits": {"pair": pair},
+        })
+        .validate()
+        .assert_equal("status_code", 200)
+    )
+
+
+class TestCaseOp13_TraitSchemaHonoursHostDialect_Rejects(HttpRunner):
+    """OP#13 - the effective trait schema is validated under the host dialect.
+
+    A Type Schema's trait schema MUST be interpreted under the dialect the type
+    declares (README 11.0). A Draft 2020-12 trait schema using `prefixItems`
+    that requires a string first item MUST reject a trait value whose first item
+    is a number. An implementation that validates trait values under Draft-07
+    would silently ignore `prefixItems` and wrongly accept it.
+    """
+
+    config = Config("OP#13 - trait schema honours host dialect (reject)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test13.tdialect.bad.v1~"
+    teststeps = [
+        _register_2020_trait_type(
+            "gts://gts.x.test13.tdialect.bad.v1~",
+            [42],
+            "register 2020-12 type with a non-conforming prefixItems trait value",
+        ),
+        _validate_type_schema(
+            type_id,
+            False,
+            "prefixItems trait constraint must reject a number first item",
+        ),
+    ]
+
+
+class TestCaseOp13_TraitSchemaHonoursHostDialect_Accepts(HttpRunner):
+    """OP#13 - the same 2020-12 trait constraint accepts a conforming value."""
+
+    config = Config("OP#13 - trait schema honours host dialect (accept)").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test13.tdialect.ok.v1~"
+    teststeps = [
+        _register_2020_trait_type(
+            "gts://gts.x.test13.tdialect.ok.v1~",
+            ["ok"],
+            "register 2020-12 type with a conforming prefixItems trait value",
+        ),
+        _validate_type_schema(
+            type_id,
+            True,
+            "prefixItems trait constraint must accept a string first item",
+        ),
+    ]
