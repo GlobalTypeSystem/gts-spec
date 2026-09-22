@@ -1430,6 +1430,8 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 
 Implement a simple in-memory GTS entity registry with optional validation on registration. When validation is enabled, identifiers MUST satisfy their GTS syntax and matching rules, validation dependencies such as `$id` ancestors and GTS `$ref` targets MUST satisfy the transitive validation rule, and `x-gts-ref` constraints and values MUST satisfy the implementation's selected reference-validation policy under §9.6.
 
+Registration and removal are explicit registry operations. Validation operations MUST NOT add, replace, or remove entities. In particular, an entity accepted by an earlier registration without validation MUST remain stored when a later validation reports it as invalid; deciding whether to remove that entity is the client's explicit responsibility. A combined registration-with-validation request is atomic from the client's perspective: if validation fails, no new entity is committed and any entity previously stored under the same identifier remains unchanged.
+
 ### 9.4 - CLI support
 
 Provide a CLI wrapping OPs for local use and CI: e.g., `gts validate`, `gts parse`, `gts match`, `gts uuid`, `gts compat`, `gts cast`, `gts query`, `gts get`. Use non-zero exit codes on validation/compatibility failures for pipeline integration.
