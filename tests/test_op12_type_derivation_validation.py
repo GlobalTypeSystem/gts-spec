@@ -4515,5 +4515,125 @@ class TestCaseOp12_ValidateTypeSchemaRejectsInstanceID(HttpRunner):
     ]
 
 
+class TestCaseTestOp12TypeDerivationValidation_CrossDialectRefRejected(HttpRunner):
+    """OP#12 - Type Derivation: a cross-dialect ``$ref`` is rejected (§11.0).
+
+    A ``$ref`` composes the referenced schema into the referrer's own
+    validation, which a validator evaluates under a single dialect; JSON Schema
+    does not define composing subschemas of different dialects. A Type Schema
+    that derives via ``allOf`` + ``$ref`` from a parent declaring a different
+    dialect therefore MUST be rejected rather than reported as a false
+    validation verdict. Registration itself does not validate, so both POSTs
+    return 200; the mismatch surfaces at ``/validate-type-schema``.
+    """
+
+    config = Config("OP#12 - Cross-dialect ref rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    derived_type_id = (
+        "gts.x.test12xd.base.item.v1~x.test12xd._.child.v1~"
+    )
+    teststeps = [
+        Step(
+            RunRequest("register 2020-12 base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test12xd.base.item.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register draft-07 child deriving via allOf+$ref")
+            .post("/entities")
+            .with_json({
+                "$$id": (
+                    "gts://gts.x.test12xd.base.item.v1~"
+                    "x.test12xd._.child.v1~"
+                ),
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12xd.base.item.v1~"},
+                ],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            derived_type_id,
+            False,
+            "cross-dialect ref derivation must be rejected",
+        ),
+    ]
+
+
+class TestCaseTestOp12TypeDerivationValidation_CrossDialectRedeclarationAllowed(HttpRunner):
+    """OP#12 - Type Derivation: cross-dialect redeclaration is allowed (§11.0).
+
+    Derivation is established by the chained ``$id`` alone (ADR-0001). A derived
+    Type Schema that re-declares its parent's fields WITHOUT a ``$ref`` composes
+    nothing, compiles independently under its own dialect, and MUST remain valid
+    whatever dialect it and its parent declare.
+    """
+
+    config = Config("OP#12 - Cross-dialect redeclaration allowed").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    derived_type_id = (
+        "gts.x.test12rd.base.item.v1~x.test12rd._.child.v1~"
+    )
+    teststeps = [
+        Step(
+            RunRequest("register draft-07 base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test12rd.base.item.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register 2020-12 child that re-declares fields (no $ref)")
+            .post("/entities")
+            .with_json({
+                "$$id": (
+                    "gts://gts.x.test12rd.base.item.v1~"
+                    "x.test12rd._.child.v1~"
+                ),
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            derived_type_id,
+            True,
+            "cross-dialect redeclaration must remain valid",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp12TypeDerivationValidation_DerivedSchemaFullyMatches().test_start()
