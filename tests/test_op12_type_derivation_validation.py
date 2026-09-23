@@ -4309,17 +4309,16 @@ class TestCaseOp12_Dialect_2020_12_PrefixItemsAllowed(HttpRunner):
     ]
 
 
-class TestCaseOp12_Redeclared_MixedDialectChain(HttpRunner):
-    """ADR-0001: per-schema $schema — a Draft-07 base with a Draft 2019-09 derived.
+class TestCaseOp12_Redeclared_MixedDialectChainRejected(HttpRunner):
+    """A redeclared child cannot change the dialect selected by its root type.
 
-    GTS pins no single draft; each schema's dialect is set by its own $schema
-    (README §11.0). The derived re-declares the parent's fields (no allOf) and
-    only tightens (maxLength 100 → 50), so OP#12 compatibility holds across the
-    dialect boundary. Validation passes.
+    The Draft-07 root selects the dialect for the complete chained ``$id``
+    hierarchy. The Draft 2019-09 child must therefore fail OP#12 even though it
+    re-declares the inherited fields without ``$ref`` and only tightens them.
     """
 
     config = Config(
-        "OP#12 ADR-0001: mixed-dialect chain (07 base, 2019-09 derived)"
+        "OP#12: mixed-dialect redeclaration rejected (07 root, 2019-09 child)"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -4356,8 +4355,8 @@ class TestCaseOp12_Redeclared_MixedDialectChain(HttpRunner):
         ),
         _validate_type_schema(
             "gts.x.test12.mixdia.user.v1~x.test12._.premium.v1~",
-            True,
-            "validate mixed-dialect derived - tightening across dialect boundary",
+            False,
+            "reject mixed-dialect child despite compatible field redeclaration",
         ),
     ]
 
@@ -4511,6 +4510,173 @@ class TestCaseOp12_ValidateTypeSchemaRejectsInstanceID(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseTestOp12TypeDerivationValidation_CrossDialectRefRejected(HttpRunner):
+    """OP#12 - Type Derivation: a cross-dialect ``$ref`` is rejected (§11.0).
+
+    JSON Schema permits references between schema resources that declare
+    different dialects. GTS deliberately applies a stricter portability rule:
+    every reference in a GTS Type Schema must preserve the hierarchy's selected
+    dialect. A Type Schema that derives via ``allOf`` + ``$ref`` from a parent
+    declaring a different dialect therefore MUST be rejected. Registration
+    itself does not validate, so both POSTs return 200; the mismatch surfaces at
+    ``/validate-type-schema``.
+    """
+
+    config = Config("OP#12 - Cross-dialect ref rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    derived_type_id = (
+        "gts.x.test12xd.base.item.v1~x.test12xd._.child.v1~"
+    )
+    teststeps = [
+        Step(
+            RunRequest("register 2020-12 base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test12xd.base.item.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register draft-07 child deriving via allOf+$ref")
+            .post("/entities")
+            .with_json({
+                "$$id": (
+                    "gts://gts.x.test12xd.base.item.v1~"
+                    "x.test12xd._.child.v1~"
+                ),
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+                "allOf": [
+                    {"$$ref": "gts://gts.x.test12xd.base.item.v1~"},
+                ],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            derived_type_id,
+            False,
+            "cross-dialect ref derivation must be rejected",
+        ),
+    ]
+
+
+class TestCaseTestOp12TypeDerivationValidation_CrossDialectEmbeddedRefRejected(HttpRunner):
+    """OP#12 - A document-local $ref cannot cross a schema dialect boundary.
+
+    JSON Schema permits compound documents containing embedded resources that
+    declare different dialects. GTS deliberately prohibits every cross-dialect
+    reference, including a local fragment reference to an embedded resource in
+    the same document.
+    """
+
+    config = Config("OP#12 - Cross-dialect embedded ref rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test12xd.embedded.item.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register 2020-12 type with referenced Draft-07 resource")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + type_id,
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                    "legacy": {"$$ref": "#/$$defs/legacy"},
+                },
+                "$$defs": {
+                    "legacy": {
+                        "$$id": "legacy",
+                        "$$schema": "http://json-schema.org/draft-07/schema#",
+                        "type": "string",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            type_id,
+            False,
+            "document-local cross-dialect ref must be rejected",
+        ),
+    ]
+
+
+class TestCaseTestOp12TypeDerivationValidation_CrossDialectRedeclarationRejected(HttpRunner):
+    """OP#12 - changing dialect is invalid even without ``$ref`` (§11.0).
+
+    Derivation is established by the chained ``$id`` alone (ADR-0001), and the
+    root Type Schema selects the dialect for that complete hierarchy. Repeating
+    the parent's fields instead of composing them with ``$ref`` does not permit
+    the child to select a different dialect.
+    """
+
+    config = Config("OP#12 - Cross-dialect redeclaration rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    derived_type_id = (
+        "gts.x.test12rd.base.item.v1~x.test12rd._.child.v1~"
+    )
+    teststeps = [
+        Step(
+            RunRequest("register draft-07 base schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test12rd.base.item.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register 2020-12 child that re-declares fields (no $ref)")
+            .post("/entities")
+            .with_json({
+                "$$id": (
+                    "gts://gts.x.test12rd.base.item.v1~"
+                    "x.test12rd._.child.v1~"
+                ),
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["a"],
+                "properties": {"a": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            derived_type_id,
+            False,
+            "cross-dialect redeclaration must be rejected",
         ),
     ]
 

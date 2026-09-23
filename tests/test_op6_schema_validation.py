@@ -397,6 +397,100 @@ class TestCaseTestOp6SchemaValidation_SchemaGtsUriWithInvalidBody(HttpRunner):
     ]
 
 
+class TestCaseTestOp6SchemaValidation_UnknownDialectRejected(HttpRunner):
+    """OP#6 - Reject a Type Schema whose $schema URI is not supported."""
+
+    config = Config("OP#6 - Schema Validation: unknown dialect rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with unknown dialect should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test6.invalid_dialect.unknown.v1~",
+                "$$schema": "https://example.invalid/not-a-json-schema-dialect",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_MistypedDialectRejected(HttpRunner):
+    """OP#6 - Reject a typo in an otherwise recognizable $schema URI."""
+
+    config = Config("OP#6 - Schema Validation: mistyped dialect rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register schema with mistyped dialect should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test6.invalid_dialect.mistyped.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-21/schema",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseTestOp6SchemaValidation_PreDraft7DialectsRejected(HttpRunner):
+    """OP#6 - Draft-07 is the minimum supported JSON Schema dialect."""
+
+    config = Config("OP#6 - Schema Validation: pre-Draft-07 rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register Draft 6 schema should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test6.invalid_dialect.draft6.v1~",
+                "$$schema": "http://json-schema.org/draft-06/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("register Draft 4 schema should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test6.invalid_dialect.draft4.v1~",
+                "$$schema": "http://json-schema.org/draft-04/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
 class TestCaseTestOp6SchemaValidation_LiteralDoubleDollarIdRejected(HttpRunner):
     """OP#6 - Reject a schema that uses a literal ``$$id`` field.
 
