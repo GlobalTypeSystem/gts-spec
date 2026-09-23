@@ -4517,13 +4517,13 @@ class TestCaseOp12_ValidateTypeSchemaRejectsInstanceID(HttpRunner):
 class TestCaseTestOp12TypeDerivationValidation_CrossDialectRefRejected(HttpRunner):
     """OP#12 - Type Derivation: a cross-dialect ``$ref`` is rejected (§11.0).
 
-    A ``$ref`` composes the referenced schema into the referrer's own
-    validation, which a validator evaluates under a single dialect; JSON Schema
-    does not define composing subschemas of different dialects. A Type Schema
-    that derives via ``allOf`` + ``$ref`` from a parent declaring a different
-    dialect therefore MUST be rejected rather than reported as a false
-    validation verdict. Registration itself does not validate, so both POSTs
-    return 200; the mismatch surfaces at ``/validate-type-schema``.
+    JSON Schema permits references between schema resources that declare
+    different dialects. GTS deliberately applies a stricter portability rule:
+    every reference in a GTS Type Schema must preserve the hierarchy's selected
+    dialect. A Type Schema that derives via ``allOf`` + ``$ref`` from a parent
+    declaring a different dialect therefore MUST be rejected. Registration
+    itself does not validate, so both POSTs return 200; the mismatch surfaces at
+    ``/validate-type-schema``.
     """
 
     config = Config("OP#12 - Cross-dialect ref rejected").base_url(
@@ -4573,6 +4573,53 @@ class TestCaseTestOp12TypeDerivationValidation_CrossDialectRefRejected(HttpRunne
             derived_type_id,
             False,
             "cross-dialect ref derivation must be rejected",
+        ),
+    ]
+
+
+class TestCaseTestOp12TypeDerivationValidation_CrossDialectEmbeddedRefRejected(HttpRunner):
+    """OP#12 - A document-local $ref cannot cross a schema dialect boundary.
+
+    JSON Schema permits compound documents containing embedded resources that
+    declare different dialects. GTS deliberately prohibits every cross-dialect
+    reference, including a local fragment reference to an embedded resource in
+    the same document.
+    """
+
+    config = Config("OP#12 - Cross-dialect embedded ref rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test12xd.embedded.item.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register 2020-12 type with referenced Draft-07 resource")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + type_id,
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {
+                    "legacy": {"$$ref": "#/$$defs/legacy"},
+                },
+                "$$defs": {
+                    "legacy": {
+                        "$$id": "legacy",
+                        "$$schema": "http://json-schema.org/draft-07/schema#",
+                        "type": "string",
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            type_id,
+            False,
+            "document-local cross-dialect ref must be rejected",
         ),
     ]
 
