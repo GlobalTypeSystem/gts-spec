@@ -6986,3 +6986,127 @@ class TestCaseOp13_TraitSchemaHonoursHostDialect_Accepts(HttpRunner):
             "prefixItems trait constraint must accept a string first item",
         ),
     ]
+
+
+class TestCaseOp13_InheritedTraitSchema_MixedDialectChildRejected(HttpRunner):
+    """A child cannot change the root dialect when inheriting trait constraints.
+
+    The 2020-12 root selects the dialect for the complete chained ``$id``
+    hierarchy. The Draft-07 child must fail before OP#13 can reinterpret or
+    silently ignore the inherited ``prefixItems`` constraint.
+    """
+
+    config = Config(
+        "OP#13 - mixed-dialect child of 2020-12 trait root rejected"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    parent_id = "gts.x.test13.tdialectinherit.bad.v1~"
+    child_id = parent_id + "x.test13._.child.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register 2020-12 parent with prefixItems trait constraint")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + parent_id,
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "pair": {
+                            "type": "array",
+                            "prefixItems": [{"type": "string"}],
+                        },
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register draft-07 redeclaration child with invalid trait")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + child_id,
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+                "x-gts-traits": {"pair": [42]},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            child_id,
+            False,
+            "draft-07 child must not change its 2020-12 root dialect",
+        ),
+    ]
+
+
+class TestCaseOp13_InheritedTraitSchema_MixedDialectChildRejectedReverse(HttpRunner):
+    """A 2020-12 child cannot change the dialect of its Draft-07 root.
+
+    This covers the reverse direction: even though the inherited Draft-07 tuple
+    constraint would accept ``["ok"]``, the mixed-dialect ``$id`` hierarchy is
+    invalid independently of its trait values and independently of ``$ref``.
+    """
+
+    config = Config(
+        "OP#13 - mixed-dialect child of Draft-07 trait root rejected"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    parent_id = "gts.x.test13.tdialectinherit.ok.v1~"
+    child_id = parent_id + "x.test13._.child.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register draft-07 parent with tuple items trait constraint")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + parent_id,
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "pair": {
+                            "type": "array",
+                            "items": [{"type": "string"}],
+                        },
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register 2020-12 redeclaration child with valid trait")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + child_id,
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+                "x-gts-traits": {"pair": ["ok"]},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            child_id,
+            False,
+            "2020-12 child must not change its Draft-07 root dialect",
+        ),
+    ]
