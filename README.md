@@ -53,6 +53,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
   - [2.1 Canonical form](#21-canonical-form)
   - [2.2 Chained identifiers](#22-chained-identifiers)
   - [2.3 Formal Grammar (EBNF)](#23-formal-grammar-ebnf)
+  - [2.4 Types, instances, and JSON representation](#24-types-instances-and-json-representation)
 - [3. Semantics and Capabilities](#3-semantics-and-capabilities)
   - [3.1 Core Operations](#31-core-operations)
   - [3.2 GTS Types Inheritance](#32-gts-types-inheritance)
@@ -299,6 +300,41 @@ uuid             = 8hex , "-" , 4hex , "-" , 4hex , "-" , 4hex , "-" , 12hex ;
 5. **Normalization**: GTS identifiers must be lowercase. Leading/trailing whitespace is not permitted. Canonical form has no optional spacing.
 
 6. **Reserved prefix**: The `gts.` prefix is mandatory and reserved. Future versions may introduce alternative prefixes but will maintain backward compatibility.
+
+### 2.4 Types, instances, and JSON representation
+
+Data systems commonly distinguish **types**, which define structure and constraints, from **instances**, which are concrete values of those types. GTS preserves this distinction while remaining presentation-agnostic: implementations MAY use formats such as JSON Schema, YAML, or TypeSpec, provided alternative forms map deterministically to the same GTS Type. This specification uses JSON Schema and JSON instances as its reference representation.
+
+For JSON object documents, GTS implementations MUST apply this classification before ID heuristics:
+
+| Top-level fields | Classification |
+|---|---|
+| No `$schema` | An instance document, even if `$id` is present. It is a GTS Instance only when its GTS Type is determined and the document conforms to that Type. |
+| `$schema`, but no `$id` | A JSON Schema document without a GTS identifier; not a GTS Type Schema. |
+| `$schema` and a non-GTS `$id` | A JSON Schema document, but not a GTS Type Schema. |
+| `$schema` and a valid GTS Type `$id` | A candidate GTS Type Schema, valid only if it satisfies the declared JSON Schema dialect and all applicable GTS rules. |
+
+A canonical JSON GTS Type Schema MUST therefore contain both a supported top-level `$schema` and a top-level `$id` of the form `gts://<type-id>`, where `<type-id>` is a valid GTS Type Identifier ending with `~`. An identifier supplied separately by an API does not make `$id` optional and MUST match the normalized `$id`. Section 11 defines the detailed JSON Schema and instance conventions.
+
+**Examples:**
+
+A canonical GTS Type Schema:
+
+```json
+{ "$schema": "http://json-schema.org/draft-07/schema#", "$id": "gts://gts.x.example.users.user.v1~", "type": "object" }
+```
+
+A JSON Schema document without a GTS identifier:
+
+```json
+{ "$schema": "http://json-schema.org/draft-07/schema#", "type": "object" }
+```
+
+An instance document — not a schema — despite containing `$id`:
+
+```json
+{ "$id": "record-123", "type": "gts.x.example.users.user.v1~", "name": "Alex" }
+```
 
 
 ## 3. Semantics and Capabilities
@@ -1884,7 +1920,7 @@ JSON Schema has no native concept of derivation or inheritance — its closest p
 
 ### 11.1 Global rules: schema vs instance, normalization, and document categories
 
-This section defines recommendations for how GTS-aware systems interpret JSON documents. The rules describe the concepts; the exact field names used for instance IDs and instance types are **implementation-defined** and may be **configuration-driven** (different systems may look for identifiers in different fields).
+Section 2.4 introduces the classification used here. This section provides the detailed JSON rules; the exact field names used for instance IDs and instance types are **implementation-defined** and may be **configuration-driven**.
 
 #### Rule A — Schema vs instance discriminator
 

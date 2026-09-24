@@ -491,6 +491,66 @@ class TestCaseTestOp6SchemaValidation_PreDraft7DialectsRejected(HttpRunner):
     ]
 
 
+class TestCaseTestOp6SchemaValidation_Draft7AliasUsesDraft7Semantics(HttpRunner):
+    """An accepted Draft-07 URI alias must still select the Draft-07 validator.
+
+    Tuple-form ``items`` is valid in Draft-07 but invalid in Draft 2020-12, so
+    this covers both schema validation and positional instance validation.
+    """
+
+    config = Config(
+        "OP#6 - Schema Validation: Draft-07 alias uses Draft-07 semantics"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test6.dialect_alias.tuple.v1~"
+    valid_id = type_id + "x.test6._.valid.v1"
+    invalid_id = type_id + "x.test6._.invalid.v1"
+    teststeps = [
+        Step(
+            RunRequest("register Draft-07 HTTPS alias with tuple-form items")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://" + type_id,
+                "$$schema": "https://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id", "pair"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "pair": {
+                        "type": "array",
+                        "items": [{"type": "string"}, {"type": "integer"}],
+                        "additionalItems": False,
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _register_instance(
+            {"id": valid_id, "pair": ["ok", 1]},
+            "register instance valid under Draft-07 tuple semantics",
+        ),
+        _validate_instance(
+            valid_id,
+            True,
+            "Draft-07 tuple accepts matching positional items",
+        ),
+        _register_instance(
+            {"id": invalid_id, "pair": ["ok", "not-an-integer"]},
+            "register instance invalid under Draft-07 tuple semantics",
+        ),
+        _validate_instance(
+            invalid_id,
+            False,
+            "Draft-07 tuple rejects a mismatched positional item",
+        ),
+    ]
+
+
 class TestCaseTestOp6SchemaValidation_LiteralDoubleDollarIdRejected(HttpRunner):
     """OP#6 - Reject a schema that uses a literal ``$$id`` field.
 
@@ -2722,19 +2782,23 @@ class TestCaseOp6ValidateJson_ExplicitDerivedType(HttpRunner):
     ]
 
 
-class TestCaseOp6ValidateJson_ExplicitSchemaWithoutEmbeddedIdentity(HttpRunner):
-    config = Config("OP#6 validate-json: explicit schema without embedded identity").base_url(get_gts_base_url())
+class TestCaseOp6ValidateJson_ExplicitSchemaWithMatchingEmbeddedIdentity(HttpRunner):
+    """The external type_id and embedded $id identify the same GTS Type Schema."""
+
+    config = Config("OP#6 validate-json: explicit schema with matching identity").base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
 
     teststeps = [
         Step(
-            RunRequest("register an explicit schema without $id or root type")
+            RunRequest("register an explicit schema with matching $$id")
             .post("/type-schemas")
             .with_json({
                 "type_id": "gts.x.test6json._.external_identity.v1~",
                 "type_schema": {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6json._.external_identity.v1~",
                     "properties": {"prop": {"type": "string"}},
                 },
             })
@@ -2759,6 +2823,70 @@ class TestCaseOp6ValidateJson_ExplicitSchemaWithoutEmbeddedIdentity(HttpRunner):
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
             .assert_contains("body.error", "is not of type 'string'")
+        ),
+    ]
+
+
+class TestCaseOp6ExplicitSchemaRequiresCanonicalIdentity(HttpRunner):
+    """An external type_id does not replace canonical $schema and $id fields.
+
+    The embedded $id must be a GTS Type Identifier equal to the external
+    type_id supplied to ``/type-schemas``.
+    """
+
+    config = Config(
+        "OP#6 explicit schema registration: canonical identity is required"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject explicit type schema without $$schema")
+            .post("/type-schemas")
+            .with_json({
+                "type_id": "gts.x.test6json._.missing_schema_marker.v1~",
+                "type_schema": {
+                    "$$id": "gts://gts.x.test6json._.missing_schema_marker.v1~",
+                    "type": "object",
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "$$schema")
+        ),
+        Step(
+            RunRequest("reject explicit type schema without $$id")
+            .post("/type-schemas")
+            .with_json({
+                "type_id": "gts.x.test6json._.missing_id_marker.v1~",
+                "type_schema": {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "$$id")
+        ),
+        Step(
+            RunRequest("reject explicit type schema with mismatched $$id")
+            .post("/type-schemas")
+            .with_json({
+                "type_id": "gts.x.test6json._.external_identity.v2~",
+                "type_schema": {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6json._.different_identity.v2~",
+                    "type": "object",
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_contains("body.error", "match")
         ),
     ]
 
