@@ -193,17 +193,16 @@
     },
     "/type-schemas": {
       "post": {
-        "summary": "Register a GTS Type Schema under an explicit type_id",
-        "operationId": "add_type_schema_type_schemas_post",
+        "summary": "Register a batch of GTS Type Schemas",
+        "operationId": "add_type_schemas_type_schemas_post",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "allOf": [
-                  {
-                    "$ref": "#/components/schemas/TypeSchemaRegister"
-                  }
-                ],
+                "items": {
+                  "type": "object"
+                },
+                "type": "array",
                 "title": "Body"
               }
             }
@@ -1054,24 +1053,6 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
-      },
-      "TypeSchemaRegister": {
-        "properties": {
-          "type_id": {
-            "type": "string",
-            "title": "Type Id"
-          },
-          "type_schema": {
-            "type": "object",
-            "title": "Type Schema"
-          }
-        },
-        "type": "object",
-        "required": [
-          "type_id",
-          "type_schema"
-        ],
-        "title": "TypeSchemaRegister"
       },
       "ValidateJsonResult": {
         "properties": {

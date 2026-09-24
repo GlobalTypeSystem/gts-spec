@@ -2783,7 +2783,12 @@ class TestCaseOp6ValidateJson_ExplicitDerivedType(HttpRunner):
 
 
 class TestCaseOp6ValidateJson_ExplicitSchemaWithMatchingEmbeddedIdentity(HttpRunner):
-    """The external type_id and embedded $id identify the same GTS Type Schema."""
+    """A GTS Type Schema registered via the batch ``/type-schemas`` endpoint.
+
+    ``/type-schemas`` accepts a JSON array of GTS Type Schema objects; the
+    GTS Type Identifier of each entry is derived from its embedded ``$id``
+    (there is no external ``type_id`` key).
+    """
 
     config = Config("OP#6 validate-json: explicit schema with matching identity").base_url(get_gts_base_url())
 
@@ -2792,19 +2797,20 @@ class TestCaseOp6ValidateJson_ExplicitSchemaWithMatchingEmbeddedIdentity(HttpRun
 
     teststeps = [
         Step(
-            RunRequest("register an explicit schema with matching $$id")
+            RunRequest("register an explicit schema batch")
             .post("/type-schemas")
-            .with_json({
-                "type_id": "gts.x.test6json._.external_identity.v1~",
-                "type_schema": {
+            .with_json([
+                {
                     "$$schema": "http://json-schema.org/draft-07/schema#",
                     "$$id": "gts://gts.x.test6json._.external_identity.v1~",
                     "properties": {"prop": {"type": "string"}},
                 },
-            })
+            ])
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", True)
+            .assert_equal("body.results[0].ok", True)
+            .assert_equal("body.results[0].type_id", "gts.x.test6json._.external_identity.v1~")
         ),
         Step(
             RunRequest("validate an object against the explicit schema")
@@ -2827,11 +2833,81 @@ class TestCaseOp6ValidateJson_ExplicitSchemaWithMatchingEmbeddedIdentity(HttpRun
     ]
 
 
-class TestCaseOp6ExplicitSchemaRequiresCanonicalIdentity(HttpRunner):
-    """An external type_id does not replace canonical $schema and $id fields.
+class TestCaseOp6BatchTypeSchemaRegistration(HttpRunner):
+    """``/type-schemas`` registers a batch and reports per-item results.
 
-    The embedded $id must be a GTS Type Identifier equal to the external
-    type_id supplied to ``/type-schemas``.
+    The top-level ``ok`` is ``true`` only when every schema in the batch was
+    registered; individual outcomes are reported in ``results``.
+    """
+
+    config = Config("OP#6 type-schemas: batch registration").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register a batch with a valid and an invalid schema")
+            .post("/type-schemas")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6json._.batch_ok.v1~",
+                    "type": "object",
+                    "properties": {"prop": {"type": "string"}},
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.results[0].ok", True)
+            .assert_equal("body.results[0].type_id", "gts.x.test6json._.batch_ok.v1~")
+            .assert_equal("body.results[1].ok", False)
+            .assert_contains("body.results[1].error", "$$id")
+        ),
+        Step(
+            RunRequest("validate an object against the batch-registered schema")
+            .post("/validate-json/gts.x.test6json._.batch_ok.v1~")
+            .with_json({"prop": "valid"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+    ]
+
+
+class TestCaseOp6TypeSchemasRequiresArrayBody(HttpRunner):
+    """``/type-schemas`` requires a JSON array body."""
+
+    config = Config("OP#6 type-schemas: array body required").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject a single object body")
+            .post("/type-schemas")
+            .with_json({
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "$$id": "gts://gts.x.test6json._.not_an_array.v1~",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseOp6ExplicitSchemaRequiresCanonicalIdentity(HttpRunner):
+    """Batch entries must carry canonical ``$schema`` and ``$id`` fields.
+
+    The GTS Type Identifier is derived from the embedded ``$id``; entries
+    missing either canonical field are rejected in ``results``.
     """
 
     config = Config(
@@ -2845,48 +2921,32 @@ class TestCaseOp6ExplicitSchemaRequiresCanonicalIdentity(HttpRunner):
         Step(
             RunRequest("reject explicit type schema without $$schema")
             .post("/type-schemas")
-            .with_json({
-                "type_id": "gts.x.test6json._.missing_schema_marker.v1~",
-                "type_schema": {
+            .with_json([
+                {
                     "$$id": "gts://gts.x.test6json._.missing_schema_marker.v1~",
                     "type": "object",
                 },
-            })
+            ])
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
-            .assert_contains("body.error", "$$schema")
+            .assert_equal("body.results[0].ok", False)
+            .assert_contains("body.results[0].error", "$$schema")
         ),
         Step(
             RunRequest("reject explicit type schema without $$id")
             .post("/type-schemas")
-            .with_json({
-                "type_id": "gts.x.test6json._.missing_id_marker.v1~",
-                "type_schema": {
+            .with_json([
+                {
                     "$$schema": "http://json-schema.org/draft-07/schema#",
                     "type": "object",
                 },
-            })
+            ])
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
-            .assert_contains("body.error", "$$id")
-        ),
-        Step(
-            RunRequest("reject explicit type schema with mismatched $$id")
-            .post("/type-schemas")
-            .with_json({
-                "type_id": "gts.x.test6json._.external_identity.v2~",
-                "type_schema": {
-                    "$$schema": "http://json-schema.org/draft-07/schema#",
-                    "$$id": "gts://gts.x.test6json._.different_identity.v2~",
-                    "type": "object",
-                },
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-            .assert_equal("body.ok", False)
-            .assert_contains("body.error", "match")
+            .assert_equal("body.results[0].ok", False)
+            .assert_contains("body.results[0].error", "$$id")
         ),
     ]
 
