@@ -6988,6 +6988,42 @@ class TestCaseOp13_TraitSchemaHonoursHostDialect_Accepts(HttpRunner):
     ]
 
 
+class TestCaseOp13_TraitSchemaResourceDialectMismatchRejected(HttpRunner):
+    """An embedded trait-schema resource must use the host type's dialect."""
+
+    config = Config(
+        "OP#13 - conflicting trait schema resource dialect rejected"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test13.tdialect.resource_mismatch.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register 2020-12 host with Draft-07 trait resource")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + type_id,
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "x-gts-traits-schema": {
+                    "$$id": "https://example.com/gts/legacy-traits",
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            type_id,
+            False,
+            "trait resource with a conflicting dialect must be rejected",
+        ),
+    ]
+
+
 class TestCaseOp13_InheritedTraitSchema_MixedDialectChildRejected(HttpRunner):
     """A child cannot change the root dialect when inheriting trait constraints.
 
