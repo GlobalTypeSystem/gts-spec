@@ -2654,6 +2654,56 @@ class TestCaseOp6ValidateJson_AutoInvalidInstance(HttpRunner):
     ]
 
 
+class TestCaseOp6ValidateJson_MixedDialectSchemaGraphRejected(HttpRunner):
+    config = Config(
+        "OP#6 validate-json: mixed-dialect schema graph rejected"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test6json.dialect_graph.host.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register Draft 2020-12 referenced type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6json.dialect_graph.foreign.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register Draft-07 host referencing 2020-12 type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + type_id,
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "allOf": [{
+                    "$$ref": "gts://gts.x.test6json.dialect_graph.foreign.v1~",
+                }],
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("reject transient instance of mixed-dialect type graph")
+            .post("/validate-json")
+            .with_json({
+                "id": type_id + "x.test6json._.item.v1",
+                "type": type_id,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.is_type_schema", False)
+        ),
+    ]
+
+
 class TestCaseOp6ValidateJson_AutoIdlessInstance(HttpRunner):
     config = Config("OP#6 validate-json: idless transient instance").base_url(get_gts_base_url())
 
