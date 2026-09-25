@@ -1918,29 +1918,30 @@ JSON Schema has no native concept of derivation or inheritance — its closest p
 
 - Reusable subschemas inside a GTS Type Schema SHOULD be placed under the canonical container for the dialect declared by `$schema`: `definitions` for Draft-07, `$defs` for Draft 2019-09 and later. Local JSON Pointer references such as `"$ref": "#/definitions/Foo"` (Draft-07) or `"$ref": "#/$defs/Foo"` (Draft 2019-09+) are the recommended form.
 
-### 11.1 Global rules: schema vs instance, normalization, and document categories
+### 11.1 Applying the JSON document model
 
-Section 2.4 introduces the classification used here. This section provides the detailed JSON rules; the exact field names used for instance IDs and instance types are **implementation-defined** and may be **configuration-driven**.
+Section 2.4 defines the normative distinction between JSON Schema documents and instance documents, and defines the canonical JSON representation of a GTS Type Schema. This section specifies how implementations apply that model when processing JSON: `$id` normalization, the detailed document categories, implementation-defined instance ID/type fields, and `type_id` extraction.
 
-#### Rule A — Schema vs instance discriminator
+The exact field names used for instance IDs and instance type references are **implementation-defined** and MAY be **configuration-driven**.
 
-**A JSON document is a schema if and only if it contains a top-level `$schema` field.**
+#### Rule A — Apply the §2.4 discriminator
 
-- If `$schema` is present → the document MUST be treated as a **schema**.
-- If `$schema` is absent → the document MUST be treated as an **instance**.
+Before applying any ID or type-field heuristics, an implementation MUST classify a JSON object document according to §2.4:
 
-This discriminator MUST be applied before any ID parsing heuristics.
+- A document with a top-level `$schema` is a JSON Schema document.
+- A document without a top-level `$schema` is an instance document.
 
-#### Rule B — GTS schema `$id` normalization
+The presence, absence, or value of `$id` MUST NOT change that initial classification.
 
-For GTS schemas (documents with `$schema`), it is recommended that `$id` is URI-compatible by using:
-- `$id: "gts://<canonical-gts-id>"`
+#### Rule B — Canonical GTS Type Schema `$id` normalization
 
-Implementations MUST normalize this by stripping the `gts://` prefix when extracting/returning the canonical GTS identifier. The `gts://` prefix exists only to make `$id` URI-compatible.
+For a document classified as a schema, it is a GTS Type Schema only if it meets the canonical representation requirements in §2.4, including a top-level `$id` of the form `gts://<type-id>`, where `<type-id>` is a valid GTS Type Identifier.
+
+When extracting or returning the GTS identifier from such an `$id`, implementations MUST remove the `gts://` URI prefix and return the canonical GTS Type Identifier. The prefix is a JSON Schema URI representation detail and is not part of the canonical GTS identifier.
 
 #### Rule C — JSON document categories
 
-Implementations MUST clearly distinguish the following **five** categories of JSON documents:
+The §2.4 classification is refined into the following **five** processing categories:
 
 1. **GTS Type Schemas**
    - Have `$schema`
