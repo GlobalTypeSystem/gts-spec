@@ -7146,3 +7146,54 @@ class TestCaseOp13_InheritedTraitSchema_MixedDialectChildRejectedReverse(HttpRun
             "2020-12 child must not change its Draft-07 root dialect",
         ),
     ]
+
+
+class TestCaseOp13_TraitSchema_Draft07TupleItemsStandaloneAccepted(HttpRunner):
+    """A standalone Draft-07 type may use tuple-form ``items`` in its trait schema.
+
+    Draft-07 spells tuple validation as ``"items": [<schema>, ...]`` (2020-12
+    renamed this to ``prefixItems`` and made ``items`` a single schema). The
+    trait-schema integrity check must compile each ``x-gts-traits-schema``
+    fragment under the *host document's* dialect, not a hard-coded default.
+    Evaluating a Draft-07 fragment against the 2020-12 metaschema would wrongly
+    reject the legal tuple ``items`` here. The type is uniformly Draft-07, so
+    the single-dialect rule (README §11.0) is satisfied and it must validate.
+    """
+
+    config = Config(
+        "OP#13 - standalone Draft-07 tuple-items trait schema accepted"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    type_id = "gts.x.test13.tdialecttuple.standalone.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register standalone draft-07 type with tuple items trait")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://" + type_id,
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["id"],
+                "properties": {"id": {"type": "string"}},
+                "x-gts-traits-schema": {
+                    "type": "object",
+                    "properties": {
+                        "pair": {
+                            "type": "array",
+                            "items": [{"type": "string"}],
+                        },
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_type_schema(
+            type_id,
+            True,
+            "standalone draft-07 tuple-items trait schema is valid",
+        ),
+    ]
