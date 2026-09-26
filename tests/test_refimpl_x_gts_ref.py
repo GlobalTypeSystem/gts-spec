@@ -2786,6 +2786,171 @@ class TestCaseXGtsRef_PrefixItems(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_NullableReference(HttpRunner):
+    """x-gts-ref: nullable reference via a combinator with a neutral branch.
+
+    The common "optional reference" shape mixes an x-gts-ref branch with a
+    plain structural branch that carries no x-gts-ref, e.g.::
+
+        "oneOf": [
+            {"type": "string", "x-gts-ref": "gts.a._.b.v1~"},
+            {"type": "null"}
+        ]
+
+    The neutral ``{"type": "null"}`` branch has no x-gts-ref, so the standard
+    JSON Schema engine already enforces which branch a value belongs to. An
+    implementation that runs its own x-gts-ref combinator pass must treat a
+    branch without an x-gts-ref as neutral rather than a branch that always
+    "matches"; otherwise a valid string reference counts as matching *both*
+    branches and a valid value is rejected. Earlier combinator coverage only
+    exercised combinators where *every* branch carried an x-gts-ref, so this
+    mixed shape was never checked.
+    """
+
+    config = Config("x-gts-ref: nullable reference").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Target schema + a registered instance to reference.
+        Step(
+            RunRequest("register nullable target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_nullable._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register nullable target instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_nullable._.target.v1~x.vendor._.t1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # oneOf: nullable reference (string+x-gts-ref OR null).
+        Step(
+            RunRequest("register nullable oneOf holder schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_nullable._.oneof_holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "x-gts-ref": "gts.x.testref_nullable._.target.v1~",
+                            },
+                            {"type": "null"},
+                        ]
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # A valid string reference must match exactly the x-gts-ref branch.
+        Step(
+            RunRequest("register nullable oneOf instance - valid reference")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_nullable._.target.v1~x.vendor._.t1.v1.0",
+                "id": "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i1.v1.0",
+            True,
+            "nullable oneOf must accept a valid reference",
+        ),
+        # A null value matches the neutral branch only.
+        Step(
+            RunRequest("register nullable oneOf instance - null value")
+            .post("/entities")
+            .with_json({
+                "ref": None,
+                "id": "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i2.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i2.v1.0",
+            True,
+            "nullable oneOf must accept null",
+        ),
+        # anyOf: nullable reference (string+x-gts-ref OR null).
+        Step(
+            RunRequest("register nullable anyOf holder schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_nullable._.anyof_holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "x-gts-ref": "gts.x.testref_nullable._.target.v1~",
+                            },
+                            {"type": "null"},
+                        ]
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register nullable anyOf instance - valid reference")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_nullable._.target.v1~x.vendor._.t1.v1.0",
+                "id": "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i1.v1.0",
+            True,
+            "nullable anyOf must accept a valid reference",
+        ),
+        Step(
+            RunRequest("register nullable anyOf instance - null value")
+            .post("/entities")
+            .with_json({
+                "ref": None,
+                "id": "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i2.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i2.v1.0",
+            True,
+            "nullable anyOf must accept null",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_UnsupportedPointers().test_start()
@@ -2797,3 +2962,4 @@ if __name__ == "__main__":
     TestCaseXGtsRef_NestedCombinators().test_start()
     TestCaseXGtsRef_WildcardPattern().test_start()
     TestCaseXGtsRef_TildeWildcardPattern().test_start()
+    TestCaseXGtsRef_NullableReference().test_start()
