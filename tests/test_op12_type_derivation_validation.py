@@ -4681,5 +4681,81 @@ class TestCaseTestOp12TypeDerivationValidation_CrossDialectRedeclarationRejected
     ]
 
 
+class TestCaseTestOp12TypeDerivationValidation_AncestorCrossDialectRefRejected(HttpRunner):
+    """OP#12 - A cross-dialect ``$ref`` on an *ancestor* invalidates the descendant.
+
+    §11.0: every reference in a derivation hierarchy must preserve the root's
+    dialect, and §12: a type is only as valid as the types it builds on. Here the
+    root/ancestor ``base`` (Draft-07) references a Draft 2020-12 schema; the
+    descendant ``child`` derives by chained ``$id`` re-declaration and does NOT
+    itself reference the 2020-12 schema. Validating the descendant must still be
+    rejected, because its ancestor is invalid.
+
+    This isolates the ancestor case from the already-covered leaf case: an
+    implementation that only walks the *selected* type's reference graph (rather
+    than the whole chain + reference closure, as the reference implementation
+    does) would wrongly accept the descendant.
+    """
+
+    config = Config("OP#12 - Ancestor cross-dialect ref rejected").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    child_type_id = "gts.x.test12anc.base.item.v1~x.test12anc._.child.v1~"
+    teststeps = [
+        Step(
+            RunRequest("register Draft 2020-12 referenced schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test12anc.ext.detail.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {"note": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register Draft-07 ancestor referencing the 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test12anc.base.item.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ext": {"$$ref": "gts://gts.x.test12anc.ext.detail.v1~"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # The ancestor itself is invalid (leaf case, all implementations catch it).
+        _validate_type_schema(
+            "gts.x.test12anc.base.item.v1~",
+            False,
+            "ancestor with cross-dialect ref is invalid (control)",
+        ),
+        _register_derived_redeclared(
+            "gts://gts.x.test12anc.base.item.v1~x.test12anc._.child.v1~",
+            "gts://gts.x.test12anc.base.item.v1~",
+            {
+                "type": "object",
+                "properties": {"label": {"type": "string"}},
+            },
+            "register descendant by re-declaration (no ref to ancestor or target)",
+        ),
+        # The descendant does not reference the 2020-12 schema, but its ancestor
+        # does — so it must be rejected too.
+        _validate_type_schema(
+            child_type_id,
+            False,
+            "descendant of an ancestor with a cross-dialect ref must be rejected",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp12TypeDerivationValidation_DerivedSchemaFullyMatches().test_start()
