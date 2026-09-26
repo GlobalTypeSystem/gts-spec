@@ -3351,5 +3351,95 @@ class TestCaseTestOp6ValidateInstance_AncestorCrossDialectRefRejected(HttpRunner
     ]
 
 
+class TestCaseTestOp6ValidateInstance_RefSiblingKeywordsApplied(HttpRunner):
+    """OP#6 - Keywords that sit next to a ``$ref`` still constrain the instance
+    under Draft 2019-09/2020-12.
+
+    Those dialects evaluate ``$ref`` alongside its sibling keywords (the ``$ref``
+    is no longer an exclusive replacement, unlike Draft-07). An implementation
+    that resolves a GTS ``$ref`` by inlining only the referenced document and
+    discarding the sibling keywords loses the extra ``required``/``properties``
+    constraint, so an instance missing the sibling-required field is wrongly
+    accepted. The referenced schema is inlined *and* the siblings must apply.
+    """
+
+    config = Config("OP#6 - ref sibling keywords are applied").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Referenced base object (2020-12), intentionally permissive.
+        Step(
+            RunRequest("register referenced person schema (2020-12)")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.refsib._.person.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Host schema: `author` inherits person via $ref AND adds a sibling
+        # `required`/`properties` constraint (nickname) that 2020-12 must apply.
+        Step(
+            RunRequest("register host schema with ref siblings (2020-12)")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.refsib._.doc.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["author"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "author": {
+                        "$$ref": "gts://gts.x.refsib._.person.v1~",
+                        "required": ["nickname"],
+                        "properties": {"nickname": {"type": "string"}},
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Author with the sibling-required nickname -> valid.
+        Step(
+            RunRequest("register doc instance satisfying ref siblings")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.refsib._.doc.v1~x.vendor._.d1.v1",
+                "author": {"name": "Ada", "nickname": "a"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.refsib._.doc.v1~x.vendor._.d1.v1",
+            True,
+            "instance satisfying ref sibling constraint must pass",
+        ),
+        # Author missing the sibling-required nickname -> must be rejected.
+        Step(
+            RunRequest("register doc instance violating ref siblings")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.refsib._.doc.v1~x.vendor._.d2.v1",
+                "author": {"name": "Ada"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.refsib._.doc.v1~x.vendor._.d2.v1",
+            False,
+            "instance violating ref sibling constraint must fail",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp6ValidateInstance_ValidInstance().test_start()
