@@ -2951,6 +2951,110 @@ class TestCaseXGtsRef_NullableReference(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_SelfRefInOneOf(HttpRunner):
+    """x-gts-ref: a /$id branch inside oneOf must not shadow a sibling branch.
+
+    ``oneOf`` requires exactly one branch to match. When one branch is
+    ``{"x-gts-ref": "/$id"}`` and another is a concrete GTS pattern, an
+    implementation must resolve ``/$id`` to the selected type while selecting
+    the matching branch. If ``/$id`` is instead treated as always-matching
+    (e.g. a JSON Schema engine that evaluates x-gts-ref as a keyword but
+    short-circuits ``/$id`` to "valid" because it lacks the selected type),
+    a value that matches only the sibling pattern satisfies *both* branches
+    and the exactly-one rule wrongly rejects a valid value.
+
+    Prior oneOf coverage only used concrete patterns in every branch, so this
+    /$id-versus-concrete combination was never exercised.
+    """
+
+    config = Config("x-gts-ref: /$$id inside oneOf").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # A sibling target type + a registered instance to reference.
+        Step(
+            RunRequest("register selfcomb other schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_selfcomb._.other.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register selfcomb other instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_selfcomb._.other.v1~x.vendor._.o1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Holder type: ref must match exactly one of /$id (this type) or other.
+        Step(
+            RunRequest("register selfcomb holder schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_selfcomb._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "oneOf": [
+                            {"x-gts-ref": "/$$id"},
+                            {"x-gts-ref": "gts.x.testref_selfcomb._.other.v1~"},
+                        ],
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # ref matches ONLY the concrete sibling branch. /$id (this holder type)
+        # does not match an "other"-typed id, so exactly one branch matches.
+        Step(
+            RunRequest("register holder instance referencing the sibling")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_selfcomb._.other.v1~x.vendor._.o1.v1.0",
+                "id": "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_other.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_other.v1.0",
+            True,
+            "oneOf with a /$$id branch must accept a value matching only the sibling",
+        ),
+        # ref matches ONLY the /$id branch: the referenced id is itself a holder
+        # instance (so it matches this selected type) and is not an "other" id.
+        Step(
+            RunRequest("register holder instance referencing another holder instance")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_other.v1.0",
+                "id": "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_self.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_self.v1.0",
+            True,
+            "oneOf with a /$$id branch must accept a value matching only /$$id",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_UnsupportedPointers().test_start()
@@ -2963,3 +3067,4 @@ if __name__ == "__main__":
     TestCaseXGtsRef_WildcardPattern().test_start()
     TestCaseXGtsRef_TildeWildcardPattern().test_start()
     TestCaseXGtsRef_NullableReference().test_start()
+    TestCaseXGtsRef_SelfRefInOneOf().test_start()
