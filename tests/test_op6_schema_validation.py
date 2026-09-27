@@ -3979,6 +3979,10 @@ class TestCaseTestOp6BatchValidate_DependentOfDiscarded(HttpRunner):
         get_gts_base_url()
     )
 
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
     teststeps = [
         Step(
             RunRequest("register batch where B depends on the invalid A")
@@ -4039,6 +4043,10 @@ class TestCaseTestOp6BatchValidate_DuplicateId(HttpRunner):
     config = Config("OP#6 batch validate: conflicting duplicate id").base_url(
         get_gts_base_url()
     )
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
 
     teststeps = [
         Step(
