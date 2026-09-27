@@ -3940,5 +3940,131 @@ def test_op6_batch_validate_never_exposes_uncommitted_entities():
     )
 
 
+# ---------------------------------------------------------------------------
+# OP#6 - batch registration must not publish a schema whose dependency is
+# rejected in the same batch, and must not silently drop a duplicated id.
+#
+# POST /type-schemas?validate=true validates a batch as a unit against the whole
+# staged set, so an entry can resolve intra-batch references/ancestors
+# regardless of order. Two integrity guarantees follow that the
+# "never expose an uncommitted entity" probe above does not exercise, because
+# there every valid entry is independent of the failing one:
+#
+#   1. A survivor must never be committed when a sibling it depends on is itself
+#      rejected. If B references A and A fails validation, an implementation that
+#      validates every entry once against the fully-staged set sees B pass (A is
+#      still staged) and would then commit B with a dangling reference after A is
+#      discarded. A correct implementation re-validates the survivors against the
+#      reduced set and rejects B too.
+#   2. A batch that carries the same id twice with different content must not
+#      keep only the last entry and report both as ok - staging keyed purely by
+#      id lets the entries clobber each other. At most one may commit.
+# ---------------------------------------------------------------------------
+
+
+class TestCaseTestOp6BatchValidate_DependentOfDiscarded(HttpRunner):
+    """A survivor must not be committed when a sibling it depends on is rejected.
+
+    Under any-present ref validation, entry B carries an x-gts-ref to A, and A
+    carries an x-gts-ref to a type that is never registered. Validated against
+    the fully staged set B passes (A is present) while A fails (its target is
+    missing); a single-pass implementation would commit B with a dangling
+    reference to the discarded A. A correct implementation rejects both, so
+    neither is retrievable afterwards.
+
+    Bodies use `$$id`/`$$schema` so HttpRunner does not treat `$` as a variable.
+    """
+
+    config = Config("OP#6 batch validate: dependent of discarded sibling").base_url(
+        get_gts_base_url()
+    )
+
+    teststeps = [
+        Step(
+            RunRequest("register batch where B depends on the invalid A")
+            .post("/type-schemas")
+            .with_params(**{"validate": "true", "gts-ref-validation": "any-present"})
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdepdisc._.a.v1~",
+                    "type": "object",
+                    "properties": {
+                        "r": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.batchdepdisc._.missing.v1~",
+                        }
+                    },
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdepdisc._.b.v1~",
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "string", "x-gts-ref": "gts.x.batchdepdisc._.a.v1~"}
+                    },
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.results[0].ok", False)
+            .assert_equal("body.results[1].ok", False)
+        ),
+        Step(
+            RunRequest("invalid A must not be registered")
+            .get("/entities/gts.x.batchdepdisc._.a.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("dependent B must not be registered")
+            .get("/entities/gts.x.batchdepdisc._.b.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseTestOp6BatchValidate_DuplicateId(HttpRunner):
+    """A validate=true batch that carries the same id twice with different content
+    must not commit both entries. Staging keyed purely by id would let the second
+    entry silently overwrite the first while both report ok; a correct
+    implementation rejects at least one, so the aggregate ok is false. Bodies use
+    `$$id`/`$$schema` so HttpRunner does not treat `$` as a variable.
+    """
+
+    config = Config("OP#6 batch validate: conflicting duplicate id").base_url(
+        get_gts_base_url()
+    )
+
+    teststeps = [
+        Step(
+            RunRequest("register batch with the same id twice (different content)")
+            .post("/type-schemas")
+            .with_params(**{"validate": "true"})
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdupid._.t.v1~",
+                    "type": "object",
+                    "title": "a",
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdupid._.t.v1~",
+                    "type": "object",
+                    "title": "b",
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseTestOp6ValidateInstance_ValidInstance().test_start()
