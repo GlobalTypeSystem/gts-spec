@@ -3001,6 +3001,137 @@ class TestCaseOp6ExplicitSchemaRequiresCanonicalIdentity(HttpRunner):
     ]
 
 
+class TestCaseOp6BatchTypeSchemaValidateEnforced(HttpRunner):
+    """``POST /type-schemas?validate=true`` runs full validation per entry.
+
+    Batch registration MUST honor ``?validate`` exactly as ``POST /entities``
+    does. With ``validate=true`` an entry whose ``$ref`` targets a type that is
+    not registered is rejected (unresolved reference), so its per-item ``ok``
+    is ``false`` and the aggregate ``ok`` is ``false``. Without ``validate``
+    the same forward reference is accepted (its target may be registered
+    later), so the entry registers with ``ok: true``. The contrast is what
+    proves ``?validate`` is actually applied to each entry rather than dropped.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: ?validate is enforced per entry"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("validate=true rejects an entry with an unresolved $$ref")
+            .post("/type-schemas")
+            .with_params(validate="true")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.needs_ref.v1~",
+                    "type": "object",
+                    "properties": {
+                        "a": {"$$ref": "gts://gts.x.test6batchval._.missing.v1~"}
+                    },
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.results[0].ok", False)
+        ),
+        Step(
+            RunRequest("without validate the same forward reference is accepted")
+            .post("/type-schemas")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.fwd_ref.v1~",
+                    "type": "object",
+                    "properties": {
+                        "a": {"$$ref": "gts://gts.x.test6batchval._.missing.v1~"}
+                    },
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.results[0].ok", True)
+        ),
+    ]
+
+
+class TestCaseOp6BatchTypeSchemaValidateAcceptsValid(HttpRunner):
+    """``POST /type-schemas?validate=true`` still accepts a valid schema.
+
+    Guard against over-rejection: a self-contained, well-formed schema must
+    register successfully even when full validation is requested.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: ?validate accepts a valid schema"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("validate=true registers a valid self-contained schema")
+            .post("/type-schemas")
+            .with_params(validate="true")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.valid.v1~",
+                    "type": "object",
+                    "properties": {"prop": {"type": "string"}},
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.results[0].ok", True)
+            .assert_equal(
+                "body.results[0].type_id", "gts.x.test6batchval._.valid.v1~"
+            )
+        ),
+    ]
+
+
+class TestCaseOp6BatchTypeSchemaRejectsInvalidRefValidationMode(HttpRunner):
+    """``/type-schemas`` rejects a malformed ``gts-ref-validation`` with 422.
+
+    A bad ``gts-ref-validation`` spelling is a request-level error, so the
+    whole batch is refused with 422 before any entry is registered - the same
+    contract the single-entity registration path enforces.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: invalid gts-ref-validation is rejected"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject a bogus gts-ref-validation mode")
+            .post("/type-schemas")
+            .with_params(**{"gts-ref-validation": "bogus"})
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.badmode.v1~",
+                    "type": "object",
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
 class TestCaseOp6ValidateJson_MalformedExplicitType(HttpRunner):
     config = Config("OP#6 validate-json: malformed explicit type").base_url(get_gts_base_url())
 
