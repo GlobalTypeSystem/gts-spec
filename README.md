@@ -1468,6 +1468,12 @@ Implement a simple in-memory GTS entity registry with optional validation on reg
 
 Registration and removal are explicit registry operations. Validation operations MUST NOT add, replace, or remove entities. In particular, an entity accepted by an earlier registration without validation MUST remain stored when a later validation reports it as invalid; deciding whether to remove that entity is the client's explicit responsibility. A combined registration-with-validation request is atomic from the client's perspective: if validation fails, no new entity is committed and any entity previously stored under the same identifier remains unchanged.
 
+**Batch Type Schema Registration:** The `/type-schemas` endpoint accepts a JSON array of GTS Type Schema documents and registers them in batch. The GTS Type Identifier of each entry is derived from its embedded `$id`. Like single-entity registration, the batch endpoint supports optional query parameters:
+- `validate` (boolean, default `false`): When `true`, enables full validation for every schema in the batch.
+- `gts-ref-validation` (`none` | `any-present` | `any-valid`, default `any-valid`): Specifies the reference-validation policy for `x-gts-ref` constraints when `validate=true`. An invalid mode value is rejected with HTTP 422 before registering any entry.
+
+When `validate=true`, implementations MUST stage the entire batch so that intra-batch references (such as `$ref` to sibling schemas or derivation inheritance where a child appears before its parent in the batch array) resolve successfully regardless of entry ordering. In a batch containing both valid and invalid entries, only entries that pass validation are committed to the registry; invalid entries are reported with `"ok": false` and are never committed or exposed to concurrent reads.
+
 ### 9.4 - CLI support
 
 Provide a CLI wrapping OPs for local use and CI: e.g., `gts validate`, `gts parse`, `gts match`, `gts uuid`, `gts compat`, `gts cast`, `gts query`, `gts get`. Use non-zero exit codes on validation/compatibility failures for pipeline integration.
