@@ -1496,7 +1496,9 @@ Use `x-gts-ref` in GTS schemas (JSON schemas) to declare that a string field is 
 
 Allowed values:
 - `"x-gts-ref": "<gts-pattern>"` — **wildcard**. Any GTS wildcard pattern (§10); e.g. `gts.*`, `gts.cf.core.am.*`, or `gts.x.core.events.topic.v1~*`. The field value MUST be a syntactically valid GTS identifier (see OP#1) that matches the pattern.
-- `"x-gts-ref": "<gts-prefix>"` — **specific reference**, where `<gts-prefix>` is a concrete GTS identifier such as `gts.x.core.events.topic.v1~`. The field value MUST be a syntactically valid GTS identifier that begins with `<gts-prefix>` (a `startsWith` match, see §8.1/8.2). A prefix ending in `~` matches the identifier itself **and** any identifier derived from it: `gts.cf.core.iam.user.v1~` is equivalent to matching `gts.cf.core.iam.user.v1~` **or** `gts.cf.core.iam.user.v1~*` (see §3.5, §10).
+- `"x-gts-ref": "<gts-id>"` — **concrete identifier reference**, where `<gts-id>` is a concrete GTS identifier:
+  - If `<gts-id>` is a **Type Identifier** (ending in `~`, such as `gts.x.core.events.topic.v1~`), it matches the identifier itself **and** any identifier derived from or instantiated under it: `gts.cf.core.iam.user.v1~` is equivalent to matching `gts.cf.core.iam.user.v1~` **or** `gts.cf.core.iam.user.v1~*` (see §3.5, §10).
+  - If `<gts-id>` is an **Instance Identifier** (not ending in `~`, such as `...item.v1~x.vendor._.thing.v1`), it requires an **exact match** on that specific instance identifier. Textual prefix supersets across segment or version boundaries (such as `...thing.v12` when referencing `...thing.v1`) MUST NOT match.
 - `"x-gts-ref": "/$id"` — **selected-type self-reference**. Resolves to the top-level `$id` of the leaf (right-most derived) GTS Type Schema being validated, without `gts://`. This remains the root when the constraint is inherited through `$ref` or `allOf`. Rooted matching applies: the leaf and its descendants match; its ancestors and siblings do not. Use `const` for exact equality, or a literal GTS ID to keep the reference rooted at a specific base type.
 
 For example, if base type `A~` declares `x-gts-ref: "/$id"` and leaf type `A~B~` imports that constraint, validation against `A~B~` resolves the operand to `A~B~`. Values `A~B~` and `A~B~C` match; ancestor `A~` and sibling `A~D~` do not.
@@ -1516,7 +1518,8 @@ Implementation notes:
 
 - Treating `x-gts-ref` like JSON Schema string constraints:
   - For a wildcard pattern (e.g. `gts.*`, `gts.cf.core.am.*`), validate that the field value is a well-formed GTS ID (OP#1) and matches the pattern (§10).
-  - For a specific literal prefix (e.g. `gts.x.core.modules.capability.v1~`), enforce it similarly to a `startsWith(...)` check against the provided GTS prefix (sections 8.1/8.2), and validate that the value is a well-formed GTS ID.
+  - For a concrete Type Identifier ending in `~` (e.g. `gts.x.core.modules.capability.v1~`), match the identifier itself and any descendant identifier rooted at that type boundary.
+  - For a concrete Instance Identifier (not ending in `~`), match only that exact identifier on segment boundaries; a raw `startsWith(...)` check MUST NOT leak across segment or version boundaries.
   - Treat `/$id` as a reserved operand, not as general JSON Pointer support. Resolve it directly from the canonical top-level `$id` of the selected leaf GTS Type Schema and strip `gts://` before matching.
   - Reject every other slash-prefixed operand during registration. Implementations MUST NOT resolve schema-local paths or chain through another `x-gts-ref` value.
   - Registry lookup and target validation for `x-gts-ref` are implementation-specific. Implementations may use policies such as `none`, `any-present`, and `any-valid` described above; operand syntax and the pointer prohibition are mandatory in every mode.
