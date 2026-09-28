@@ -4687,14 +4687,17 @@ class TestCaseTestOp12TypeDerivationValidation_AncestorCrossDialectRefRejected(H
     §11.0: every reference in a derivation hierarchy must preserve the root's
     dialect, and §12: a type is only as valid as the types it builds on. Here the
     root/ancestor ``base`` (Draft-07) references a Draft 2020-12 schema; the
-    descendant ``child`` derives by chained ``$id`` re-declaration and does NOT
-    itself reference the 2020-12 schema. Validating the descendant must still be
-    rejected, because its ancestor is invalid.
+    descendant ``child`` derives by chained ``$id`` re-declaration, redeclares
+    ``ext`` compatibly without ``$ref``, and does NOT itself reference the
+    2020-12 schema. Validating the descendant must still be rejected, because
+    its ancestor is invalid.
 
-    This isolates the ancestor case from the already-covered leaf case: an
-    implementation that only walks the *selected* type's reference graph (rather
-    than the whole chain + reference closure, as the reference implementation
-    does) would wrongly accept the descendant.
+    This isolates the ancestor dialect check from derivation incompatibility:
+    because ``child`` compatibly redeclares ``ext``, it would be accepted if
+    ancestor validity were not checked. An implementation that only walks the
+    *selected* type's reference graph (rather than the whole chain + reference
+    closure, as the reference implementation does) would wrongly accept the
+    descendant.
     """
 
     config = Config("OP#12 - Ancestor cross-dialect ref rejected").base_url(
@@ -4743,7 +4746,13 @@ class TestCaseTestOp12TypeDerivationValidation_AncestorCrossDialectRefRejected(H
             "gts://gts.x.test12anc.base.item.v1~",
             {
                 "type": "object",
-                "properties": {"label": {"type": "string"}},
+                "properties": {
+                    "label": {"type": "string"},
+                    "ext": {
+                        "type": "object",
+                        "properties": {"note": {"type": "string"}},
+                    },
+                },
             },
             "register descendant by re-declaration (no ref to ancestor or target)",
         ),

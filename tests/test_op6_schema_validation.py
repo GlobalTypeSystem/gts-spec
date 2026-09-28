@@ -3582,8 +3582,10 @@ class TestCaseTestOp6ValidateInstance_AncestorCrossDialectRefRejected(HttpRunner
     cross-dialect ``$ref``.
 
     The instance's type (``child``) derives by chained ``$id`` from ``base``
-    (Draft-07), which references a Draft 2020-12 schema. The instance is
-    structurally valid against ``child`` and ``child`` itself references nothing
+    (Draft-07), which references a Draft 2020-12 schema. The descendant
+    redeclares ``ext`` compatibly without ``$ref``, and the instance is
+    structurally valid against both ``child`` and ``base`` with a valid ``ext``
+    object. Neither ``child`` nor the instance itself references anything
     cross-dialect — so an implementation that only walks the selected type's
     reference graph accepts it. Per §11.0 + §12 the mixed-dialect graph reachable
     through the ancestor must still be rejected (the reference implementation
@@ -3634,7 +3636,13 @@ class TestCaseTestOp6ValidateInstance_AncestorCrossDialectRefRejected(HttpRunner
                 "$$id": "gts://gts.x.test6anc.base.item.v1~x.test6anc._.child.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
-                "properties": {"label": {"type": "string"}},
+                "properties": {
+                    "label": {"type": "string"},
+                    "ext": {
+                        "type": "object",
+                        "properties": {"note": {"type": "string"}},
+                    },
+                },
             })
             .validate()
             .assert_equal("status_code", 200)
@@ -3649,6 +3657,7 @@ class TestCaseTestOp6ValidateInstance_AncestorCrossDialectRefRejected(HttpRunner
                     "x.test6anc._.thing.v1.0"
                 ),
                 "label": "example",
+                "ext": {"note": "valid"},
             })
             .validate()
             .assert_equal("status_code", 200)
