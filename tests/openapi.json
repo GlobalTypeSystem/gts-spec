@@ -195,6 +195,34 @@
       "post": {
         "summary": "Register a batch of GTS Type Schemas",
         "operationId": "add_type_schemas_type_schemas_post",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "title": "Validate",
+              "default": false
+            },
+            "name": "validate",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "none",
+                "any-present",
+                "any-valid"
+              ],
+              "title": "Ref Validation",
+              "default": "any-valid"
+            },
+            "description": "x-gts-ref validation mode used when validate=true",
+            "name": "gts-ref-validation",
+            "in": "query"
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {

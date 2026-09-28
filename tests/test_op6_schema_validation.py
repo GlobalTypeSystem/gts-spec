@@ -6,6 +6,11 @@ including well-known instances (chained GTS IDs), anonymous instances
 extended JSON Schema constraints (formats, nesting, enums, arrays).
 """
 
+import threading
+import uuid
+
+import requests
+
 from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
     register as _register,
@@ -3001,6 +3006,312 @@ class TestCaseOp6ExplicitSchemaRequiresCanonicalIdentity(HttpRunner):
     ]
 
 
+class TestCaseOp6BatchTypeSchemaValidateEnforced(HttpRunner):
+    """``POST /type-schemas?validate=true`` runs full validation per entry.
+
+    Batch registration MUST honor ``?validate`` exactly as ``POST /entities``
+    does. With ``validate=true`` an entry whose ``$ref`` targets a type that is
+    not registered is rejected (unresolved reference), so its per-item ``ok``
+    is ``false`` and the aggregate ``ok`` is ``false``. Without ``validate``
+    the same forward reference is accepted (its target may be registered
+    later), so the entry registers with ``ok: true``. The contrast is what
+    proves ``?validate`` is actually applied to each entry rather than dropped.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: ?validate is enforced per entry"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("validate=true rejects an entry with an unresolved $$ref")
+            .post("/type-schemas")
+            .with_params(validate="true")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.needs_ref.v1~",
+                    "type": "object",
+                    "properties": {
+                        "a": {"$$ref": "gts://gts.x.test6batchval._.missing.v1~"}
+                    },
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.results[0].ok", False)
+        ),
+        Step(
+            RunRequest("without validate the same forward reference is accepted")
+            .post("/type-schemas")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.fwd_ref.v1~",
+                    "type": "object",
+                    "properties": {
+                        "a": {"$$ref": "gts://gts.x.test6batchval._.missing.v1~"}
+                    },
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.results[0].ok", True)
+        ),
+    ]
+
+
+class TestCaseOp6BatchTypeSchemaValidateAcceptsValid(HttpRunner):
+    """``POST /type-schemas?validate=true`` still accepts a valid schema.
+
+    Guard against over-rejection: a self-contained, well-formed schema must
+    register successfully even when full validation is requested.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: ?validate accepts a valid schema"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("validate=true registers a valid self-contained schema")
+            .post("/type-schemas")
+            .with_params(validate="true")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.valid.v1~",
+                    "type": "object",
+                    "properties": {"prop": {"type": "string"}},
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.results[0].ok", True)
+            .assert_equal(
+                "body.results[0].type_id", "gts.x.test6batchval._.valid.v1~"
+            )
+        ),
+    ]
+
+
+class TestCaseOp6BatchTypeSchemaRejectsInvalidRefValidationMode(HttpRunner):
+    """``/type-schemas`` rejects a malformed ``gts-ref-validation`` with 422.
+
+    A bad ``gts-ref-validation`` spelling is a request-level error, so the
+    whole batch is refused with 422 before any entry is registered - the same
+    contract the single-entity registration path enforces.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: invalid gts-ref-validation is rejected"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("reject a bogus gts-ref-validation mode")
+            .post("/type-schemas")
+            .with_params(**{"gts-ref-validation": "bogus"})
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchval._.badmode.v1~",
+                    "type": "object",
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 422)
+        ),
+    ]
+
+
+class TestCaseOp6BatchValidateOrderIndependentReference(HttpRunner):
+    """``/type-schemas?validate=true`` resolves intra-batch ``$ref`` regardless of order.
+
+    A batch is validated as a unit: an entry may reference another entry in the
+    same batch even when the referrer appears BEFORE its target. This only holds
+    if the implementation stages every entry first and validates them against
+    the fully-staged set (rather than validating each entry against only what
+    was already committed). Both entries must register, and both must then be
+    retrievable.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: validate resolves a forward intra-batch reference"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register referrer BEFORE its target in one validated batch")
+            .post("/type-schemas")
+            .with_params(validate="true")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchorder._.referrer.v1~",
+                    "type": "object",
+                    "properties": {
+                        "child": {"$$ref": "gts://gts.x.test6batchorder._.target.v1~"}
+                    },
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchorder._.target.v1~",
+                    "type": "object",
+                    "properties": {"n": {"type": "string"}},
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.results[0].ok", True)
+            .assert_equal("body.results[1].ok", True)
+        ),
+        Step(
+            RunRequest("the referrer is retrievable after the batch")
+            .get("/entities/gts.x.test6batchorder._.referrer.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest("the target is retrievable after the batch")
+            .get("/entities/gts.x.test6batchorder._.target.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+    ]
+
+
+class TestCaseOp6BatchValidateOrderIndependentInheritance(HttpRunner):
+    """``/type-schemas?validate=true`` resolves intra-batch inheritance regardless of order.
+
+    A derived Type Schema (chained ``$id``, composing its base with ``allOf`` +
+    ``$ref``) may appear BEFORE its base in the same validated batch. Both must
+    register - proving derivation/ancestor resolution sees the whole batch, not
+    just what was already committed.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: ?validate resolves a forward intra-batch inheritance"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register derived BEFORE its base in one validated batch")
+            .post("/type-schemas")
+            .with_params(validate="true")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchorder._.base.v1~x.test6batchorder._.derived.v1~",
+                    "type": "object",
+                    "allOf": [{"$$ref": "gts://gts.x.test6batchorder._.base.v1~"}],
+                    "properties": {"extra": {"type": "string"}},
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchorder._.base.v1~",
+                    "type": "object",
+                    "properties": {"b": {"type": "string"}},
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+            .assert_equal("body.results[0].ok", True)
+            .assert_equal("body.results[1].ok", True)
+        ),
+        Step(
+            RunRequest("the derived schema is retrievable after the batch")
+            .get("/entities/gts.x.test6batchorder._.base.v1~x.test6batchorder._.derived.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+    ]
+
+
+class TestCaseOp6BatchValidateAtomicityValidPersistsInvalidDoesNot(HttpRunner):
+    """``/type-schemas?validate=true`` publishes only the entries that pass validation.
+
+    In a mixed batch, the valid entry is committed and retrievable while the
+    invalid one (here an unresolved ``$ref``) is rejected in ``results`` AND is
+    NOT registered - a client can never observe an entity that failed
+    validation. The store must not be left holding the invalid entry, so a
+    follow-up read for it returns not-found.
+    """
+
+    config = Config(
+        "OP#6 type-schemas: ?validate commits only the valid entries"
+    ).base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register a valid entry alongside an invalid one")
+            .post("/type-schemas")
+            .with_params(validate="true")
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchatomic._.valid.v1~",
+                    "type": "object",
+                    "properties": {"n": {"type": "string"}},
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.test6batchatomic._.invalid.v1~",
+                    "type": "object",
+                    "properties": {
+                        "a": {"$$ref": "gts://gts.x.test6batchatomic._.never_registered.v1~"}
+                    },
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.results[0].ok", True)
+            .assert_equal("body.results[1].ok", False)
+        ),
+        Step(
+            RunRequest("the valid entry was committed and is retrievable")
+            .get("/entities/gts.x.test6batchatomic._.valid.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", True)
+        ),
+        Step(
+            RunRequest("the invalid entry was never committed and is not found")
+            .get("/entities/gts.x.test6batchatomic._.invalid.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
 class TestCaseOp6ValidateJson_MalformedExplicitType(HttpRunner):
     config = Config("OP#6 validate-json: malformed explicit type").base_url(get_gts_base_url())
 
@@ -3262,6 +3573,512 @@ class TestCaseOp6TypeResubmission(HttpRunner):
             )
             .validate()
             .assert_equal("status_code", 409)
+        ),
+    ]
+
+
+class TestCaseTestOp6ValidateInstance_AncestorCrossDialectRefRejected(HttpRunner):
+    """OP#6 - An instance is rejected when an *ancestor* of its type has a
+    cross-dialect ``$ref``.
+
+    The instance's type (``child``) derives by chained ``$id`` from ``base``
+    (Draft-07), which references a Draft 2020-12 schema. The descendant
+    redeclares ``ext`` compatibly without ``$ref``, and the instance is
+    structurally valid against both ``child`` and ``base`` with a valid ``ext``
+    object. Neither ``child`` nor the instance itself references anything
+    cross-dialect — so an implementation that only walks the selected type's
+    reference graph accepts it. Per §11.0 + §12 the mixed-dialect graph reachable
+    through the ancestor must still be rejected (the reference implementation
+    validates the whole chain + reference closure).
+    """
+
+    config = Config("OP#6 - Instance rejected via ancestor cross-dialect ref").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    instance_id = (
+        "gts.x.test6anc.base.item.v1~x.test6anc._.child.v1~x.test6anc._.thing.v1.0"
+    )
+    teststeps = [
+        Step(
+            RunRequest("register Draft 2020-12 referenced schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6anc.ext.detail.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {"note": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register Draft-07 ancestor referencing the 2020-12 schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6anc.base.item.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "ext": {"$$ref": "gts://gts.x.test6anc.ext.detail.v1~"},
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register Draft-07 descendant type by re-declaration")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.test6anc.base.item.v1~x.test6anc._.child.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "properties": {
+                    "label": {"type": "string"},
+                    "ext": {
+                        "type": "object",
+                        "properties": {"note": {"type": "string"}},
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register instance of the descendant")
+            .post("/entities")
+            .with_json({
+                "type": "gts.x.test6anc.base.item.v1~x.test6anc._.child.v1~",
+                "id": (
+                    "gts.x.test6anc.base.item.v1~x.test6anc._.child.v1~"
+                    "x.test6anc._.thing.v1.0"
+                ),
+                "label": "example",
+                "ext": {"note": "valid"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            instance_id,
+            False,
+            "instance whose ancestor has a cross-dialect ref must be rejected",
+            expected_id=instance_id,
+        ),
+    ]
+
+
+class TestCaseTestOp6ValidateInstance_RefSiblingKeywordsApplied(HttpRunner):
+    """OP#6 - Keywords that sit next to a ``$ref`` still constrain the instance
+    under Draft 2019-09/2020-12.
+
+    Those dialects evaluate ``$ref`` alongside its sibling keywords (the ``$ref``
+    is no longer an exclusive replacement, unlike Draft-07). An implementation
+    that resolves a GTS ``$ref`` by inlining only the referenced document and
+    discarding the sibling keywords loses the extra ``required``/``properties``
+    constraint, so an instance missing the sibling-required field is wrongly
+    accepted. The referenced schema is inlined *and* the siblings must apply.
+    """
+
+    config = Config("OP#6 - ref sibling keywords are applied").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Referenced base object (2020-12), intentionally permissive.
+        Step(
+            RunRequest("register referenced person schema (2020-12)")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.refsib._.person.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Host schema: `author` inherits person via $ref AND adds a sibling
+        # `required`/`properties` constraint (nickname) that 2020-12 must apply.
+        Step(
+            RunRequest("register host schema with ref siblings (2020-12)")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.refsib._.doc.v1~",
+                "$$schema": "https://json-schema.org/draft/2020-12/schema",
+                "type": "object",
+                "required": ["author"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "author": {
+                        "$$ref": "gts://gts.x.refsib._.person.v1~",
+                        "required": ["nickname"],
+                        "properties": {"nickname": {"type": "string"}},
+                    },
+                },
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Author with the sibling-required nickname -> valid.
+        Step(
+            RunRequest("register doc instance satisfying ref siblings")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.refsib._.doc.v1~x.vendor._.d1.v1",
+                "author": {"name": "Ada", "nickname": "a"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.refsib._.doc.v1~x.vendor._.d1.v1",
+            True,
+            "instance satisfying ref sibling constraint must pass",
+        ),
+        # Author missing the sibling-required nickname -> must be rejected.
+        Step(
+            RunRequest("register doc instance violating ref siblings")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.refsib._.doc.v1~x.vendor._.d2.v1",
+                "author": {"name": "Ada"},
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.refsib._.doc.v1~x.vendor._.d2.v1",
+            False,
+            "instance violating ref sibling constraint must fail",
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# OP#6 - batch registration must never expose an uncommitted entity.
+#
+# POST /type-schemas?validate=true validates a batch as a unit. An
+# implementation that made this order-independent by registering every entry
+# and then rolling back the ones that fail would briefly publish entities that
+# have not passed validation - observable by a concurrent reader. The correct
+# design stages entries invisibly, validates them, and only then commits the
+# survivors, so a concurrent read never sees an entry that failed (or has not
+# yet passed) validation.
+#
+# This is a best-effort concurrency probe: while a large validated batch that
+# contains a deliberately-invalid entry is in flight, several background threads
+# hammer GET /entities/<invalid-id> and assert the invalid entity is NEVER
+# visible. The assertion cannot false-fail a correct implementation (the invalid
+# entry is never committed, so it is never visible before, during, or after the
+# batch); against a register-then-rollback implementation the probe can catch
+# the entry while it is transiently published. The httprunner-based classes
+# above are sequential, so this check is expressed as a plain threaded pytest
+# test, and the whole registration+probe cycle is repeated many times to widen
+# the window.
+# ---------------------------------------------------------------------------
+
+_STAGING_RACE_DRAFT7 = "http://json-schema.org/draft-07/schema#"
+_STAGING_RACE_ATTEMPTS = 100
+_STAGING_RACE_PROBE_THREADS = 4
+_STAGING_RACE_VALID_PER_ATTEMPT = 2
+_STAGING_RACE_INVALID_PER_ATTEMPT = 1
+# Query limit high enough to return every committed entry in the shared
+# namespace at once (so a transiently-published invalid entry can never hide
+# past the page boundary); the server caps this at 1000.
+_STAGING_RACE_QUERY_LIMIT = 1000
+
+
+def _staging_race_strip_scheme(value) -> str:
+    return value[len("gts://"):] if isinstance(value, str) and value.startswith("gts://") else value
+
+
+def _staging_race_batch(pkg: str, attempt: int) -> tuple[list[dict], set[str]]:
+    """One mixed batch for a single registration attempt: a couple of valid
+    schemas plus an invalid one (unresolved $ref), interleaved. Returns the
+    batch and the set of its VALID ids."""
+    valid_ids = {
+        f"gts.x.{pkg}._.a{attempt}v{i}.v1~" for i in range(_STAGING_RACE_VALID_PER_ATTEMPT)
+    }
+    entries: list[dict] = []
+    for i, type_id in enumerate(sorted(valid_ids)):
+        entries.append(
+            {
+                "$schema": _STAGING_RACE_DRAFT7,
+                "$id": f"gts://{type_id}",
+                "type": "object",
+                "properties": {"p": {"type": "string"}},
+            }
+        )
+        if i < _STAGING_RACE_INVALID_PER_ATTEMPT:
+            entries.append(
+                {
+                    "$schema": _STAGING_RACE_DRAFT7,
+                    "$id": f"gts://gts.x.{pkg}._.a{attempt}bad{i}.v1~",
+                    "type": "object",
+                    # Unresolved reference to a type that is never registered:
+                    # staged, then fails validation, so it must never commit.
+                    "properties": {"a": {"$ref": f"gts://gts.x.{pkg}._.a{attempt}never{i}.v1~"}},
+                }
+            )
+    return entries, valid_ids
+
+
+def test_op6_batch_validate_never_exposes_uncommitted_entities():
+    """Keep several wildcard-LIST probe workers running continuously while many
+    validate=true batches are registered back to back. Each batch mixes valid
+    schemas with an invalid one (unresolved $ref). The probers start before the
+    first registration and stop after the last, and continuously LIST the shared
+    namespace via a ``<pkg>.*`` wildcard: any id they ever see that is not one
+    of the known-valid ids is an entity that should never have been visible - so
+    a transiently-published invalid entry is caught regardless of its GTS ID.
+    Repeating the registration ~100 times widens the window."""
+    base = get_gts_base_url()
+    query_url = f"{base}/query"
+    pkg = f"racecond{uuid.uuid4().hex[:8]}"
+    wildcard = f"gts.x.{pkg}.*"
+
+    # Every valid id across all attempts, precomputed so a probe can flag any
+    # returned id that is not in this allow-set.
+    valid_ids: set[str] = set()
+    for attempt in range(_STAGING_RACE_ATTEMPTS):
+        _, attempt_valid = _staging_race_batch(pkg, attempt)
+        valid_ids |= attempt_valid
+
+    stop = threading.Event()
+    # Barrier so every prober is actively querying BEFORE the first registration
+    # (main thread is the +1 party).
+    ready = threading.Barrier(_STAGING_RACE_PROBE_THREADS + 1)
+    leaks: list[str] = []
+    leaks_lock = threading.Lock()
+
+    def signal_ready_once(state):
+        if not state["ready"]:
+            state["ready"] = True
+            try:
+                ready.wait(timeout=30)
+            except threading.BrokenBarrierError:
+                pass
+
+    def probe():
+        session = requests.Session()
+        state = {"ready": False}
+        while not stop.is_set():
+            try:
+                response = session.get(
+                    query_url,
+                    params={"expr": wildcard, "limit": _STAGING_RACE_QUERY_LIMIT},
+                    timeout=5,
+                )
+            except requests.RequestException:
+                # Signal readiness even on a transient error so the barrier is
+                # never left waiting on this prober.
+                signal_ready_once(state)
+                continue
+            # Signal readiness only after the first query round-trip, so the
+            # probers are genuinely live before the first registration.
+            signal_ready_once(state)
+            if response.status_code != 200:
+                continue
+            try:
+                results = response.json().get("results") or []
+            except ValueError:
+                continue
+            for content in results:
+                type_id = _staging_race_strip_scheme(
+                    content.get("$id") if isinstance(content, dict) else None
+                )
+                if type_id is not None and type_id not in valid_ids:
+                    with leaks_lock:
+                        leaks.append(type_id)
+
+    probers = [
+        threading.Thread(target=probe, daemon=True) for _ in range(_STAGING_RACE_PROBE_THREADS)
+    ]
+    for prober in probers:
+        prober.start()
+    # Wait until every prober is live before the first registration, so the
+    # workers straddle the entire multi-registration window.
+    try:
+        ready.wait(timeout=30)
+    except threading.BrokenBarrierError:
+        pass
+
+    try:
+        for attempt in range(_STAGING_RACE_ATTEMPTS):
+            batch, _ = _staging_race_batch(pkg, attempt)
+            response = requests.post(
+                f"{base}/type-schemas",
+                params={"validate": "true"},
+                json=batch,
+                timeout=120,
+            )
+            assert response.status_code == 200, response.text
+            assert response.json()["ok"] is False, (
+                f"attempt {attempt}: batch with an invalid entry must report ok=false"
+            )
+    finally:
+        stop.set()
+        for prober in probers:
+            prober.join(timeout=10)
+
+    assert leaks == [], (
+        "an uncommitted/invalid entity was exposed to a concurrent wildcard list "
+        f"during a validate=true batch (observed {len(leaks)} time(s)); first: {leaks[0]}"
+    )
+
+    # Final committed state: the wildcard list returns exactly the valid ids -
+    # every invalid entry across all attempts was rejected and none is registered.
+    final = requests.get(
+        query_url, params={"expr": wildcard, "limit": _STAGING_RACE_QUERY_LIMIT}, timeout=10
+    ).json()
+    final_ids = {
+        _staging_race_strip_scheme(content.get("$id"))
+        for content in (final.get("results") or [])
+        if isinstance(content, dict)
+    }
+    assert final_ids == valid_ids, (
+        "after all attempts the namespace must contain exactly the valid ids; "
+        f"unexpected: {sorted(final_ids - valid_ids)}, missing: {sorted(valid_ids - final_ids)}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# OP#6 - batch registration must not publish a schema whose dependency is
+# rejected in the same batch, and must not silently drop a duplicated id.
+#
+# POST /type-schemas?validate=true validates a batch as a unit against the whole
+# staged set, so an entry can resolve intra-batch references/ancestors
+# regardless of order. Two integrity guarantees follow that the
+# "never expose an uncommitted entity" probe above does not exercise, because
+# there every valid entry is independent of the failing one:
+#
+#   1. A survivor must never be committed when a sibling it depends on is itself
+#      rejected. If B references A and A fails validation, an implementation that
+#      validates every entry once against the fully-staged set sees B pass (A is
+#      still staged) and would then commit B with a dangling reference after A is
+#      discarded. A correct implementation re-validates the survivors against the
+#      reduced set and rejects B too.
+#   2. A batch that carries the same id twice with different content must not
+#      keep only the last entry and report both as ok - staging keyed purely by
+#      id lets the entries clobber each other. At most one may commit.
+# ---------------------------------------------------------------------------
+
+
+class TestCaseTestOp6BatchValidate_DependentOfDiscarded(HttpRunner):
+    """A survivor must not be committed when a sibling it depends on is rejected.
+
+    Under any-present ref validation, entry B carries an x-gts-ref to A, and A
+    carries an x-gts-ref to a type that is never registered. Validated against
+    the fully staged set B passes (A is present) while A fails (its target is
+    missing); a single-pass implementation would commit B with a dangling
+    reference to the discarded A. A correct implementation rejects both, so
+    neither is retrievable afterwards.
+
+    Bodies use `$$id`/`$$schema` so HttpRunner does not treat `$` as a variable.
+    """
+
+    config = Config("OP#6 batch validate: dependent of discarded sibling").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register batch where B depends on the invalid A")
+            .post("/type-schemas")
+            .with_params(**{"validate": "true", "gts-ref-validation": "any-present"})
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdepdisc._.a.v1~",
+                    "type": "object",
+                    "properties": {
+                        "r": {
+                            "type": "string",
+                            "x-gts-ref": "gts.x.batchdepdisc._.missing.v1~",
+                        }
+                    },
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdepdisc._.b.v1~",
+                    "type": "object",
+                    "properties": {
+                        "x": {"type": "string", "x-gts-ref": "gts.x.batchdepdisc._.a.v1~"}
+                    },
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+            .assert_equal("body.results[0].ok", False)
+            .assert_equal("body.results[1].ok", False)
+        ),
+        Step(
+            RunRequest("invalid A must not be registered")
+            .get("/entities/gts.x.batchdepdisc._.a.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("dependent B must not be registered")
+            .get("/entities/gts.x.batchdepdisc._.b.v1~")
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseTestOp6BatchValidate_DuplicateId(HttpRunner):
+    """A validate=true batch that carries the same id twice with different content
+    must not commit both entries. Staging keyed purely by id would let the second
+    entry silently overwrite the first while both report ok; a correct
+    implementation rejects at least one, so the aggregate ok is false. Bodies use
+    `$$id`/`$$schema` so HttpRunner does not treat `$` as a variable.
+    """
+
+    config = Config("OP#6 batch validate: conflicting duplicate id").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        """Run the test steps."""
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register batch with the same id twice (different content)")
+            .post("/type-schemas")
+            .with_params(**{"validate": "true"})
+            .with_json([
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdupid._.t.v1~",
+                    "type": "object",
+                    "title": "a",
+                },
+                {
+                    "$$schema": "http://json-schema.org/draft-07/schema#",
+                    "$$id": "gts://gts.x.batchdupid._.t.v1~",
+                    "type": "object",
+                    "title": "b",
+                },
+            ])
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.ok", False)
         ),
     ]
 

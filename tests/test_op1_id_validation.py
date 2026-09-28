@@ -128,6 +128,49 @@ class TestCaseTestOp1IdValidationInvalid(HttpRunner):
     ]
 
 
+class TestCaseTestOp1IdValidation_UriFormRejected(HttpRunner):
+    """OP#1 - The ``gts://`` URI form is not a canonical identifier.
+
+    A GTS identifier is validated in its bare canonical form (``gts.xxx``). The
+    ``gts://`` scheme exists only to embed an identifier in JSON Schema
+    ``$id``/``$ref`` fields; URI-specific callers strip it before validation.
+    Passing a URI-form value directly to ``/validate-id`` must be rejected, so
+    the validated identifier never disagrees with its canonical form.
+    """
+
+    config = Config("OP#1 - Validate ID rejects gts:// URI form").base_url(
+        get_gts_base_url()
+    )
+
+    @pytest.mark.parametrize(
+        "param",
+        Parameters(
+            {
+                "id": [
+                    "gts://gts.x.test1.events.type.v1~",
+                    "gts://gts.x.test1.events.type.v1~x.vendor._.item.v1.0",
+                    "gts://gts://gts.x.test1.events.type.v1~",
+                ]
+            }
+        ),
+    )
+    def test_start(self, param):
+        super().test_start(param)
+
+    teststeps = [
+        Step(
+            RunRequest("validate gts_id in URI form is rejected")
+            .get("/validate-id")
+            .with_params(**{"gts_id": "${id}"})
+            .validate()
+            .assert_equal("status_code", 200)
+            .assert_equal("body.id", "${id}")
+            .assert_equal("body.valid", False)
+            .assert_not_equal("body.error", "")
+        ),
+    ]
+
+
 class TestCaseTestOp1IdValidation_MaxLengthSegments(HttpRunner):
     """OP#1 Extended - IDs with maximum length segments"""
     config = Config(

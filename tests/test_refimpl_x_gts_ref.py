@@ -167,6 +167,107 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_ExactRefSegmentBoundary(HttpRunner):
+    """x-gts-ref: an exact (non-wildcard, non-`~`) reference matches on a segment
+    boundary, not by raw string prefix.
+
+    An exact instance constraint ``...thing.v1`` must accept only that identifier,
+    not a textual superset such as ``...thing.v12``. A naive ``value.startsWith(pattern)``
+    check leaks across the version boundary and wrongly accepts a reference to a
+    *different* registered instance, so validation would pass an unrelated entity.
+    """
+
+    config = Config("x-gts-ref: exact ref segment boundary").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Base type whose instances are referenced by an exact x-gts-ref.
+        Step(
+            RunRequest("register exact-ref target type")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.refbound._.item.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Two instances where one id is a textual prefix of the other (v1 vs v12).
+        Step(
+            RunRequest("register exact target instance v1")
+            .post("/entities")
+            .with_json({"id": "gts.x.refbound._.item.v1~x.vendor._.thing.v1"})
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register sibling target instance v12")
+            .post("/entities")
+            .with_json({"id": "gts.x.refbound._.item.v1~x.vendor._.thing.v12"})
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Holder schema constrains `ref` to the EXACT v1 instance.
+        Step(
+            RunRequest("register holder schema with exact instance ref")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.refbound._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "x-gts-ref": "gts.x.refbound._.item.v1~x.vendor._.thing.v1",
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Exact match -> valid.
+        Step(
+            RunRequest("register holder instance referencing exact v1")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.refbound._.item.v1~x.vendor._.thing.v1",
+                "id": "gts.x.refbound._.holder.v1~x.vendor._.h1.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.refbound._.holder.v1~x.vendor._.h1.v1",
+            True,
+            "exact instance reference must pass",
+        ),
+        # Prefix superset (v12) -> must be rejected on the segment boundary.
+        Step(
+            RunRequest("register holder instance referencing superset v12")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.refbound._.item.v1~x.vendor._.thing.v12",
+                "id": "gts.x.refbound._.holder.v1~x.vendor._.h2.v1",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.refbound._.holder.v1~x.vendor._.h2.v1",
+            False,
+            "prefix-superset reference must fail (segment boundary)",
+        ),
+    ]
+
+
 class TestCaseXGtsRef_UnsupportedPointers(HttpRunner):
     """Every slash-prefixed x-gts-ref operand except /$id is prohibited."""
 
@@ -850,6 +951,121 @@ class TestCaseXGtsRef_OneOf(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.ok", False)
+        ),
+    ]
+
+
+class TestCaseXGtsRef_OneOfSharedStructuralKeywords(HttpRunner):
+    """x-gts-ref: oneOf branches that share structural keywords and differ only
+    by x-gts-ref must still validate.
+
+    The JSON Schema engine does not see x-gts-ref (its exclusivity is enforced
+    separately). Branches like ``{"type":"string","x-gts-ref":"...a~"}`` and
+    ``{"type":"string","x-gts-ref":"...b~"}`` are structurally identical once
+    x-gts-ref is set aside, so an implementation that hands the raw oneOf to a
+    structural validator sees *every* string match *both* branches and rejects
+    every value. A reference to a valid target must pass.
+    """
+
+    config = Config("x-gts-ref: oneOf shared structural keywords").base_url(
+        get_gts_base_url()
+    )
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        Step(
+            RunRequest("register target_a schema (shared-kw)")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_shared._.target_a.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register target_b schema (shared-kw)")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_shared._.target_b.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register target_a instance (shared-kw)")
+            .post("/entities")
+            .with_json({"id": "gts.x.testref_shared._.target_a.v1~x.vendor._.a1.v1.0"})
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register target_b instance (shared-kw)")
+            .post("/entities")
+            .with_json({"id": "gts.x.testref_shared._.target_b.v1~x.vendor._.b1.v1.0"})
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # oneOf branches share `type: string` and differ only by x-gts-ref.
+        Step(
+            RunRequest("register oneOf schema with shared structural keywords")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_shared._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "oneOf": [
+                            {"type": "string", "x-gts-ref": "gts.x.testref_shared._.target_a.v1~"},
+                            {"type": "string", "x-gts-ref": "gts.x.testref_shared._.target_b.v1~"},
+                        ],
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Reference to a valid target_a instance -> matches exactly one branch.
+        Step(
+            RunRequest("register holder instance referencing target_a")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_shared._.target_a.v1~x.vendor._.a1.v1.0",
+                "id": "gts.x.testref_shared._.holder.v1~x.vendor._.h1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_shared._.holder.v1~x.vendor._.h1.v1.0",
+            True,
+            "oneOf with shared structural keywords must accept a valid target",
+        ),
+        # Reference to a valid target_b instance -> matches the other branch.
+        Step(
+            RunRequest("register holder instance referencing target_b")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_shared._.target_b.v1~x.vendor._.b1.v1.0",
+                "id": "gts.x.testref_shared._.holder.v1~x.vendor._.h2.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_shared._.holder.v1~x.vendor._.h2.v1.0",
+            True,
+            "oneOf with shared structural keywords must accept the other target",
         ),
     ]
 
@@ -2570,6 +2786,275 @@ class TestCaseXGtsRef_PrefixItems(HttpRunner):
     ]
 
 
+class TestCaseXGtsRef_NullableReference(HttpRunner):
+    """x-gts-ref: nullable reference via a combinator with a neutral branch.
+
+    The common "optional reference" shape mixes an x-gts-ref branch with a
+    plain structural branch that carries no x-gts-ref, e.g.::
+
+        "oneOf": [
+            {"type": "string", "x-gts-ref": "gts.a._.b.v1~"},
+            {"type": "null"}
+        ]
+
+    The neutral ``{"type": "null"}`` branch has no x-gts-ref, so the standard
+    JSON Schema engine already enforces which branch a value belongs to. An
+    implementation that runs its own x-gts-ref combinator pass must treat a
+    branch without an x-gts-ref as neutral rather than a branch that always
+    "matches"; otherwise a valid string reference counts as matching *both*
+    branches and a valid value is rejected. Earlier combinator coverage only
+    exercised combinators where *every* branch carried an x-gts-ref, so this
+    mixed shape was never checked.
+    """
+
+    config = Config("x-gts-ref: nullable reference").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # Target schema + a registered instance to reference.
+        Step(
+            RunRequest("register nullable target schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_nullable._.target.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register nullable target instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_nullable._.target.v1~x.vendor._.t1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # oneOf: nullable reference (string+x-gts-ref OR null).
+        Step(
+            RunRequest("register nullable oneOf holder schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_nullable._.oneof_holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "x-gts-ref": "gts.x.testref_nullable._.target.v1~",
+                            },
+                            {"type": "null"},
+                        ]
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # A valid string reference must match exactly the x-gts-ref branch.
+        Step(
+            RunRequest("register nullable oneOf instance - valid reference")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_nullable._.target.v1~x.vendor._.t1.v1.0",
+                "id": "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i1.v1.0",
+            True,
+            "nullable oneOf must accept a valid reference",
+        ),
+        # A null value matches the neutral branch only.
+        Step(
+            RunRequest("register nullable oneOf instance - null value")
+            .post("/entities")
+            .with_json({
+                "ref": None,
+                "id": "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i2.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.oneof_holder.v1~x.vendor._.i2.v1.0",
+            True,
+            "nullable oneOf must accept null",
+        ),
+        # anyOf: nullable reference (string+x-gts-ref OR null).
+        Step(
+            RunRequest("register nullable anyOf holder schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_nullable._.anyof_holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "x-gts-ref": "gts.x.testref_nullable._.target.v1~",
+                            },
+                            {"type": "null"},
+                        ]
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register nullable anyOf instance - valid reference")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_nullable._.target.v1~x.vendor._.t1.v1.0",
+                "id": "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i1.v1.0",
+            True,
+            "nullable anyOf must accept a valid reference",
+        ),
+        Step(
+            RunRequest("register nullable anyOf instance - null value")
+            .post("/entities")
+            .with_json({
+                "ref": None,
+                "id": "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i2.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_nullable._.anyof_holder.v1~x.vendor._.i2.v1.0",
+            True,
+            "nullable anyOf must accept null",
+        ),
+    ]
+
+
+class TestCaseXGtsRef_SelfRefInOneOf(HttpRunner):
+    """x-gts-ref: a /$id branch inside oneOf must not shadow a sibling branch.
+
+    ``oneOf`` requires exactly one branch to match. When one branch is
+    ``{"x-gts-ref": "/$id"}`` and another is a concrete GTS pattern, an
+    implementation must resolve ``/$id`` to the selected type while selecting
+    the matching branch. If ``/$id`` is instead treated as always-matching
+    (e.g. a JSON Schema engine that evaluates x-gts-ref as a keyword but
+    short-circuits ``/$id`` to "valid" because it lacks the selected type),
+    a value that matches only the sibling pattern satisfies *both* branches
+    and the exactly-one rule wrongly rejects a valid value.
+
+    Prior oneOf coverage only used concrete patterns in every branch, so this
+    /$id-versus-concrete combination was never exercised.
+    """
+
+    config = Config("x-gts-ref: /$$id inside oneOf").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        # A sibling target type + a registered instance to reference.
+        Step(
+            RunRequest("register selfcomb other schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_selfcomb._.other.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        Step(
+            RunRequest("register selfcomb other instance")
+            .post("/entities")
+            .with_json({
+                "id": "gts.x.testref_selfcomb._.other.v1~x.vendor._.o1.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # Holder type: ref must match exactly one of /$id (this type) or other.
+        Step(
+            RunRequest("register selfcomb holder schema")
+            .post("/entities")
+            .with_json({
+                "$$id": "gts://gts.x.testref_selfcomb._.holder.v1~",
+                "$$schema": "http://json-schema.org/draft-07/schema#",
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "id": {"type": "string"},
+                    "ref": {
+                        "type": "string",
+                        "oneOf": [
+                            {"x-gts-ref": "/$$id"},
+                            {"x-gts-ref": "gts.x.testref_selfcomb._.other.v1~"},
+                        ],
+                    },
+                },
+                "additionalProperties": False,
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        # ref matches ONLY the concrete sibling branch. /$id (this holder type)
+        # does not match an "other"-typed id, so exactly one branch matches.
+        Step(
+            RunRequest("register holder instance referencing the sibling")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_selfcomb._.other.v1~x.vendor._.o1.v1.0",
+                "id": "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_other.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_other.v1.0",
+            True,
+            "oneOf with a /$$id branch must accept a value matching only the sibling",
+        ),
+        # ref matches ONLY the /$id branch: the referenced id is itself a holder
+        # instance (so it matches this selected type) and is not an "other" id.
+        Step(
+            RunRequest("register holder instance referencing another holder instance")
+            .post("/entities")
+            .with_json({
+                "ref": "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_other.v1.0",
+                "id": "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_self.v1.0",
+            })
+            .validate()
+            .assert_equal("status_code", 200)
+        ),
+        _validate_instance(
+            "gts.x.testref_selfcomb._.holder.v1~x.vendor._.href_self.v1.0",
+            True,
+            "oneOf with a /$$id branch must accept a value matching only /$$id",
+        ),
+    ]
+
+
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
     TestCaseXGtsRef_UnsupportedPointers().test_start()
@@ -2581,3 +3066,5 @@ if __name__ == "__main__":
     TestCaseXGtsRef_NestedCombinators().test_start()
     TestCaseXGtsRef_WildcardPattern().test_start()
     TestCaseXGtsRef_TildeWildcardPattern().test_start()
+    TestCaseXGtsRef_NullableReference().test_start()
+    TestCaseXGtsRef_SelfRefInOneOf().test_start()

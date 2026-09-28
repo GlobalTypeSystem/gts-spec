@@ -1466,7 +1466,13 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 
 Implement a simple in-memory GTS entity registry with optional validation on registration. When validation is enabled, identifiers MUST satisfy their GTS syntax and matching rules, validation dependencies such as `$id` ancestors and GTS `$ref` targets MUST satisfy the transitive validation rule, and `x-gts-ref` constraints and values MUST satisfy the implementation's selected reference-validation policy under §9.6.
 
-Registration and removal are explicit registry operations. Validation operations MUST NOT add, replace, or remove entities. In particular, an entity accepted by an earlier registration without validation MUST remain stored when a later validation reports it as invalid; deciding whether to remove that entity is the client's explicit responsibility. A combined registration-with-validation request is atomic from the client's perspective: if validation fails, no new entity is committed and any entity previously stored under the same identifier remains unchanged.
+Registration and removal are explicit registry operations. Validation operations MUST NOT add, replace, or remove entities. In particular, an entity accepted by an earlier registration without validation MUST remain stored when a later validation reports it as invalid; deciding whether to remove that entity is the client's explicit responsibility. For **single-entity** registration, a combined registration-with-validation request is atomic from the client's perspective: if validation fails, no new entity is committed and any entity previously stored under the same identifier remains unchanged. Batch registration validates each entry independently and MAY partially succeed, committing the entries that pass while never committing those that fail — see **Batch Type Schema Registration** below.
+
+**Batch Type Schema Registration:** The `/type-schemas` endpoint accepts a JSON array of GTS Type Schema documents and registers them in batch. The GTS Type Identifier of each entry is derived from its embedded `$id`. Like single-entity registration, the batch endpoint supports optional query parameters:
+- `validate` (boolean, default `false`): When `true`, enables full validation for every schema in the batch.
+- `gts-ref-validation` (`none` | `any-present` | `any-valid`, default `any-valid`): Specifies the reference-validation policy for `x-gts-ref` constraints when `validate=true`. An invalid mode value is rejected with HTTP 422 before registering any entry.
+
+When `validate=true`, implementations MUST stage the entire batch so that intra-batch references (such as `$ref` to sibling schemas or derivation inheritance where a child appears before its parent in the batch array) resolve successfully regardless of entry ordering. In a batch containing both valid and invalid entries, only entries that pass validation are committed to the registry; invalid entries are reported with `"ok": false` and are never committed or exposed to concurrent reads.
 
 ### 9.4 - CLI support
 
@@ -1490,7 +1496,9 @@ Use `x-gts-ref` in GTS schemas (JSON schemas) to declare that a string field is 
 
 Allowed values:
 - `"x-gts-ref": "<gts-pattern>"` — **wildcard**. Any GTS wildcard pattern (§10); e.g. `gts.*`, `gts.cf.core.am.*`, or `gts.x.core.events.topic.v1~*`. The field value MUST be a syntactically valid GTS identifier (see OP#1) that matches the pattern.
-- `"x-gts-ref": "<gts-prefix>"` — **specific reference**, where `<gts-prefix>` is a concrete GTS identifier such as `gts.x.core.events.topic.v1~`. The field value MUST be a syntactically valid GTS identifier that begins with `<gts-prefix>` (a `startsWith` match, see §8.1/8.2). A prefix ending in `~` matches the identifier itself **and** any identifier derived from it: `gts.cf.core.iam.user.v1~` is equivalent to matching `gts.cf.core.iam.user.v1~` **or** `gts.cf.core.iam.user.v1~*` (see §3.5, §10).
+- `"x-gts-ref": "<gts-id>"` — **concrete identifier reference**, where `<gts-id>` is a concrete GTS identifier:
+  - If `<gts-id>` is a **Type Identifier** (ending in `~`, such as `gts.x.core.events.topic.v1~`), it matches the identifier itself **and** any identifier derived from or instantiated under it: `gts.cf.core.iam.user.v1~` is equivalent to matching `gts.cf.core.iam.user.v1~` **or** `gts.cf.core.iam.user.v1~*` (see §3.5, §10).
+  - If `<gts-id>` is an **Instance Identifier** (not ending in `~`, such as `...item.v1~x.vendor._.thing.v1`), it requires an **exact match** on that specific instance identifier. Textual prefix supersets across segment or version boundaries (such as `...thing.v12` when referencing `...thing.v1`) MUST NOT match.
 - `"x-gts-ref": "/$id"` — **selected-type self-reference**. Resolves to the top-level `$id` of the leaf (right-most derived) GTS Type Schema being validated, without `gts://`. This remains the root when the constraint is inherited through `$ref` or `allOf`. Rooted matching applies: the leaf and its descendants match; its ancestors and siblings do not. Use `const` for exact equality, or a literal GTS ID to keep the reference rooted at a specific base type.
 
 For example, if base type `A~` declares `x-gts-ref: "/$id"` and leaf type `A~B~` imports that constraint, validation against `A~B~` resolves the operand to `A~B~`. Values `A~B~` and `A~B~C` match; ancestor `A~` and sibling `A~D~` do not.
@@ -1510,7 +1518,8 @@ Implementation notes:
 
 - Treating `x-gts-ref` like JSON Schema string constraints:
   - For a wildcard pattern (e.g. `gts.*`, `gts.cf.core.am.*`), validate that the field value is a well-formed GTS ID (OP#1) and matches the pattern (§10).
-  - For a specific literal prefix (e.g. `gts.x.core.modules.capability.v1~`), enforce it similarly to a `startsWith(...)` check against the provided GTS prefix (sections 8.1/8.2), and validate that the value is a well-formed GTS ID.
+  - For a concrete Type Identifier ending in `~` (e.g. `gts.x.core.modules.capability.v1~`), match the identifier itself and any descendant identifier rooted at that type boundary.
+  - For a concrete Instance Identifier (not ending in `~`), match only that exact identifier on segment boundaries; a raw `startsWith(...)` check MUST NOT leak across segment or version boundaries.
   - Treat `/$id` as a reserved operand, not as general JSON Pointer support. Resolve it directly from the canonical top-level `$id` of the selected leaf GTS Type Schema and strip `gts://` before matching.
   - Reject every other slash-prefixed operand during registration. Implementations MUST NOT resolve schema-local paths or chain through another `x-gts-ref` value.
   - Registry lookup and target validation for `x-gts-ref` are implementation-specific. Implementations may use policies such as `none`, `any-present`, and `any-valid` described above; operand syntax and the pointer prohibition are mandatory in every mode.
