@@ -1423,14 +1423,15 @@ def test_pattern_properties_matches_ecma262(gts_session, gts_base_url):
         {"123px": 1, "aa": "value"},
     )
     assert valid["ok"] is True, valid
-    invalid = _validate_json(
-        gts_session,
-        gts_base_url,
-        type_id,
-        {"123px": "not-an-integer", "aa": 1},
-    )
-    _assert_explicit_validation_error(invalid, "patternProperties")
-    assert "Unsupported pattern" not in invalid["error"], invalid
+    for invalid_value in ({"123px": "not-an-integer"}, {"aa": 1}):
+        invalid = _validate_json(
+            gts_session,
+            gts_base_url,
+            type_id,
+            invalid_value,
+        )
+        _assert_explicit_validation_error(invalid, "patternProperties")
+        assert "Unsupported pattern" not in invalid["error"], invalid
 
 
 def test_invalid_json_schema_patterns_report_explicit_error(
