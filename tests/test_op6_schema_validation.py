@@ -7,6 +7,7 @@ extended JSON Schema constraints (formats, nesting, enums, arrays).
 """
 
 import threading
+import time
 import uuid
 
 import requests
@@ -420,6 +421,19 @@ class TestCaseTestOp6SchemaValidation_UnknownDialectRejected(HttpRunner):
             .with_json({
                 "$$id": "gts://gts.x.test6.invalid_dialect.unknown.v1~",
                 "$$schema": "https://example.invalid/not-a-json-schema-dialect",
+                "type": "object",
+            })
+            .validate()
+            .assert_equal("status_code", 422)
+            .assert_equal("body.ok", False)
+        ),
+        Step(
+            RunRequest("register schema with future dialect should fail")
+            .post("/entities")
+            .with_params(**{"validate": "true"})
+            .with_json({
+                "$$id": "gts://gts.x.test6.invalid_dialect.future.v1~",
+                "$$schema": "https://json-schema.org/draft/2025-01/schema",
                 "type": "object",
             })
             .validate()
@@ -1197,6 +1211,308 @@ class TestCaseTestOp6Validation_RegexEcma262(HttpRunner):
             for label, _ in _REGEX_ECMA262_INVALID
         ],
     ]
+
+
+_RETENTION_PATTERN = r"^P(?!$).+"
+_DURATION_PATTERN = (
+    r"^P(?!$)(?:\d+Y)?(?:\d+M)?(?:\d+D)?"
+    r"(?:T(?:\d+H)?(?:\d+M)?(?:\d+S)?)?$"
+)
+
+_RETENTION_MATCHES = (
+    "P90D",
+    "PT1H",
+    "P1Y2M3DT4H5M6S",
+    "P0D",
+    "PX",
+    "P ",
+    "P😀",
+)
+_RETENTION_NON_MATCHES = (
+    "P",
+    "",
+    "90D",
+    "p90d",
+    "XP1D",
+    " P1D",
+    "P\n",
+    "\nP1D",
+)
+_DURATION_MATCHES = (
+    "P1Y",
+    "P1M",
+    "P1D",
+    "P1Y2M3D",
+    "P1Y3D",
+    "P2M10D",
+    "PT1H",
+    "PT1M",
+    "PT1S",
+    "PT1H30M",
+    "P1DT12H",
+    "P1Y2M3DT4H5M6S",
+    "P10Y",
+    "PT",
+    "P1DT",
+)
+_DURATION_NON_MATCHES = (
+    "P",
+    "",
+    "P1W",
+    "P1H",
+    "PT1D",
+    "P1Y1Y",
+    "P1D1Y",
+    "P1M1Y",
+    "P1.5D",
+    "P-1D",
+    "1Y",
+    "p1d",
+    "P1Y ",
+    " P1Y",
+    "P1YT1D",
+    "PT1H1D",
+)
+
+_ECMA262_PATTERN_CASES = (
+    (r"^[a-z]+$", ("abc", "z"), ("", "abc1", "ABC")),
+    (r"(a+)+$", ("a", "aaaa"), ("", "aaab")),
+    (
+        r"^(?=.*[A-Z])(?=.*\d).{8,}$",
+        ("Abcdef1x", "1abcdefG"),
+        ("abcdefgh", "Abcdef1\n"),
+    ),
+    (r"^(?![0-9])\w+$", ("abc_1", "_1"), ("1abc", "abc-")),
+    (r"^ab(?<=b)c+", ("abc", "abccc-tail"), ("abbc", "ac")),
+    (r"^[a-z0-9-]+(?<!-)$", ("abc", "a1-b2"), ("abc-", "ABC")),
+    (r"^(?!-)[a-z-]+(?<!-)$", ("abc", "ab-c"), ("-abc", "abc-")),
+    (r"\d+(?!\.)$", ("12", "x12"), ("12.", "x")),
+    (r"^\p{Lu}(?=\p{Ll})", ("Ab", "Éa"), ("AB", "ab")),
+    (r"^(?=a)(a+)+$", ("a", "aaaa"), ("", "b", "aaaa!")),
+    (r"^(?!b)(a|a)*$", ("", "a", "aaaa"), ("b", "aaa!")),
+    (r"^(a+)+(?<!b)$", ("a", "aaaa"), ("", "aaaab")),
+    (r"^(a+)+(?=b)", ("ab", "aaab"), ("aaa", "baab")),
+    (r"a(?=b)", ("ab", "zabz"), ("ac", "ba")),
+    (r"(?<=\d{3})px", ("123px", "x123px"), ("12px", "123py")),
+    (r"^(a+)\1$", ("aa", "aaaa"), ("a", "aaa", "aab")),
+    (r"^(a)\1$", ("aa",), ("a", "aaaa", "ab")),
+    (r"^(?=a\b)", ("a", "a!"), ("ab", "ba")),
+)
+
+_ATTACK_CASES = (
+    (r"^(?=a)(a+)+$", "a" * 50_000 + "!"),
+    (r"^(?!b)(a|a)*$", "a" * 50_000 + "!"),
+    (r"^(a+)+(?<!b)$", "a" * 50_000 + "b"),
+    (_DURATION_PATTERN, "P" + "1" * 50_000 + "!"),
+)
+
+
+def _regexp_schema(type_id, pattern):
+    return {
+        "$id": f"gts://{type_id}",
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "required": ["value"],
+        "properties": {"value": {"type": "string", "pattern": pattern}},
+    }
+
+
+def _register_pattern(gts_session, gts_base_url, name, pattern):
+    type_id = f"gts.x.test6regexp._.{name}.v1~"
+    response = gts_session.post(
+        f"{gts_base_url}/entities",
+        json=_regexp_schema(type_id, pattern),
+        timeout=30,
+    )
+    assert response.status_code == 200, response.text
+    return type_id
+
+
+def _validate_json(gts_session, gts_base_url, type_id, instance, timeout=10):
+    response = gts_session.post(
+        f"{gts_base_url}/validate-json/{type_id}",
+        json=instance,
+        timeout=timeout,
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
+def _validate_pattern(gts_session, gts_base_url, type_id, value, timeout=30):
+    return _validate_json(
+        gts_session, gts_base_url, type_id, {"value": value}, timeout
+    )
+
+
+def _assert_explicit_validation_error(result, context):
+    assert result["ok"] is False, (context, result)
+    error = result.get("error")
+    assert isinstance(error, str) and error.strip(), (context, result)
+
+
+def _assert_pattern_matches(
+    gts_session, gts_base_url, type_id, matches, non_matches
+):
+    for value in matches:
+        result = _validate_pattern(gts_session, gts_base_url, type_id, value)
+        assert result["ok"] is True, (value, result)
+    for value in non_matches:
+        result = _validate_pattern(gts_session, gts_base_url, type_id, value)
+        _assert_explicit_validation_error(result, value)
+        assert "Unsupported pattern" not in result["error"], (value, result)
+
+
+def test_retention_pattern_matches_ecma262_corner_cases(gts_session, gts_base_url):
+    type_id = _register_pattern(
+        gts_session, gts_base_url, "retention", _RETENTION_PATTERN
+    )
+    _assert_pattern_matches(
+        gts_session,
+        gts_base_url,
+        type_id,
+        _RETENTION_MATCHES,
+        _RETENTION_NON_MATCHES,
+    )
+
+
+def test_iso_duration_pattern_matches_ecma262_corner_cases(gts_session, gts_base_url):
+    type_id = _register_pattern(
+        gts_session, gts_base_url, "duration", _DURATION_PATTERN
+    )
+    _assert_pattern_matches(
+        gts_session,
+        gts_base_url,
+        type_id,
+        _DURATION_MATCHES,
+        _DURATION_NON_MATCHES,
+    )
+
+
+def test_json_schema_patterns_match_ecma262(gts_session, gts_base_url):
+    for index, (pattern, matches, non_matches) in enumerate(_ECMA262_PATTERN_CASES):
+        type_id = _register_pattern(
+            gts_session, gts_base_url, f"ecma262_{index}", pattern
+        )
+        _assert_pattern_matches(
+            gts_session, gts_base_url, type_id, matches, non_matches
+        )
+
+
+def test_pattern_properties_matches_ecma262(gts_session, gts_base_url):
+    type_id = "gts.x.test6regexp._.pattern_properties.v1~"
+    schema = {
+        "$id": f"gts://{type_id}",
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "patternProperties": {
+            r"(?<=\d{3})px$": {"type": "integer"},
+            r"^(a)\1$": {"type": "string"},
+        },
+    }
+    registered = gts_session.post(
+        f"{gts_base_url}/entities",
+        json=schema,
+        timeout=30,
+    )
+    assert registered.status_code == 200, registered.text
+    assert registered.json()["ok"] is True, registered.json()
+    valid = _validate_json(
+        gts_session,
+        gts_base_url,
+        type_id,
+        {"123px": 1, "aa": "value"},
+    )
+    assert valid["ok"] is True, valid
+    invalid = _validate_json(
+        gts_session,
+        gts_base_url,
+        type_id,
+        {"123px": "not-an-integer", "aa": 1},
+    )
+    _assert_explicit_validation_error(invalid, "patternProperties")
+    assert "Unsupported pattern" not in invalid["error"], invalid
+
+
+def test_invalid_json_schema_patterns_report_explicit_error(
+    gts_session, gts_base_url
+):
+    cases = (
+        (
+            "pattern",
+            {
+                "type": "object",
+                "properties": {"value": {"type": "string", "pattern": "["}},
+            },
+        ),
+        (
+            "pattern_properties",
+            {
+                "type": "object",
+                "patternProperties": {"[": {"type": "string"}},
+            },
+        ),
+    )
+    for name, body in cases:
+        type_id = f"gts.x.test6regexp._.invalid_{name}.v1~"
+        schema = {
+            "$id": f"gts://{type_id}",
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            **body,
+        }
+        registered = gts_session.post(
+            f"{gts_base_url}/entities",
+            params={"validate": "true"},
+            json=schema,
+            timeout=30,
+        )
+        assert registered.status_code == 422, registered.text
+        _assert_explicit_validation_error(registered.json(), name)
+
+
+def test_adversarial_inputs_fail_in_under_two_seconds(gts_session, gts_base_url):
+    for index, (pattern, attack_input) in enumerate(_ATTACK_CASES):
+        type_id = _register_pattern(
+            gts_session, gts_base_url, f"attack_{index}", pattern
+        )
+        started = time.perf_counter()
+        result = _validate_pattern(
+            gts_session, gts_base_url, type_id, attack_input, timeout=2
+        )
+        elapsed = time.perf_counter() - started
+        _assert_explicit_validation_error(result, pattern)
+        assert elapsed < 2, (pattern, elapsed)
+
+
+def test_duration_pattern_compiles_in_trait_schema(gts_session, gts_base_url):
+    type_id = "gts.x.test13regexp._.duration_trait.v1~"
+    schema = {
+        "$id": f"gts://{type_id}",
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "required": ["id"],
+        "properties": {"id": {"type": "string"}},
+        "x-gts-traits-schema": {
+            "type": "object",
+            "properties": {
+                "duration": {"type": "string", "pattern": _DURATION_PATTERN},
+            },
+        },
+    }
+    registered = gts_session.post(
+        f"{gts_base_url}/entities",
+        json=schema,
+        timeout=30,
+    )
+    assert registered.status_code == 200, registered.text
+    response = gts_session.post(
+        f"{gts_base_url}/validate-type-schema",
+        json={"type_id": type_id},
+        timeout=30,
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["ok"] is True, result
+    assert "failed to compile trait schema" not in (result.get("error") or ""), result
 
 
 class TestCaseTestOp6Validation_UuidRejectsGtsId(HttpRunner):
