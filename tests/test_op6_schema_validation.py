@@ -10,6 +10,7 @@ import threading
 import time
 import uuid
 
+import pytest
 import requests
 
 from .conftest import get_gts_base_url
@@ -1482,6 +1483,176 @@ def test_adversarial_inputs_fail_in_under_two_seconds(gts_session, gts_base_url)
         elapsed = time.perf_counter() - started
         _assert_explicit_validation_error(result, pattern)
         assert elapsed < 2, (pattern, elapsed)
+
+
+# Regex execution failures (README §11.0, "Regular-expression semantics"): an
+# exhausted resource limit must fail validation with an explicit error, never
+# change the match result. In the cases below the expected match succeeds, so
+# an engine that reports a failed match as "no match" accepts invalid data.
+
+# The first alternative can exhaust a backtracking engine's resource budget.
+# The second alternative matches every key below, so its value must be an
+# integer. A resource error must not be treated as a non-matching property name.
+_PATTERN_PROPERTIES_STRESS_PATTERN = r"^(?:(a+(?=a?))+$|a+!$)"
+
+# The second alternative matches a run of "a" followed by "!". The first can
+# exhaust a backtracking engine before it reaches that successful alternative:
+# the ambiguous `a|aa` repetition is exponential, and the lookahead inside it
+# keeps hybrid engines from running the repetition on a linear-time automaton.
+_AMBIGUOUS_PATTERN = r"^(?:((a|aa)(?=a?))+$|a+!$)"
+
+
+def _register_regexp_type(
+    gts_session,
+    gts_base_url,
+    name,
+    body,
+    dialect="http://json-schema.org/draft-07/schema#",
+):
+    type_id = f"gts.x.test6regexp._.{name}.v1~"
+    schema = {
+        "$id": f"gts://{type_id}",
+        "$schema": dialect,
+        "type": "object",
+        **body,
+    }
+    response = gts_session.post(
+        f"{gts_base_url}/entities",
+        params={"validate": "true"},
+        json=schema,
+        timeout=30,
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["ok"] is True, response.json()
+    return type_id
+
+
+def _validate_json_in_under_two_seconds(gts_session, gts_base_url, type_id, instance):
+    started = time.perf_counter()
+    result = _validate_json(gts_session, gts_base_url, type_id, instance, timeout=2)
+    elapsed = time.perf_counter() - started
+    assert elapsed < 2, (type_id, elapsed)
+    return result
+
+
+@pytest.mark.parametrize(
+    "key",
+    ["aaaa!", "a" * 64 + "!"],
+    ids=["short-control", "backtracking-stress"],
+)
+def test_pattern_properties_cannot_accept_invalid_value_after_regex_failure(
+    gts_session, gts_base_url, key
+):
+    """Reject a matching key's wrong value type, including on regex exhaustion."""
+    type_id = _register_regexp_type(
+        gts_session,
+        gts_base_url,
+        "pattern_properties_resource_limits",
+        {"patternProperties": {_PATTERN_PROPERTIES_STRESS_PATTERN: {"type": "integer"}}},
+    )
+    # A short matching key with the correct value type is accepted.
+    valid = _validate_json(gts_session, gts_base_url, type_id, {"aaaa!": 1})
+    assert valid["ok"] is True, valid
+
+    invalid = _validate_json_in_under_two_seconds(
+        gts_session, gts_base_url, type_id, {key: "not-an-integer"}
+    )
+    _assert_explicit_validation_error(
+        invalid,
+        "patternProperties must reject the wrong value type or report a regex "
+        "resource error; the matching property must not be silently skipped",
+    )
+
+
+@pytest.mark.parametrize("keyword", ["pattern", "patternProperties"])
+@pytest.mark.parametrize(
+    "length", [4, 64], ids=["short-control", "backtracking-stress"]
+)
+def test_not_cannot_accept_instance_after_regex_failure(
+    gts_session, gts_base_url, keyword, length
+):
+    """A regex execution error must not become a successful `not` assertion."""
+    matched = "a" * length + "!"
+    if keyword == "pattern":
+        body = {
+            "required": ["value"],
+            "properties": {
+                "value": {"type": "string", "not": {"pattern": _AMBIGUOUS_PATTERN}}
+            },
+        }
+        valid_instance = {"value": "b"}
+        invalid_instance = {"value": matched}
+    else:
+        # additionalProperties makes the inner schema fail if the matching key
+        # is skipped, so treating a regex error as "no match" is observable too.
+        body = {
+            "not": {
+                "patternProperties": {_AMBIGUOUS_PATTERN: {"type": "integer"}},
+                "additionalProperties": False,
+            }
+        }
+        valid_instance = {"aaaa!": "not-an-integer"}
+        invalid_instance = {matched: 1}
+    type_id = _register_regexp_type(
+        gts_session, gts_base_url, f"not_{keyword.lower()}_resource_limits", body
+    )
+
+    valid = _validate_json(gts_session, gts_base_url, type_id, valid_instance)
+    assert valid["ok"] is True, valid
+
+    # These instances satisfy the schema inside `not`, so `not` must reject
+    # them. An engine unable to complete the match must report an error too.
+    invalid = _validate_json_in_under_two_seconds(
+        gts_session, gts_base_url, type_id, invalid_instance
+    )
+    _assert_explicit_validation_error(
+        invalid,
+        f"not must reject the instance or report a regex resource error in {keyword}; "
+        "an execution failure must not be inverted into successful validation",
+    )
+
+
+@pytest.mark.parametrize(
+    "keyword, dialect",
+    [
+        ("additionalProperties", "http://json-schema.org/draft-07/schema#"),
+        ("unevaluatedProperties", "https://json-schema.org/draft/2020-12/schema"),
+    ],
+    ids=["additionalProperties", "unevaluatedProperties"],
+)
+def test_property_classification_regex_match_is_resource_bounded(
+    gts_session, gts_base_url, keyword, dialect
+):
+    """Bound the regex match used to classify keys as additional or unevaluated."""
+    # The keyword precedes patternProperties so an implementation that
+    # evaluates keywords in schema order classifies the key first, before a
+    # bounded patternProperties match can fail the instance.
+    type_id = _register_regexp_type(
+        gts_session,
+        gts_base_url,
+        f"{keyword.lower()}_resource_limits",
+        {
+            keyword: False,
+            "patternProperties": {_AMBIGUOUS_PATTERN: {"type": "integer"}},
+        },
+        dialect=dialect,
+    )
+    # A short key matching the pattern is evaluated, not an additional property.
+    valid = _validate_json(gts_session, gts_base_url, type_id, {"aaaa!": 1})
+    assert valid["ok"] is True, valid
+
+    # The key matches the pattern, so its value must be an integer. Whether the
+    # engine completes the match or reports a resource error, the instance is
+    # rejected in under two seconds. An implementation that matches property
+    # names without a resource bound never answers and may stay busy afterwards.
+    invalid = _validate_json_in_under_two_seconds(
+        gts_session, gts_base_url, type_id, {"a" * 64 + "!": "not-an-integer"}
+    )
+    _assert_explicit_validation_error(
+        invalid,
+        f"{keyword} and patternProperties must reject the wrong value type or "
+        "report a regex resource error",
+    )
 
 
 def test_duration_pattern_compiles_in_trait_schema(gts_session, gts_base_url):
