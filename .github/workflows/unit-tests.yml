@@ -1,0 +1,37 @@
+name: Unit Tests
+
+# Offline checks of the conformance suite itself (`pytest -m unit`): no GTS
+# server is needed. Implementations run these too through the runner image,
+# but a broken test should fail here, before the image is released.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+
+    - name: Setup Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: '3.12'
+
+    # Same install as tests/Dockerfile: httprunner without its pydantic<1.9 pin.
+    - name: Install test dependencies
+      run: |
+        pip install -r tests/requirements.txt
+        pip install --no-deps 'httprunner>=4,<5'
+
+    - name: Run unit tests
+      run: pytest tests -m unit -p no:cacheprovider
