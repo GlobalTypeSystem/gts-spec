@@ -20,7 +20,8 @@
     "retention": {
       "description": "How long events are retained. ISO-8601 duration recommended (e.g., P30D).",
       "type": "string",
-      "pattern": "^P(?!$)(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?(?:T(?:\\d+H)?(?:\\d+M)?(?:\\d+S)?)?$"
+      "minLength": 2,
+      "pattern": "^P(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?(?:T(?:[0-9]+H(?:[0-9]+M)?(?:[0-9]+S)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S))?$"
     },
     "ordering": {
       "description": "Ordering model for the stream.",
@@ -49,7 +50,8 @@
         "window": {
           "description": "Only for time-window strategy: ISO-8601 duration.",
           "type": "string",
-          "pattern": "^P(?!$)(?:\\d+Y)?(?:\\d+M)?(?:\\d+D)?(?:T(?:\\d+H)?(?:\\d+M)?(?:\\d+S)?)?$"
+          "minLength": 2,
+          "pattern": "^P(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?(?:T(?:[0-9]+H(?:[0-9]+M)?(?:[0-9]+S)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S))?$"
         },
         "keyPaths": {
           "description": "One or more JSON Pointers used to build the dedup key.",

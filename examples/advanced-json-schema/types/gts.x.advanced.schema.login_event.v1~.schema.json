@@ -81,7 +81,7 @@
       "format": "ipv6"
     },
     "rule_regex": {
-      "description": "Matching rule recorded as an ECMA-262 regex pattern.",
+      "description": "Matching rule recorded as a regular expression in the common GTS profile (README §11.0.1).",
       "type": "string",
       "format": "regex"
     },
@@ -109,7 +109,8 @@
       "retention": {
         "description": "ISO-8601 retention duration.",
         "type": "string",
-        "pattern": "^P(?!$).+"
+        "minLength": 2,
+        "pattern": "^P(?:[0-9]+Y)?(?:[0-9]+M)?(?:[0-9]+D)?(?:T(?:[0-9]+H(?:[0-9]+M)?(?:[0-9]+S)?|[0-9]+M(?:[0-9]+S)?|[0-9]+S))?$"
       }
     }
   }

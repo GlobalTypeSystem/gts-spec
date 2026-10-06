@@ -5,7 +5,7 @@
 - **Deciders:** GTS spec maintainers
 - **Consulted:** aviator5
 - **Supersedes:** —
-- **Superseded by:** —
+- **Superseded by:** [ADR-0006](0006-safe-regexp-profile.md), for the `regex` format semantics only; the format-assertion decision remains accepted.
 
 ## Context and Problem Statement
 

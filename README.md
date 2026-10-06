@@ -1,5 +1,5 @@
-<!-- gts-spec-version: 0.14 -->
-> **VERSION**: GTS specification draft, version 0.14
+<!-- gts-spec-version: 0.15 -->
+> **VERSION**: GTS specification draft, version 0.15
 
 # Global Type System (GTS) Specification
 
@@ -118,6 +118,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 | 0.12 | BREAKING: reframe GTS Type Schemas as a dialect-agnostic JSON Schema extension; the prior `$defs MUST NOT` and post-Draft-07-keyword restrictions are dropped; derivation compatibility and the finality guard use the chained `$id` alone, `allOf`+`$ref` recommended but not required (ADR-0001). `x-gts-traits-schema` becomes a JSON Schema subschema (object/`true`/`false`); the registry chain-aggregates declarations along the `$id` chain via `allOf` (ADR-0002). Trait completeness is keyed on `x-gts-abstract` and enforced on non-abstract types against the materialized effective traits object (ADR-0003). Trait-value merge follows JSON Merge Patch (RFC 7396); cross-descendant locking moves to standard JSON Schema `const` in `x-gts-traits-schema` (ADR-0004). The four document-level keywords (`x-gts-final`, `x-gts-abstract`, `x-gts-traits-schema`, `x-gts-traits`) MUST appear at the schema top level and are rejected (fail fast) when nested in a subschema (§9.7.1, §9.11). |
 | 0.13 | CORRECTION: Define compatibility through accepted-instance-set inclusion (§4.3) and separate **Type Derivation Compatibility** (§4.1, one-way) from **Type Schema Evolution Compatibility** (§4.2). This corrects OP#8 verdicts for unchanged inputs — notably for open content models, enums, and `const` identifier fields; implementations targeting 0.12 may need to update their compatibility checker. OP#8 reports the tri-state `compatible`, `incompatible`, or `unknown` for each relation, preserving an inconclusive check instead of conflating it with incompatibility. Tolerant-reader, casting, and default-materialization guarantees MUST be reported separately (§4.3). Content models are classified on the resolved effective schema, not on `additionalProperties` alone (§4.4). §4 restructured and renumbered; later sections unchanged. OP#8 conformance tests updated. |
 | 0.14 | BREAKING: generalize and tighten `x-gts-ref` matching (§9.6). The operand may be any GTS wildcard pattern (§10), not just `gts.*` — e.g. `gts.cf.core.am.*` or `...v1~*` — a concrete GTS identifier, or the reserved string `/$id`; every other slash-prefixed value is prohibited and registration MUST reject it. `/$id` resolves to the canonical top-level identifier of the leaf GTS Type Schema selected for validation and retains that root through inherited or composed constraints. Reference lookup and target validation policy remain implementation-specific; an implementation may expose modes such as `gts-ref-validation=none|any-present|any-valid`. `any-present` requires registered targets without validating them, while `any-valid` requires valid targets; for wildcard constraints, at least one registered target must satisfy the selected mode. Clarify that a `~`-terminated concrete reference matches the exact identifier and any derived identifier (`gts.x...v1~` ≡ `gts.x...v1~` or `gts.x...v1~*`), that abstract types still enforce the selected `x-gts-ref` mode, and that explicit validation requires GTS `$ref` targets to resolve. Reference conformance tests updated. |
+| 0.15 | BREAKING: replace full ECMA-262 support with a bounded GTS regex profile for `pattern`, `patternProperties`, and `format: "regex"`. Require RE2 matching semantics with declared Unicode shorthand deviations, linear-time search, and explicit operational errors. See [§11.0.1](#1101-regular-expression-execution-safety) and [ADR-0006](adr/0006-safe-regexp-profile.md). |
 
 ## Terminology
 
@@ -1444,7 +1445,7 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 - **OP#5 - ID to UUID Mapping**: Generate deterministic UUIDs from GTS identifiers
 
 - **OP#6 - Schema Validation**: Validate object instances against their corresponding schemas. When validating instances, if the rightmost type in the chain is marked `x-gts-abstract: true`, validation MUST fail (see section 9.11)
-- **JSON Schema formats**: OP#6 and OP#13 MUST enforce `uuid`, `email`, `date-time`, `date`, `time`, `uri`, `hostname`, `ipv4`, `ipv6`, and `regex` formats as assertions on string values, including instance properties and effective trait values. The `regex` format follows JSON Schema Draft-07: a value is valid when it is a regular expression that is valid according to the ECMA 262 regular expression dialect. Other format names retain the selected JSON Schema dialect's semantics. See [ADR-0005](adr/0005-json-schema-format-assertions.md).
+- **JSON Schema formats**: OP#6 and OP#13 MUST enforce `uuid`, `email`, `date-time`, `date`, `time`, `uri`, `hostname`, `ipv4`, `ipv6`, and `regex` formats as assertions on string values, including instance properties and effective trait values. The `regex` format checks the bounded GTS profile in [§11.0.1](#1101-regular-expression-execution-safety); other formats retain the selected JSON Schema dialect's semantics. See [ADR-0005](adr/0005-json-schema-format-assertions.md) and [ADR-0006](adr/0006-safe-regexp-profile.md).
 
 - **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
 
@@ -1909,9 +1910,7 @@ Result:    ❌ NO MATCH (different major versions)
 
 ### 11.0 Relationship to JSON Schema
 
-GTS Type Schemas **extend JSON Schema** with a vendor keyword set (`x-gts-*`) and a set of **registry-enforced semantic rules** (see §3.2 derivation, §9.11 modifiers, OP#12 derivation compatibility, OP#13 trait validation). GTS does **not** impose additional syntactic restrictions on the standard JSON Schema body: any syntactically valid JSON Schema body under one of the supported dialects defined below that carries a valid GTS `$id` is a syntactically valid GTS Type Schema. The constraints GTS does enforce on document structure concern only its own `x-gts-*` keywords in GTS Type Schemas — these are type-level annotations that MUST appear at the document top level and are rejected when misplaced (§9.7.1, §9.11). Implementations MUST treat the GTS keywords described in this specification as layered on top of the underlying JSON Schema dialect's semantics, alongside the standard JSON Schema keywords (`$id`, `$ref`, `allOf`, `const`, …) used here.
-
-**Regular-expression semantics.** `pattern` and `patternProperties` MUST use the ECMA-262 regular-expression dialect required by the declared JSON Schema dialect. Implementations MUST support the ECMA-262 constructs permitted by that dialect and MUST NOT substitute a narrower engine-specific subset. Unsupported expressions or exhausted resource limits MUST produce an explicit validation error, not a different match result. This applies wherever validation evaluates these expressions, including when `patternProperties` patterns determine which properties `additionalProperties` and `unevaluatedProperties` apply to. Such an error MUST fail the validation as a whole: an implementation MUST NOT treat it as a non-matching property name, nor as a subschema failure that an enclosing applicator such as `not` can turn into a successful result.
+GTS Type Schemas **extend JSON Schema** with a vendor keyword set (`x-gts-*`) and a set of **registry-enforced semantic rules** (see §3.2 derivation, §9.11 modifiers, OP#12 derivation compatibility, OP#13 trait validation). GTS accepts the standard JSON Schema body under the supported dialects defined below, except that regular expressions follow [§11.0.1](#1101-regular-expression-execution-safety). The constraints GTS does enforce on document structure concern only its own `x-gts-*` keywords in GTS Type Schemas — these are type-level annotations that MUST appear at the document top level and are rejected when misplaced (§9.7.1, §9.11). Implementations MUST treat the GTS keywords described in this specification as layered on top of the underlying JSON Schema dialect's semantics, alongside the standard JSON Schema keywords (`$id`, `$ref`, `allOf`, `const`, …) used here.
 
 GTS schema validation MUST reject schema keywords with the `x-gts-` prefix that are not defined by this specification, at the document root or in any subschema. This check MUST run on explicit schema validation and on registration with validation enabled. This rule applies to schema keywords, not instance property names or keys in literal data such as `examples`, `default`, or `const`.
 
@@ -1928,6 +1927,54 @@ This specification does **not** publish a dedicated GTS meta-schema or `$schema`
 JSON Schema has no native concept of derivation or inheritance — its closest primitive, [`allOf`](https://json-schema.org/understanding-json-schema/reference/combining#allof), is a logical AND over [subschemas](https://json-schema.org/learn/glossary#subschema) at instance-validation time. In GTS, derivation is expressed by the **chained `$id`** (e.g., `gts://A~B~`); the schema body MAY use `allOf` with a `$ref` to the parent — which is convenient for avoiding duplication of the parent's fields and constraints in the derived schema — but is **not strictly required**. A derived schema that re-declares the parent's fields directly without `allOf` is admissible, provided it satisfies derivation compatibility (OP#12). See [`adr/0001-derivation-form.md`](adr/0001-derivation-form.md) for the full discussion.
 
 - Reusable subschemas inside a GTS Type Schema SHOULD be placed under the canonical container for the dialect declared by `$schema`: `definitions` for Draft-07, `$defs` for Draft 2019-09 and later. Local JSON Pointer references such as `"$ref": "#/definitions/Foo"` (Draft-07) or `"$ref": "#/$defs/Foo"` (Draft 2019-09+) are the recommended form.
+
+#### 11.0.1 Regular-expression execution safety
+
+The following requirements replace each supported dialect's regex rules for `pattern`, `patternProperties`, and `format: "regex"`. They MUST apply consistently across all regex paths, including traits, property classification for `additionalProperties` and `unevaluatedProperties`, and cached or generated validators. [ADR-0006](adr/0006-safe-regexp-profile.md) explains the decision and engine differences. Existing expressions must be checked against this profile before migration from GTS 0.14.
+
+**Syntax profile.** Only the constructs below, combined under the spelling rules and support bounds, are permitted. This closed subset is compatible with ECMA-262 Unicode mode (`u`) and RE2; no particular library is required. Implementations MUST support all in-profile expressions given adequate operational resources and MUST reject all others, even if their engine accepts them. Membership MUST be checked after JSON decoding, independently of caches, load, process state, and previous requests. Compiling with a broader engine is insufficient; equivalent bounded checks, including parsers and caches, MAY be used. Examples show decoded regex source.
+
+| Construct | Forms |
+|-----------|-------|
+| Literals and concatenation | Outside a class, any code point except the syntax characters `^ $ \ . * + ? ( ) [ ] { } \|`, including Unicode literals. |
+| Escaped metacharacters | `\` followed by a syntax character or `/`, such as `\.`, `\*`, and `\\`; no other identity escapes. |
+| Character escapes | `\n`, `\r`, `\t`, `\f`, `\v`, `\xHH`. |
+| Simple classes | `[abc]`, `[a-z]`, `[^abc]`: ranges, character escapes, escaped metacharacters, `\-`, shorthand classes, and literals other than `\`, `[`, and `]`. A leading `^` negates; `-` follows the spelling rules below. |
+| Groups and alternation | `(…)`, `(?:…)`, `a\|b`. Captured values are not exposed by GTS validation. |
+| Repetition | `*`, `+`, `?`, `{n}`, `{n,}`, `{n,m}` with decimal `n ≤ m`, and their lazy forms with a `?` suffix. |
+| Anchors and wildcard | `^`, `$`, `.`. |
+| Shorthand classes | `\d`, `\D`, `\w`, `\W`, `\s`, `\S`. |
+| Empty expression | Matches an empty substring; unanchored search succeeds on any supported string. |
+
+All unlisted constructs and escapes are excluded, including lookaround, backreferences, inline flags, Unicode properties, and `\uXXXX` (JSON `"\u0041"` decodes to a permitted literal; `"\\u0041"` does not).
+
+**Spelling rules.** The following are excluded:
+
+- Counts with leading zeros or spaces, such as `a{01}` or `a{1, 2}`.
+- Unescaped `]`, `{`, or `}` outside a class, except repetition braces; `\-` outside a class.
+- Quantifiers without an operand, after a quantifier, or after `^` or `$`. Only the lazy `?` suffix is allowed.
+- Empty classes; unescaped `[` or an initial `]` inside a class; unescaped `-` except as the first or last item or between two unshared range endpoints; shorthand range endpoints; reversed ranges; adjacent unescaped `&&`, `--`, or `~~` anywhere in a class. Escaped or hex-spelled characters are not operators: `[\--0]` and `[&\x26]` are supported.
+
+**Support bounds.** An expression is within the common bounds when its expanded length is at most 4096 code points, it nests at most 32 groups, every repetition count `n` or `m` is at most 1000, and the product of the counted-repetition factors along every nesting path is at most 1000. The expanded length counts each `X{n,m}`, `X{n}`, or `X{n,}` as its quantifier spelling plus `max(m, 1)`, `max(n, 1)`, or `n + 1` copies of `X`, nested repetitions included, and all other syntax by its spelling. In the product, `{n,m}` and `{n}` contribute their upper count, `{n,}` its lower count, and a zero count, `*`, `+`, and `?` contribute one. [ADR-0006](adr/0006-safe-regexp-profile.md#common-support-bounds) gives examples.
+
+**Matching.** Expressions MUST follow RE2 semantics except for the deviations below: unanchored, case-sensitive search by Unicode code point, with multiline and dot-all off. `^` and `$` match only the input's start and end; `$` does not match before a final LF. `.` matches every code point except LF (U+000A). `\d` matches `[0-9]`, `\w` matches `[0-9A-Za-z_]`, and `\s` matches exactly U+0009, U+000A, U+000C, U+000D, and U+0020. Uppercase shorthands match the complements; these definitions also apply inside classes. Unpaired surrogates are invalid GTS input; implementations SHOULD reject them, and GTS defines no results for them.
+
+**Permitted deviations.** An implementation MAY independently select `digit: unicode` (`\d` matches Unicode `Nd`), `word: unicode` (`\w` matches `Alphabetic`, marks, `Nd`, connector punctuation, and `Join_Control`, per [UTS #18](https://www.unicode.org/reports/tr18/#Compatibility_Properties)), and `space: unicode` (`\s` matches Unicode `White_Space`). Each also defines the complement and applies inside classes. Implementations MUST declare their choices, engine, version, configuration, and relevant Unicode version. No other deviations are permitted. Changes affecting support or results MUST be documented as compatibility changes.
+
+**Execution safety.** Every complete Boolean search, including fallbacks, MUST take O(n + 1) worst-case time for a fixed compiled expression and input length n. The constant may depend on expression size. Backtracking is permitted only with this guarantee; syntax restrictions, timeouts, and step limits alone do not establish it. The bound covers each search, not match enumeration or whole-document validation; deployments should also limit input sizes and validation time.
+
+**Schema validation.** On explicit schema validation or registration with validation enabled, implementations MUST check all expressions in dialect-defined schema positions, `x-gts-traits-schema`, referenced locations, and any other expression they can execute, including definitions and inactive branches. Literal data (`const`, `enum`, `default`, `examples`) and unknown keywords MUST NOT be scanned as schemas unless reached by a reference. Out-of-profile or out-of-bounds patterns MUST produce schema errors before instance or trait matching, even if registration skipped validation. Dialect keyword semantics still apply.
+
+**Format and errors.** `format: "regex"` checks profile membership and bounds without executing the expression. Engine limitations MUST NOT narrow the mandatory language; inability to support an in-profile expression within bounds is a conformance failure. Operational limits do not change profile membership. Required outcomes are:
+
+| Situation | Result |
+|-----------|--------|
+| Completed non-match | Normal keyword semantics: `pattern` fails; `patternProperties` skips the unmatched property's subschema. |
+| Schema pattern outside the profile or bounds | Schema error before matching, not invertible by `not`. |
+| Regex-valued string outside the profile or bounds | Ordinary format violation subject to applicators; the containing schema remains valid. |
+| Memory exhaustion, implementation limit exhaustion, or engine abort during expression processing or validation | MUST explicitly fail the whole validation; never a non-match, format violation, skipped constraint, or failure inverted by `not`. |
+
+**Conformance.** Checks MUST cover membership, bounds, reference matching, permitted deviations and declarations, and every regex path. Completed matching results may differ only for permitted deviations. Stress tests do not prove complexity bounds; operational-failure paths should be checked locally when the conformance API cannot exercise them.
 
 ### 11.1 Applying the JSON document model
 

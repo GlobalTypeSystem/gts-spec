@@ -122,6 +122,34 @@ export GTS_BASE_URL=http://127.0.0.1:8001
 pytest
 ```
 
+### Regular-expression tests
+
+`test_regex_validation.py` checks the bounded GTS regex profile (a closed subset of ECMA-262 `u` and RE2), reference matching, declared deviations, and execution safety from [README §11.0.1](../README.md#1101-regular-expression-execution-safety) and [ADR-0006](../adr/0006-safe-regexp-profile.md):
+
+- **Support:** accept in-profile expressions; reject malformed, engine-specific, and excluded syntax, including ambiguous spellings. Check the limits and adjacent values: 4096 expanded code points (including astral literals), 32 nested groups, and repetition counts/products of 1000. Upper counts multiply; zero counts and `*` contribute one. Unsupported patterns cause schema errors; unsupported regex-valued strings cause format violations invertible by `not`.
+- **Reference matching:** require RE2 results, including `.` matching CR, U+2028, and U+2029, ASCII shorthands inside and outside classes, and code-point matching for astral characters and `\xHH`. Paths include direct, referenced, and inherited `pattern`; stored-instance `/validate-instance` and `/validate-entity`; `propertyNames`; `patternProperties`; `additionalProperties` and `unevaluatedProperties` classification; and traits. Every path must satisfy the expected support and matching results.
+- **Declared deviations:** test `\d`, `\w`, and `\s`, including classes and Unicode word-set probes (marks, Join_Control, non-ASCII digits), against the declared behavior; undeclared constructs use the reference.
+- **Safety and failures:** check unsupported syntax and bounds in every schema position at registration and explicit validation after deferred registration. Literal data and unknown dialect keywords are excluded unless referenced as schemas. Operational failures must explicitly fail validation, including under `not` and during property classification.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `GTS_TEST_REGEX_DECLARED_BEHAVIOR` | empty | JSON object: `digit`, `word`, and `space` each accept `unicode` or `reference`; omitted keys use the reference. For Rust `regex` defaults, set `{"digit": "unicode", "word": "unicode", "space": "unicode"}`. RE2, Go, RE2/J, and RE2JS need no declaration. |
+| `GTS_TEST_REGEX_STRESS_SECONDS` | `2` | Response time limit for stress cases. |
+
+Stress workloads use ambiguous in-profile expressions: ~50,000-character strings, 500-character counted-repetition matches, arrays of 1,000 strings of 65 characters, and 32 property names of 65–96 characters. Positive cases require successful validation within the response limit. These workloads define the test environment, not GTS minimum capacity; tighter server limits may fail positive tests with explicit errors.
+
+Open questions (not asserted):
+
+- Must instance validation reject unsupported expressions in inactive branches after deferred registration? Explicit schema validation must reject them and is tested.
+- CI still compiles examples with Ajv only; a GTS profile checker remains to be added.
+
+Limitations:
+
+- The API's `ok` and error string cannot distinguish a mismatch from an operational failure. Complementary verdicts for a schema and its negation detect persistent failures under stable conditions, but independent requests cannot reliably classify transient failures. Stress checks allow either rejection or explicit error where specified.
+- Resource exhaustion needs local tests, such as fault injection; it cannot be triggered portably.
+- Stress timing detects regressions, not complexity guarantees. Client timeouts do not stop server work.
+- Offline checks use fake engines (`test_regex_validation_unit.py`, `pytest tests -m unit`, run in CI), not a profile checker or RE2 implementation.
+
 ## Generating reusable examples
 
 `generate_examples.py` runs the conformance tests against a GTS server and records the JSON entities submitted to the server. It writes only entities that the server subsequently reports as valid or invalid, preserving the server's actual request payloads rather than recreating them from test source code.
