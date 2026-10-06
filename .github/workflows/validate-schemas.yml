@@ -29,7 +29,7 @@ jobs:
         # Compile all schemas together so cross-references can be resolved
         # The 0-prefixed reference schema loads first alphabetically
         set +e
-        AJV_OUT="$(ajv compile -s "examples/*/types/*.schema.json" --strict=false 2>&1 | grep "^error: " || true)"
+        AJV_OUT="$(ajv compile -s "examples/*/types/*.schema.json" --strict=false 2>&1)"
         AJV_CODE=$?
         set -e
 
@@ -40,22 +40,19 @@ jobs:
 
         # If the only failures are "can't resolve reference", treat them as warnings.
         # This allows schemas to be validated syntactically even when external $ref targets
-        # (or custom URI schemes) are intentionally not resolvable in CI.
-        UNRESOLVED="$(echo "$AJV_OUT" | grep -Ei "can't resolve reference|cannot resolve reference|can not resolve reference" || true)"
-        OTHER="$(echo "$AJV_OUT" | grep -Eiv "can't resolve reference|cannot resolve reference|can not resolve reference" || true)"
+        # (or custom URI schemes) are intentionally not resolvable in CI. Every other
+        # line must be an ajv per-schema status line; any other diagnostic fails.
+        RESOLVE_ERROR="^error: (can't|cannot|can not) resolve reference"
+        STATUS_LINE="^schema .* is (valid|invalid)$"
+        UNRESOLVED="$(printf '%s\n' "$AJV_OUT" | grep -Ei "$RESOLVE_ERROR" || true)"
+        OTHER="$(printf '%s\n' "$AJV_OUT" | grep -Eiv "$RESOLVE_ERROR" | grep -Ev "$STATUS_LINE" | grep . || true)"
 
-        if [ -n "$OTHER" ]; then
-          echo "$AJV_OUT"
-          echo "ERROR: schema validation failed"
-          exit 1
-        fi
-
-        if [ -n "$UNRESOLVED" ]; then
-          echo "WARN: some $ref targets could not be resolved (allowed):"
+        if [ -n "$UNRESOLVED" ] && [ -z "$OTHER" ]; then
+          echo 'WARN: some $ref targets could not be resolved (allowed):'
           echo "$UNRESOLVED"
           exit 0
         fi
 
         echo "$AJV_OUT"
-        echo "ERROR: schema validation failed"
+        echo "ERROR: schema validation failed (ajv exit code $AJV_CODE)"
         exit 1
