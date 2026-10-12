@@ -149,7 +149,7 @@ Chosen option: "Option 4", because one keyword handles both syntax-only and fami
 - **Matching.** A concrete Type ID selects itself and its descendants (`root~` ≡ `root~*`), with minor-version flexibility. A concrete Instance ID selects only that exact identifier, with no minor-version expansion. Wildcards follow §10: first-segment `v1.*` and `v1~*` are equivalent; in later segments, `v1.*` also selects instances.
 - **Spelling.** The GTS grammar governs spelling and length: no trimming, case folding, or `gts://` stripping from field values; at most 1024 characters; no numeric limits beyond §2.3.
 - **Applicability and errors.** Use the same property-value applicability, schema locations, traversal, and validation paths as `x-gts-ref` (§9.6.1), including array-item schemas and effective trait-schema properties. The keyword constrains strings only; schemas specify `"type": "string"` separately. Literal data is not scanned. An invalid or uncovered value is a validation error that `not` can invert; an invalid operand is a schema error and cannot be inverted.
-- **No registry lookup.** `gts-ref-validation`, the §9.2 dependency closure, and OP#7 reference tracking do not apply.
+- **No registry lookup.** Coverage checks do not query the registry or depend on target registration or validity. `gts-ref-validation` does not apply, and the keyword does not introduce validation dependencies under §9.2.
 
 Property schema accepting any valid pattern:
 

@@ -1318,13 +1318,15 @@ def test_registry_and_reference_policy_do_not_affect_coverage(
     api.check_type_schema(holder, valid=True, mode=mode)
 
 
-def test_patterns_do_not_create_relationships(gts_api, schema_dialect):
-    """An operand is not reported as an OP#7 relationship (README §9.2).
+@pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
+def test_relationship_discovery_does_not_affect_pattern_validation(
+    gts_api, schema_dialect, mode
+):
+    """Unregistered operands and values remain valid before and after OP#7.
 
-    The API declares the OP#7 response only as an object. ``refs`` is the
-    relationship map of the reference implementation's graph: this assertion
-    depends on that shape, an existing contract limitation, until the API
-    defines one. Diagnostics are not relationships and are not compared.
+    The specification does not prescribe the discovery algorithm or the
+    exact contents of the relationship graph. This test checks
+    registry-independent validation (README §9.6.2), not graph contents.
     """
     api = gts_api
     unregistered = api.type_id("unregistered")
@@ -1338,8 +1340,17 @@ def test_patterns_do_not_create_relationships(gts_api, schema_dialect):
             },
         },
         schema_dialect,
+        mode=mode,
     )
-    api.check_type_schema(holder, valid=True)
-    graph = api.request("GET", "/resolve-relationships", params={"gts_id": holder})
-    assert graph["id"] == holder, graph
-    assert not graph.get("refs"), graph
+    instance = api.register_instance(
+        holder,
+        {"scope": unregistered + "acme.prod._.uploads.v1"},
+        validate=True,
+        mode=mode,
+    )
+    api.check_type_schema(holder, valid=True, mode=mode)
+    api.check_instance(instance, valid=True, mode=mode)
+    for entity_id in (holder, instance):
+        api.request("GET", "/resolve-relationships", params={"gts_id": entity_id})
+    api.check_type_schema(holder, valid=True, mode=mode)
+    api.check_instance(instance, valid=True, mode=mode)

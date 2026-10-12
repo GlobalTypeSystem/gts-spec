@@ -1452,7 +1452,7 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 
 - **Pattern-valued fields**: OP#6 and OP#13 MUST enforce `x-gts-pattern-ref` (§9.6.2) on string values, including instance properties and materialized effective trait values, in Draft-07, Draft 2019-09, and Draft 2020-12. Operand and value syntax and pattern coverage MUST be checked independently of registry state and `gts-ref-validation`.
 
-- **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
+- **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references.
 
 - **OP#8 - Type Schema Evolution Compatibility Checking**: Compare two definitions of one type identity, addressed by their distinct GTS Type Identifiers, and report a Compatibility Verdict (`compatible`, `incompatible`, or `unknown`) for the backward, forward, and full relations. `unknown` means the checker could not establish either compatibility or incompatibility; it is not itself evidence of incompatibility. When the compared schemas declare different JSON Schema dialects, OP#8 MUST return `unknown` for backward, forward, and full compatibility. Equivalent URI spellings of the same dialect MUST be treated as the same dialect. The checker reports evidence, while registry publication policy decides how the verdicts affect admission.
 
@@ -1467,8 +1467,6 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 - **OP#13 - Schema Traits Validation**: Validate schema traits (`x-gts-traits-schema` / `x-gts-traits`). See section 9.7 for full semantics and validation rules.
 
 **Transitive validation rule:** A GTS Type or Instance is valid only if every entity on which its validation depends is also valid. Implementations MUST recursively validate the complete dependency closure, including a Type's `$id` ancestors and GTS `$ref` targets and an Instance's Type. A dependency's own ancestors and `$ref` targets are subject to the same rule; implementations MUST handle cycles without infinite recursion. Whether entities selected through `x-gts-ref` join this dependency closure is controlled by the implementation-specific policy in §9.6.1. Under the suggested policy, only `any-valid` checks their validity; `none` and `any-present` do not.
-
-Patterns constrained by `x-gts-pattern-ref` do not declare entity references: their operands and selected identifiers MUST NOT add dependencies to this closure or relationships to OP#7.
 
 ### 9.3 - GTS entities registration
 
@@ -1547,7 +1545,7 @@ Implementation notes:
 - **Operand.** MUST be a concrete GTS Type or Instance ID, a §10 wildcard pattern, or exactly `/$id`. The latter resolves to the effective leaf Type ID, without `gts://`, using §9.6.1 rules through inheritance and composition. A missing or invalid selected Type ID is a schema error.
 - **Applicability.** Constrains strings only; use `"type": "string"` separately. OP#6 and OP#13 MUST enforce it in every supported dialect, using the schema locations and traversal rules of §9.6.1, including array items and materialized effective traits (§9.7.5). Literal data MUST NOT be scanned for keywords.
 - **Errors.** Operands MUST be checked during explicit schema validation, registration with validation enabled, and before value validation. Invalid operands are schema errors that `not` cannot invert. Malformed or uncovered values are ordinary validation failures subject to JSON Schema applicators.
-- **Registry independence.** Coverage checks MUST NOT query the registry or depend on target registration or validity. `gts-ref-validation`, the §9.2 dependency closure, and OP#7 reference tracking do not apply.
+- **Registry independence.** Coverage checks MUST NOT query the registry or depend on target registration or validity. `gts-ref-validation` does not apply, and the keyword does not introduce validation dependencies under §9.2.
 
 **Derivation and evolution.** OP#12 MUST preserve `Valid(derived) ⊆ Valid(base)` (§4.1); `allOf` conjoins inherited constraints. For isolated positive constraints with literal operands, base covering derived proves narrowing; equivalent constraints and intersections may also prove it. Resolve `/$id` for each effective schema being compared.
 
