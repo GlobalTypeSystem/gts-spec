@@ -1,0 +1,7 @@
+{
+  "id": "gts.x.core.events.subscription.v1~x.commerce.orders.fulfillment.v1",
+  "topic_id": "gts.x.core.events.topic.v1~x.commerce.orders.orders.v1.0",
+  "event_patterns": [
+    "gts.x.core.events.type.v1~x.commerce.orders.*"
+  ]
+}

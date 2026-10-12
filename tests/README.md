@@ -150,6 +150,17 @@ Limitations:
 - Stress timing detects regressions, not complexity guarantees. Client timeouts do not stop server work.
 - Offline checks use fake engines (`test_regex_validation_unit.py`, `pytest tests -m unit`, run in CI), not a profile checker or RE2 implementation.
 
+### GTS identifier pattern constraint tests
+
+`test_x_gts_pattern_ref.py` checks `x-gts-pattern-ref` from [README §9.6.2](../README.md#962-pattern-valued-fields-x-gts-pattern-ref), [§10](../README.md#10-collecting-identifiers-with-wildcards), and [ADR-0007](../adr/0007-gts-pattern-ref.md) in all three supported dialects:
+
+- **Syntax and coverage:** the universal operand `gts.*` checks concrete IDs and wildcard syntax, spelling, length, and large versions. Scoped cases cover narrowing, exact instances, minor versions, token boundaries, and segment-position semantics. Valid patterns whose every completion exceeds 1024 characters select no identifier and are covered by any operand. Each uncovered case names a witness, which the value's own scope must accept and the operand reject. Value failures are also checked under `not`; invalid operands remain schema errors in registration, transient schema validation, and value validation after deferred registration.
+- **Schema paths:** property and array schemas, local `$ref`, composition, literal data, and effective-leaf `/$id`.
+- **Traits:** trait values given on the leaf, inherited from an ancestor, supplied by `default`, and supplied on abstract types, plus `/$id` in trait schemas.
+- **Registry independence:** empty, valid, and invalid target states under every `gts-ref-validation` mode, including registration with validation; patterns do not create OP#7 relationships (checked through the reference implementation's `refs` map until the API defines the graph).
+
+`test_gts_id_pattern_syntax_unit.py` checks syntax of the value and coverage vectors and the lengths at the empty-selection boundary offline. It does not implement a coverage oracle. OP#8 and OP#12 tests cover evolution and derivation, including composition and self-reference. A separate regression in `test_refimpl_x_gts_ref.py` requires concrete payload IDs and rejects wildcard values for universal, wildcard, and concrete operands in every reference-validation mode.
+
 ## Generating reusable examples
 
 `generate_examples.py` runs the conformance tests against a GTS server and records the JSON entities submitted to the server. It writes only entities that the server subsequently reports as valid or invalid, preserving the server's actual request payloads rather than recreating them from test source code.

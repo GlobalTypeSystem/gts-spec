@@ -1,0 +1,18 @@
+{
+  "$id": "gts://gts.x.core.iam.access_scope.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Access scope",
+  "description": "An action and a GTS identifier pattern selecting resources.",
+  "type": "object",
+  "required": ["id", "type", "action", "resource_pattern"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "type": { "type": "string", "x-gts-ref": "/$id" },
+    "action": { "type": "string", "enum": ["read", "write"] },
+    "resource_pattern": {
+      "type": "string",
+      "x-gts-pattern-ref": "gts.*"
+    }
+  },
+  "additionalProperties": false
+}

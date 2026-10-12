@@ -1,0 +1,18 @@
+{
+  "$id": "gts://gts.x.core.iam.access_scope.v1~x.infra.compute.vm_scope.v1~",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "VM access scope",
+  "description": "Narrows the resource selector to virtual machine identifiers.",
+  "type": "object",
+  "allOf": [
+    { "$ref": "gts://gts.x.core.iam.access_scope.v1~" },
+    {
+      "properties": {
+        "resource_pattern": {
+          "type": "string",
+          "x-gts-pattern-ref": "gts.x.infra.compute.vm.*"
+        }
+      }
+    }
+  ]
+}

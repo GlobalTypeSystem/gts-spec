@@ -2105,9 +2105,10 @@ class TestCaseOp6_AbstractType_RejectCombinedAnonInstance(HttpRunner):
 #
 # The GTS Type Schema is a JSON Schema document annotated with the GTS-specific
 # keywords in the reserved `x-gts-*` namespace (README §Terminology / §9). The
-# specification defines exactly five such keywords:
+# specification defines exactly six such keywords:
 #
-# - x-gts-ref            (§9.6)
+# - x-gts-ref            (§9.6.1)
+# - x-gts-pattern-ref    (§9.6.2)
 # - x-gts-traits-schema  (§9.7)
 # - x-gts-traits         (§9.7)
 # - x-gts-final          (§9.11)
@@ -2159,12 +2160,12 @@ def _register_validated(gts_id, body, expected_status, label):
 
 
 class TestCaseSupportedExtensions_Accepted(HttpRunner):
-    """All five supported x-gts-* keywords, in valid positions, register cleanly.
+    """All six supported x-gts-* keywords, in valid positions, register cleanly.
 
     Positive control: proves the rejection tests below fail because of the
     *unknown* keyword name, not because validation rejects x-gts-* wholesale.
-    Covers x-gts-abstract, x-gts-traits-schema and x-gts-ref on the base, and
-    x-gts-final and x-gts-traits on the derived type.
+    Covers x-gts-abstract, x-gts-traits-schema, x-gts-ref and x-gts-pattern-ref
+    on the base, and x-gts-final and x-gts-traits on the derived type.
     """
 
     config = Config("unknown-ext: supported keywords accepted").base_url(get_gts_base_url())
@@ -2185,10 +2186,12 @@ class TestCaseSupportedExtensions_Accepted(HttpRunner):
                 "properties": {
                     "id": {"type": "string"},
                     "ownerRef": {"type": "string", "x-gts-ref": "gts.*"},
+                    "scope": {"type": "string", "x-gts-pattern-ref": "gts.*"},
                 },
             },
             200,
-            "register base using x-gts-abstract, x-gts-traits-schema, x-gts-ref",
+            "register base using x-gts-abstract, x-gts-traits-schema, x-gts-ref, "
+            "x-gts-pattern-ref",
         ),
         Step(
             RunRequest("register derived using x-gts-final and x-gts-traits")

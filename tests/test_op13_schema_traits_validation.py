@@ -77,7 +77,7 @@ class TestCaseOp13_Seed_TopicRefRegistry(HttpRunner):
 
     Many trait tests below annotate a `topicRef` trait with
     `x-gts-ref: "gts.x.test13.events.topic.v1~"` and supply concrete topic
-    references as trait values. Under §9.6 a *specific* (non-wildcard)
+    references as trait values. Under §9.6.1 a *specific* (non-wildcard)
     `x-gts-ref` is existence-enforced: the concrete constraint type and each
     referenced value MUST be registered, or validation fails. Their validity is
     outside x-gts-ref validation. This class registers the topic type and every
@@ -6124,9 +6124,9 @@ class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
 
 
 # ---------------------------------------------------------------------------
-# x-gts-ref existence semantics for trait values (§9.6)
+# x-gts-ref existence semantics for trait values (§9.6.1)
 #
-# §9.6 accepts two GTS constraint forms of x-gts-ref on a trait property:
+# §9.6.1 accepts two GTS constraint forms of x-gts-ref on a trait property:
 #   - a WILDCARD pattern (e.g. "gts.*", "gts.cf.core.am.*", "...v1~*"): the
 #     value must be a well-formed GTS id that matches the pattern (§10);
 #   - a CONCRETE identifier (e.g. "gts.x.test13.xref....v1~"): the value must be
@@ -6147,7 +6147,7 @@ class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
-    """§9.6 wildcard: exercise registry existence under the default any-valid mode.
+    """§9.6.1 wildcard: exercise registry existence under the default any-valid mode.
 
     A topicRef whose value is a well-formed GTS id that matches the pattern but
     is never registered fails; a value identifying a registered valid entity
@@ -6323,7 +6323,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
-    """§9.6 specific ref: the x-gts-ref CONSTRAINT type must itself exist.
+    """§9.6.1 specific ref: the x-gts-ref CONSTRAINT type must itself exist.
 
     The topicRef value is a syntactically valid GTS id with the correct prefix,
     but neither the constraint type nor the value is registered. Validation MUST
