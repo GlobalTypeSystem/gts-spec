@@ -1951,6 +1951,7 @@ class TestCaseTestOp8Compatibility_IdentityFullyCompatible(HttpRunner):
 
 _PATTERN_RESOURCE = "gts.x.core.resources.resource.v1~"
 _PATTERN_FAMILY = "gts.x.core.resources.resource.*"
+_PATTERN_INSTANCE = _PATTERN_RESOURCE + "acme.prod._.uploads.v1"
 
 
 def _check_compatibility(
@@ -2019,6 +2020,54 @@ def _check_compatibility(
             },
             False,
             id="pattern_negated_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.resources.resource.v1.*"},
+            {"backward": "incompatible", "forward": "compatible", "full": "incompatible"},
+            False,
+            id="pattern_minor_wildcard_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.resources.resource.v1.*"},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"backward": "compatible", "forward": "incompatible", "full": "incompatible"},
+            False,
+            id="pattern_minor_wildcard_widening",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE + ".0"},
+            {"backward": "incompatible", "forward": "compatible", "full": "incompatible"},
+            False,
+            id="pattern_instance_minor_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE + ".0"},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            {"backward": "compatible", "forward": "incompatible", "full": "incompatible"},
+            False,
+            id="pattern_instance_minor_widening",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            {
+                "type": "string",
+                "x-gts-pattern-ref": _PATTERN_INSTANCE.replace("v1~", "v1.0~"),
+            },
+            {"backward": "incompatible", "forward": "compatible", "full": "incompatible"},
+            False,
+            id="pattern_instance_type_minor_narrowing",
+        ),
+        pytest.param(
+            {
+                "type": "string",
+                "x-gts-pattern-ref": _PATTERN_INSTANCE.replace("v1~", "v1.0~"),
+            },
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            {"backward": "compatible", "forward": "incompatible", "full": "incompatible"},
+            False,
+            id="pattern_instance_type_minor_widening",
         ),
         # Compositions are assessed as a whole and may be reported `unknown`.
         pytest.param(

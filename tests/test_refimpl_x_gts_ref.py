@@ -170,13 +170,13 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
 
 
 class TestCaseXGtsRef_ExactRefSegmentBoundary(HttpRunner):
-    """x-gts-ref: an exact (non-wildcard, non-`~`) reference matches on a segment
+    """x-gts-ref: a concrete (non-wildcard, non-`~`) reference matches on a segment
     boundary, not by raw string prefix.
 
-    An exact instance constraint ``...thing.v1`` must accept only that identifier,
-    not a textual superset such as ``...thing.v12``. A naive ``value.startsWith(pattern)``
-    check leaks across the version boundary and wrongly accepts a reference to a
-    *different* registered instance, so validation would pass an unrelated entity.
+    A concrete instance constraint ``...thing.v1`` accepts any minor of major 1,
+    but rejects a textual superset such as ``...thing.v12``. A naive
+    ``value.startsWith(pattern)`` check leaks across the major-version boundary
+    and wrongly accepts an unrelated registered instance.
     """
 
     config = Config("x-gts-ref: exact ref segment boundary").base_url(
@@ -214,7 +214,7 @@ class TestCaseXGtsRef_ExactRefSegmentBoundary(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        # Holder schema constrains `ref` to the EXACT v1 instance.
+        # Holder schema constrains `ref` to this instance at major version 1.
         Step(
             RunRequest("register holder schema with exact instance ref")
             .post("/entities")
@@ -3110,6 +3110,129 @@ def test_x_gts_ref_payload_requires_concrete_ids(
         )
         instance_id = api.register_instance(holder, {"value": wildcard}, name=name)
         api.check_instance(instance_id, valid=False, mode=mode)
+
+
+@pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
+@pytest.mark.parametrize(
+    "position,tail",
+    [
+        (0, "acme.prod._.uploads.v1"),
+        (1, "acme.prod._.uploads.v1"),
+        (2, "acme.prod._.uploads.v1"),
+        (0, "7a1d2f34-5678-49ab-9012-abcdef123456"),
+        (1, "7a1d2f34-5678-49ab-9012-abcdef123456"),
+    ],
+    ids=["base_type", "derived_type", "instance", "uuid_base", "uuid_derived"],
+)
+@pytest.mark.parametrize(
+    "operand_version,value_version,valid",
+    [
+        pytest.param("1", "1", True, id="same_major"),
+        pytest.param("1", "1.0", True, id="omitted_minor"),
+        pytest.param("1", "1.27", True, id="another_minor"),
+        pytest.param("1.0", "1.0", True, id="same_explicit_minor"),
+        pytest.param("1.0", "1", False, id="explicit_minor_rejects_omitted"),
+        pytest.param("1.0", "1.1", False, id="different_explicit_minor"),
+        pytest.param("1", "12", False, id="different_major"),
+    ],
+)
+def test_concrete_instance_reference_applies_minor_flexibility(
+    gts_api, schema_dialect, mode, position, tail, operand_version, value_version, valid
+):
+    """A concrete instance operand follows the shared minor-version rules."""
+    api = gts_api
+    registered_types = set()
+    targets = []
+    for version in dict.fromkeys((operand_version, value_version)):
+        versions = ["1", "1", "1"]
+        versions[position] = version
+        base = api.type_id("target", versions[0])
+        target_type = base + "acme.prod._.derived.v" + versions[1] + "~"
+        for type_id, schema in (
+            (base, {"type": "object"}),
+            (target_type, {"allOf": [{"$ref": "gts://" + base}]}),
+        ):
+            if type_id not in registered_types:
+                api.register("target", schema, schema_dialect, type_id=type_id)
+                registered_types.add(type_id)
+        target_tail = "acme.prod._.uploads.v" + versions[2] if position == 2 else tail
+        target = target_type + target_tail
+        targets.append(target)
+        api.request(
+            "POST",
+            "/entities",
+            params={"validate": "true", "gts-ref-validation": mode},
+            json={"id": target, "type": target_type},
+        )
+    operand, value = targets[0], targets[-1]
+    holder = api.register(
+        "holder",
+        {
+            "type": "object",
+            "properties": {"ref": {"type": "string", "x-gts-ref": operand}},
+            "required": ["ref"],
+        },
+        schema_dialect,
+        mode=mode,
+    )
+    instance = api.register_instance(holder, {"ref": value})
+    api.check_instance(instance, valid=valid, mode=mode)
+
+
+@pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
+def test_anonymous_instance_reference_requires_same_uuid(gts_api, schema_dialect, mode):
+    api = gts_api
+    target_type = api.register("target", {"type": "object"}, schema_dialect)
+    targets = [
+        target_type + "7a1d2f34-5678-49ab-9012-abcdef123456",
+        target_type + "7a1d2f34-5678-49ab-9012-abcdef123457",
+    ]
+    for target in targets:
+        api.request(
+            "POST",
+            "/entities",
+            params={"validate": "true", "gts-ref-validation": mode},
+            json={"id": target, "type": target_type},
+        )
+    holder = api.register(
+        "holder",
+        {"properties": {"ref": {"type": "string", "x-gts-ref": targets[0]}}},
+        schema_dialect,
+        mode=mode,
+    )
+    instance = api.register_instance(holder, {"ref": targets[1]})
+    api.check_instance(instance, valid=False, mode=mode)
+
+
+@pytest.mark.parametrize(
+    "mode,valid",
+    [("none", True), ("any-present", False), ("any-valid", False)],
+)
+def test_minor_flexible_reference_looks_up_the_actual_value(
+    gts_api, schema_dialect, mode, valid
+):
+    """Matching an omitted minor does not replace exact registry lookup."""
+    api = gts_api
+    target_type = api.register("target", {"type": "object"}, schema_dialect)
+    operand = target_type + "acme.prod._.uploads.v1"
+    api.request(
+        "POST",
+        "/entities",
+        params={"validate": "true", "gts-ref-validation": mode},
+        json={"id": operand, "type": target_type},
+    )
+    holder = api.register(
+        "holder",
+        {
+            "type": "object",
+            "properties": {"ref": {"type": "string", "x-gts-ref": operand}},
+            "required": ["ref"],
+        },
+        schema_dialect,
+        mode=mode,
+    )
+    instance = api.register_instance(holder, {"ref": operand + ".0"})
+    api.check_instance(instance, valid=valid, mode=mode)
 
 
 if __name__ == "__main__":
