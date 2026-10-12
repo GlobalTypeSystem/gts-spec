@@ -615,9 +615,25 @@ def _regexp_type_id(name):
     return f"gts.x.test6regexp._.{name}.v1~"
 
 
+def _validate_transient_schema_json(gts_session, gts_base_url, type_id, body, dialect):
+    response = gts_session.post(
+        f"{gts_base_url}/validate-json",
+        json={"$id": f"gts://{type_id}", "$schema": dialect, "type": "object", **body},
+        timeout=30,
+    )
+    assert response.status_code == 200, response.text
+    result = response.json()
+    assert result["is_type_schema"] is True, result
+    return result
+
+
 def _register_regexp_type(gts_session, gts_base_url, name, body, dialect=_DRAFT_07):
-    """Registers a schema with validation and requires it to be accepted."""
+    """Requires acceptance of both transient schema JSON and registration."""
     type_id = _regexp_type_id(name)
+    transient = _validate_transient_schema_json(
+        gts_session, gts_base_url, type_id, body, dialect
+    )
+    assert transient["ok"] is True, transient
     response = _post_schema(gts_session, gts_base_url, type_id, body, dialect, True)
     assert response.status_code == 200, response.text
     assert response.json()["ok"] is True, response.json()
@@ -640,6 +656,17 @@ def _assert_schema_rejected(gts_session, gts_base_url, name, body, dialect=_DRAF
     response = _post_schema(gts_session, gts_base_url, type_id, body, dialect, True)
     assert response.status_code == 422, response.text
     _assert_explicit_validation_error(response.json(), (name, body))
+
+
+def _assert_transient_schema_rejected(
+    gts_session, gts_base_url, name, body, dialect=_DRAFT_07
+):
+    """Explicit validation of schema JSON must check the same regex positions."""
+    type_id = _regexp_type_id(name)
+    result = _validate_transient_schema_json(
+        gts_session, gts_base_url, type_id, body, dialect
+    )
+    _assert_explicit_validation_error(result, (name, "transient schema validation"))
 
 
 def _validate_type_schema_json(gts_session, gts_base_url, type_id):
@@ -1437,7 +1464,7 @@ _POSITION_CASES = [
 def test_unsupported_regex_in_schema_positions(
     gts_session, gts_base_url, draft, dialect, position, label, expression
 ):
-    """Every schema position is checked, at registration and on explicit validation.
+    """Check registration, stored schema validation, and transient schema JSON.
 
     Whether instance validation must also fail after deferred registration
     when the expression sits in an inactive branch is not settled by README
@@ -1445,6 +1472,9 @@ def test_unsupported_regex_in_schema_positions(
     """
     body = _schema_positions(dialect, expression)[position]
     name = f"position_{draft}_{position}_{label}"
+    _assert_transient_schema_rejected(
+        gts_session, gts_base_url, f"transient_{name}", body, dialect
+    )
     _assert_schema_rejected(gts_session, gts_base_url, name, body, dialect)
     _assert_deferred_schema_rejected(
         gts_session, gts_base_url, f"deferred_{name}", body, dialect

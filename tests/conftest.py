@@ -11,7 +11,7 @@ import typing
 import pytest
 import requests
 
-from .helpers.http_client import get_session
+from .helpers.http_client import GtsTestAPI, get_session
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -93,3 +93,22 @@ def gts_session() -> typing.Iterator[requests.Session]:
     yield session
     session.close()
     get_session.cache_clear()
+
+
+SCHEMA_DIALECTS = (
+    ("draft7", "http://json-schema.org/draft-07/schema#"),
+    ("draft2019", "https://json-schema.org/draft/2019-09/schema"),
+    ("draft2020", "https://json-schema.org/draft/2020-12/schema"),
+)
+
+
+@pytest.fixture
+def gts_api(gts_session, gts_base_url):
+    """Raw HTTP client with a fresh ID namespace for each test."""
+    return GtsTestAPI(gts_session, gts_base_url)
+
+
+@pytest.fixture(params=SCHEMA_DIALECTS, ids=[name for name, _ in SCHEMA_DIALECTS])
+def schema_dialect(request):
+    """Runs the test once per supported JSON Schema dialect (`$schema` URI)."""
+    return request.param[1]

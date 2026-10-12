@@ -1,5 +1,7 @@
 """Tests for x-gts-ref matching, /$id semantics, and combinator traversal."""
 
+import pytest
+
 from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
     validate_instance as _validate_instance,
@@ -1797,7 +1799,7 @@ class TestCaseXGtsRef_RootLocalReference(HttpRunner):
 class TestCaseXGtsRef_WildcardPattern(HttpRunner):
     """x-gts-ref: arbitrary wildcard patterns (not just ``gts.*``).
 
-    §9.6: the constraint value may be any well-formed GTS wildcard pattern
+    §9.6.1: the constraint value may be any well-formed GTS wildcard pattern
     (§10), e.g. ``gts.x.testref_wild.am.*``. The field value must be a
     syntactically valid GTS id that matches the pattern. Registry presence and
     target validity then follow the selected gts-ref-validation mode.
@@ -3053,6 +3055,61 @@ class TestCaseXGtsRef_SelfRefInOneOf(HttpRunner):
             "oneOf with a /$$id branch must accept a value matching only /$$id",
         ),
     ]
+
+
+@pytest.mark.parametrize("operand", ["universal", "wildcard", "concrete"])
+@pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
+def test_x_gts_ref_payload_requires_concrete_ids(
+    gts_api, schema_dialect, mode, operand
+):
+    """No operand permits wildcard strings in the payload.
+
+    Under ``gts.*`` every wildcard value below would be covered if pattern
+    coverage leaked into `x-gts-ref`; ``target~*`` and ``target~`` would
+    cover the type-scoped ones.
+    """
+    api = gts_api
+    target = api.register("target", {"type": "object"}, schema_dialect)
+    target_instance = api.register_instance(target, {}, validate=True)
+    x_gts_ref = {
+        "universal": "gts.*",
+        "wildcard": target + "*",
+        "concrete": target,
+    }[operand]
+    holder = api.register(
+        "holder",
+        {
+            "type": "object",
+            "required": ["value"],
+            "properties": {"value": {"type": "string", "x-gts-ref": x_gts_ref}},
+        },
+        schema_dialect,
+        mode=mode,
+    )
+    for name, concrete_id in (
+        ("concrete_type", target),
+        ("concrete_instance", target_instance),
+    ):
+        instance_id = api.register_instance(
+            holder, {"value": concrete_id}, name=name, validate=True, mode=mode
+        )
+        api.check_instance(instance_id, valid=True, mode=mode)
+    for name, wildcard in (
+        ("type_suffix_wildcard", target + "*"),
+        ("type_family_wildcard", target.rsplit(".v", 1)[0] + ".*"),
+        ("universal_wildcard", "gts.*"),
+    ):
+        # Registration with validation rejects the value in every mode.
+        api.register_instance(
+            holder,
+            {"value": wildcard},
+            name=name,
+            validate=True,
+            mode=mode,
+            status=422,
+        )
+        instance_id = api.register_instance(holder, {"value": wildcard}, name=name)
+        api.check_instance(instance_id, valid=False, mode=mode)
 
 
 if __name__ == "__main__":

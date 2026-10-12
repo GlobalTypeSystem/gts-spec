@@ -1,0 +1,20 @@
+[
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440101",
+    "type": "gts.x.core.iam.access_scope.v1~x.infra.compute.vm_scope.v1~",
+    "action": "read",
+    "resource_pattern": "gts.x.infra.compute.vm.*"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440102",
+    "type": "gts.x.core.iam.access_scope.v1~x.infra.compute.vm_scope.v1~",
+    "action": "read",
+    "resource_pattern": "gts.x.infra.compute.vm.v1~"
+  },
+  {
+    "id": "550e8400-e29b-41d4-a716-446655440103",
+    "type": "gts.x.core.iam.access_scope.v1~x.infra.compute.vm_scope.v1~",
+    "action": "read",
+    "resource_pattern": "gts.x.infra.compute.vm.v1~vmware.esxi.*"
+  }
+]

@@ -1,3 +1,5 @@
+import pytest
+
 from .conftest import get_gts_base_url
 from .helpers.http_run_helpers import (
     register as _register,
@@ -4764,6 +4766,260 @@ class TestCaseTestOp12TypeDerivationValidation_AncestorCrossDialectRefRejected(H
             "descendant of an ancestor with a cross-dialect ref must be rejected",
         ),
     ]
+
+
+_PATTERN_RESOURCE = "gts.x.core.resources.resource.v1~"
+_PATTERN_FAMILY = "gts.x.core.resources.resource.*"
+_PATTERN_INSTANCE = _PATTERN_RESOURCE + "acme.prod._.uploads.v1"
+
+
+@pytest.mark.parametrize(
+    "base_scope_schema,derived_scope_schema,expected_validity",
+    [
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.events.*"},
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.events.event.*"},
+            True,
+            id="pattern_namespace_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.events.*"},
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.*"},
+            False,
+            id="pattern_namespace_widening_forbidden",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            True,
+            id="pattern_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+            False,
+            id="pattern_widening",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE + "*"},
+            True,
+            id="pattern_equivalence",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"type": "string"},
+            False,
+            id="pattern_constraint_dropped",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"const": _PATTERN_INSTANCE},
+            True,
+            id="pattern_narrowed_without_keyword",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"enum": [_PATTERN_RESOURCE, _PATTERN_INSTANCE]},
+            True,
+            id="pattern_enum_without_keyword",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"const": "gts.*"},
+            False,
+            id="pattern_uncovered_const",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {
+                "allOf": [
+                    {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+                    {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+                ]
+            },
+            True,
+            id="pattern_intersection",
+        ),
+        pytest.param(
+            {"type": "string"},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            True,
+            id="pattern_added",
+        ),
+        pytest.param(
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE}},
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY}},
+            True,
+            id="pattern_negated_narrowing",
+        ),
+        pytest.param(
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY}},
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE}},
+            False,
+            id="pattern_negated_widening",
+        ),
+    ],
+)
+def test_pattern_ref_derivation_uses_semantic_inclusion(
+    gts_api,
+    schema_dialect,
+    base_scope_schema,
+    derived_scope_schema,
+    expected_validity,
+):
+    """A derived `scope` is valid when every value it accepts the base accepts,
+    whichever keywords express it."""
+    api = gts_api
+    base = api.register(
+        "base",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {"scope": base_scope_schema},
+        },
+        schema_dialect,
+    )
+    leaf = api.register(
+        "leaf",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {"scope": derived_scope_schema},
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=expected_validity)
+
+
+def test_pattern_ref_inherited_constraint_survives_a_wider_overlay(
+    gts_api, schema_dialect
+):
+    """A wider scope composed next to `$ref` to the base does not widen it:
+    the base's RESOURCE scope still applies."""
+    api = gts_api
+    base = api.register(
+        "base",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            },
+        },
+        schema_dialect,
+    )
+    leaf = api.register(
+        "leaf",
+        {
+            "allOf": [
+                {"$ref": "gts://" + base},
+                {
+                    "type": "object",
+                    "required": ["scope"],
+                    "properties": {
+                        "scope": {
+                            "type": "string",
+                            "x-gts-pattern-ref": _PATTERN_FAMILY,
+                        },
+                    },
+                },
+            ]
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=True)
+    api.check_payload(leaf, {"scope": _PATTERN_RESOURCE}, valid=True)
+    api.check_payload(leaf, {"scope": _PATTERN_FAMILY}, valid=False)
+
+
+def test_pattern_ref_derivation_checks_the_whole_chain(gts_api, schema_dialect):
+    """The leaf's FAMILY scope fits the base but widens the middle's RESOURCE
+    scope, so the leaf is invalid."""
+    api = gts_api
+    base = api.register(
+        "base",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+            },
+        },
+        schema_dialect,
+    )
+    middle = api.register(
+        "middle",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            },
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(base, "middle"),
+    )
+    leaf = api.register(
+        "leaf",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+            },
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(middle, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=False)
+
+
+@pytest.mark.parametrize(
+    "leaf_operand,expected_validity",
+    [
+        pytest.param("self", True, id="self"),
+        pytest.param("base", True, id="base"),
+        pytest.param("namespace", False, id="namespace"),
+    ],
+)
+def test_pattern_ref_derivation_resolves_self_for_each_schema(
+    gts_api, schema_dialect, leaf_operand, expected_validity
+):
+    """The base's `/$id` resolves to the base's own ID; the leaf may keep
+    `/$id` (its own, narrower ID) or name the base, but not widen to the
+    namespace."""
+    api = gts_api
+    base = api.register(
+        "base",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {"scope": {"type": "string", "x-gts-pattern-ref": "/$id"}},
+        },
+        schema_dialect,
+    )
+    # The namespace wildcard selects the base and its siblings: strictly wider.
+    namespace = api.id_prefix + ".*"
+    assert base.startswith(namespace[:-1]) and base != namespace, (base, namespace)
+    operand = {"self": "/$id", "base": base, "namespace": namespace}[leaf_operand]
+    leaf = api.register(
+        "leaf",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {"scope": {"type": "string", "x-gts-pattern-ref": operand}},
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=expected_validity)
 
 
 if __name__ == "__main__":

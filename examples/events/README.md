@@ -15,7 +15,7 @@ Topics are commonly well-known instances (named streams). Example:
 
 The instance uses a chained GTS identifier in `id`:
 - Left segment: `gts.x.core.events.topic.v1~` (the GTS Type)
-- Rightmost segment: `x.commerce._.orders.v1.0` (the instance name)
+- Rightmost segment: `x.commerce.orders.orders.v1.0` (the instance name)
 
 **Anonymous instance (event)**
 
@@ -45,6 +45,24 @@ Each level uses `allOf` + `$ref` to derive from its parent:
 - **Level 3** schema: `./types/gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~.schema.json`
 - **Topic**: `./instances/gts.x.core.events.topic.v1~x.core.audit.events.v1.json`
 - **Instance**: `./instances/gts.x.core.events.type.v1~x.core.audit.type.v1~x.core.iam.settings_changed.v1~.examples.json`
+
+### Event subscriptions
+
+The [orders subscription](instances/gts.x.core.events.subscription.v1~x.commerce.orders.fulfillment.v1.json)
+([schema](types/gts.x.core.events.subscription.v1~.schema.json)) pairs a reference with a pattern:
+
+- `topic_id` uses `x-gts-ref`: a concrete topic ID, here the existing orders topic.
+- `event_patterns` uses `x-gts-pattern-ref`: patterns within `gts.x.core.events.type.*`,
+  here every orders event type.
+
+| Rejected replacement | Reason |
+|---|---|
+| `topic_id`: `gts.x.core.events.topic.v1~x.commerce.orders.orders.*` | Not a concrete ID. |
+| `event_patterns`: `["gts.x.core.events.*"]` | Broader than `type.*`. |
+| `event_patterns`: `["gts.x.core.events.type_combined.*"]` | `type_combined` is a different type token. |
+
+See [README §9.6.2](../../README.md#962-pattern-valued-fields-x-gts-pattern-ref)
+and [ADR-0007](../../adr/0007-gts-pattern-ref.md).
 
 ### Field name aliases (recommended)
 

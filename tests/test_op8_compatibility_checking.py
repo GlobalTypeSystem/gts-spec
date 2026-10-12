@@ -1,3 +1,5 @@
+import pytest
+
 from .conftest import get_gts_base_url
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -1945,6 +1947,260 @@ class TestCaseTestOp8Compatibility_IdentityFullyCompatible(HttpRunner):
             .assert_equal("body.full_compatibility", "compatible")
         ),
     ]
+
+
+_PATTERN_RESOURCE = "gts.x.core.resources.resource.v1~"
+_PATTERN_FAMILY = "gts.x.core.resources.resource.*"
+
+
+def _check_compatibility(
+    api, old_type, new_type, expected_verdicts, unknown_allowed=False
+):
+    result = api.request(
+        "GET",
+        "/compatibility",
+        params={"old_type_id": old_type, "new_type_id": new_type},
+    )
+    for relation, verdict in expected_verdicts.items():
+        accepted = {verdict, "unknown"} if unknown_allowed else {verdict}
+        assert result[relation + "_compatibility"] in accepted, result
+
+
+@pytest.mark.parametrize(
+    "old_scope_schema,new_scope_schema,expected_verdicts,unknown_allowed",
+    [
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+            {
+                "backward": "compatible",
+                "forward": "incompatible",
+                "full": "incompatible",
+            },
+            False,
+            id="pattern_widening",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {
+                "backward": "incompatible",
+                "forward": "compatible",
+                "full": "incompatible",
+            },
+            False,
+            id="pattern_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE + "*"},
+            {"backward": "compatible", "forward": "compatible", "full": "compatible"},
+            False,
+            id="pattern_equivalent_scopes",
+        ),
+        pytest.param(
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE}},
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY}},
+            {
+                "backward": "incompatible",
+                "forward": "compatible",
+                "full": "incompatible",
+            },
+            False,
+            id="pattern_negated_widening",
+        ),
+        pytest.param(
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY}},
+            {"not": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE}},
+            {
+                "backward": "compatible",
+                "forward": "incompatible",
+                "full": "incompatible",
+            },
+            False,
+            id="pattern_negated_narrowing",
+        ),
+        # Compositions are assessed as a whole and may be reported `unknown`.
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+                    {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+                ]
+            },
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"backward": "compatible", "forward": "compatible", "full": "compatible"},
+            True,
+            id="pattern_intersection",
+        ),
+        pytest.param(
+            {
+                "allOf": [
+                    {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+                    {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+                ]
+            },
+            {
+                "allOf": [
+                    {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+                    {"type": "string", "x-gts-pattern-ref": "gts.*"},
+                ]
+            },
+            {"backward": "compatible", "forward": "compatible", "full": "compatible"},
+            True,
+            id="pattern_masked_widening",
+        ),
+    ],
+)
+def test_pattern_ref_evolution(
+    gts_api,
+    schema_dialect,
+    old_scope_schema,
+    new_scope_schema,
+    expected_verdicts,
+    unknown_allowed,
+):
+    """Isolated and negated scopes have definite verdicts (README §9.6.2).
+
+    A composition is assessed as a whole and may be reported ``unknown`` when
+    inclusion cannot be established, but never with the wrong definite verdict.
+    """
+    api = gts_api
+    old_type = api.register(
+        "old",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {"scope": old_scope_schema},
+        },
+        schema_dialect,
+        type_id=api.type_id("evolution", "1.0"),
+    )
+    new_type = api.register(
+        "new",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {"scope": new_scope_schema},
+        },
+        schema_dialect,
+        type_id=api.type_id("evolution", "1.1"),
+    )
+    _check_compatibility(api, old_type, new_type, expected_verdicts, unknown_allowed)
+
+
+@pytest.mark.parametrize(
+    "old_operand,new_operand,expected_verdicts",
+    [
+        # The v1.0 and v1.1 roots select disjoint scopes.
+        pytest.param(
+            "/$id",
+            "/$id",
+            {
+                "backward": "incompatible",
+                "forward": "incompatible",
+                "full": "incompatible",
+            },
+            id="both_self",
+        ),
+        pytest.param(
+            "new_type_id",
+            "/$id",
+            {"backward": "compatible", "forward": "compatible", "full": "compatible"},
+            id="new_self_equals_literal",
+        ),
+        pytest.param(
+            "/$id",
+            "old_type_id",
+            {"backward": "compatible", "forward": "compatible", "full": "compatible"},
+            id="old_self_equals_literal",
+        ),
+    ],
+)
+def test_pattern_ref_evolution_resolves_each_self_reference(
+    gts_api, schema_dialect, old_operand, new_operand, expected_verdicts
+):
+    """`/$id` names the schema it is resolved for, on each side."""
+    api = gts_api
+    type_ids = {
+        "old_type_id": api.type_id("self", "1.0"),
+        "new_type_id": api.type_id("self", "1.1"),
+    }
+    old_type = api.register(
+        "old",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {
+                    "type": "string",
+                    "x-gts-pattern-ref": type_ids.get(old_operand, old_operand),
+                },
+            },
+        },
+        schema_dialect,
+        type_id=type_ids["old_type_id"],
+    )
+    new_type = api.register(
+        "new",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {
+                    "type": "string",
+                    "x-gts-pattern-ref": type_ids.get(new_operand, new_operand),
+                },
+            },
+        },
+        schema_dialect,
+        type_id=type_ids["new_type_id"],
+    )
+    _check_compatibility(api, old_type, new_type, expected_verdicts)
+
+
+def test_pattern_ref_conditional_evolution_preserves_inconclusive_verdicts(
+    gts_api, schema_dialect
+):
+    """The old `if`/`then`/`else` scope accepts all of FAMILY; the new one only
+    RESOURCE. A solver may prove the relation or return unknown, never the
+    opposite."""
+    api = gts_api
+    old_type = api.register(
+        "old",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {
+                    "if": {"const": _PATTERN_RESOURCE},
+                    "then": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+                    "else": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+                },
+            },
+        },
+        schema_dialect,
+        type_id=api.type_id("conditional", "1.0"),
+    )
+    new_type = api.register(
+        "new",
+        {
+            "type": "object",
+            "required": ["scope"],
+            "properties": {
+                "scope": {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            },
+        },
+        schema_dialect,
+        type_id=api.type_id("conditional", "1.1"),
+    )
+    _check_compatibility(
+        api,
+        old_type,
+        new_type,
+        {"backward": "incompatible", "forward": "compatible", "full": "incompatible"},
+        unknown_allowed=True,
+    )
 
 
 if __name__ == "__main__":
