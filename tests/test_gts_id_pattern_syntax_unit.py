@@ -1,7 +1,7 @@
 """Offline checks of the value lists in test_x_gts_pattern_ref.py.
 
 The recognizer below transcribes the `gts-id-pattern` grammar of README §10
-and the identifier grammar of §2.3, with the 1024-character limit. It guards
+and the identifier grammar of §2.3, with the length and u32 version limits. It guards
 the test data against mistakes; it is not a GTS implementation.
 """
 
@@ -29,7 +29,17 @@ _GTS_ID_PATTERN = re.compile(rf"(?:{_IDENTIFIER}|{_WILDCARD_PATTERN})", re.ASCII
 
 
 def _is_gts_id_pattern(value):
-    return len(value) <= 1024 and _GTS_ID_PATTERN.fullmatch(value) is not None
+    if len(value) > 1024 or _GTS_ID_PATTERN.fullmatch(value) is None:
+        return False
+    for segment in value[4:].split("~"):
+        tokens = segment.split(".")
+        if len(tokens) >= 5:
+            versions = [tokens[4].removeprefix("v"), *tokens[5:]]
+            if any(
+                number.isdecimal() and int(number) > 4294967295 for number in versions
+            ):
+                return False
+    return True
 
 
 @pytest.mark.parametrize("value", patterns.VALID_PATTERNS)

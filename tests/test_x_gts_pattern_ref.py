@@ -9,6 +9,10 @@ implement coverage.
 
 import pytest
 
+_MAX_VERSION = "4294967295"
+_PREVIOUS_VERSION = "4294967294"
+_OVERFLOW_VERSION = "4294967296"
+
 # The longest valid value: 1024 characters, including the `*`.
 _LONGEST_PATTERN = "gts." + "a" * 1018 + ".*"
 
@@ -62,16 +66,37 @@ VALID_PATTERNS = (
     pytest.param("gts.nobody.unregistered.*", id="unregistered_prefix"),
     pytest.param(_LONGEST_PATTERN, id="length_1024"),
     pytest.param(_VENDOR_WITNESS, id="concrete_length_1024"),
-    pytest.param("gts.x.core.resources.resource.v" + "9" * 80 + "~", id="large_major"),
     pytest.param(
-        "gts.x.core.resources.resource.v1." + "9" * 80 + "~", id="large_minor"
+        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~", id="large_major"
     ),
     pytest.param(
-        "gts.x.core.resources.resource.v" + "9" * 80 + ".*", id="large_major_wildcard"
+        "gts.x.core.resources.resource.v1." + _MAX_VERSION + "~", id="large_minor"
+    ),
+    pytest.param(
+        "gts.x.core.resources.resource.v" + _MAX_VERSION + ".*",
+        id="large_major_wildcard",
     ),
 )
 
 INVALID_PATTERNS = (
+    pytest.param(
+        "gts.x.core.events.type.v" + _OVERFLOW_VERSION + "~", id="major_overflow"
+    ),
+    pytest.param(
+        "gts.x.core.events.type.v1." + _OVERFLOW_VERSION + "~", id="minor_overflow"
+    ),
+    pytest.param(
+        "gts.x.core.events.type.v" + _OVERFLOW_VERSION + ".*",
+        id="wildcard_major_overflow",
+    ),
+    pytest.param(
+        "gts.x.core.events.type.v1~acme.prod._.uploads.v" + _OVERFLOW_VERSION,
+        id="instance_major_overflow",
+    ),
+    pytest.param(
+        "gts.x.core.events.type.v1~acme.prod._.uploads.v1." + _OVERFLOW_VERSION,
+        id="instance_minor_overflow",
+    ),
     pytest.param("", id="empty"),
     pytest.param("*", id="bare_wildcard"),
     pytest.param("gts", id="prefix_without_dot"),
@@ -129,12 +154,19 @@ INSTANCE = BUCKET + "acme.prod._.uploads.v1"
 ANONYMOUS = RESOURCE + "7a1d2f34-5678-49ab-9012-abcdef123456"
 OTHER = "gts.x.core.events.event.*"
 
+# At 1024 characters a minor wildcard can select instances, but its type
+# marker would exceed the identifier length limit.
+_MINOR_WILDCARD_END = ".b.c.d.v0.*"
+_MINOR_BOUNDARY_NAME = "a" * (1024 - len(RESOURCE) - len(_MINOR_WILDCARD_END))
+_MINOR_BOUNDARY_INSTANCE = RESOURCE + _MINOR_BOUNDARY_NAME + ".b.c.d.v0"
+_MINOR_BOUNDARY_WILDCARD = _MINOR_BOUNDARY_INSTANCE + ".*"
+
 # (operand, value): every identifier the value selects, the operand selects too.
 COVERED_CASES = (
     pytest.param(_LONGEST_PATTERN, _LONGEST_PATTERN, id="operand_length_1024"),
     pytest.param(
-        "gts.x.core.resources.resource.v" + "9" * 80 + "~",
-        "gts.x.core.resources.resource.v" + "9" * 80 + "~",
+        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~",
+        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~",
         id="large_operand_version",
     ),
     pytest.param(FAMILY, FAMILY, id="equal_wildcards"),
@@ -150,13 +182,13 @@ COVERED_CASES = (
     pytest.param(RESOURCE, "gts.x.core.resources.resource.v1.2~", id="omitted_minor"),
     pytest.param(
         "gts.x.core.resources.resource.v1.*",
-        RESOURCE,
-        id="first_segment_major_covers_type",
+        "gts.x.core.resources.resource.v1.0~",
+        id="first_segment_minor_wildcard_covers_explicit_minor",
     ),
     pytest.param(
         RESOURCE,
         "gts.x.core.resources.resource.v1.*",
-        id="first_segment_major_equivalent",
+        id="first_segment_omitted_minor_covers_minor_wildcard",
     ),
     pytest.param(RESOURCE + "acme.*", BUCKET_FAMILY, id="chain_vendor_scope"),
     pytest.param(
@@ -166,10 +198,34 @@ COVERED_CASES = (
     ),
     pytest.param(
         RESOURCE + "acme.storage.resources.bucket.v1.*",
-        BUCKET,
-        id="later_major_covers_type",
+        RESOURCE + "acme.storage.resources.bucket.v1.2~",
+        id="later_minor_wildcard_covers_explicit_minor",
     ),
-    pytest.param(INSTANCE, INSTANCE, id="exact_instance"),
+    pytest.param(INSTANCE, INSTANCE, id="same_instance_scope"),
+    pytest.param(INSTANCE, INSTANCE + ".0", id="instance_omitted_minor"),
+    pytest.param(INSTANCE + ".0", INSTANCE + ".0", id="instance_explicit_minor"),
+    pytest.param(
+        INSTANCE,
+        "gts.x.core.resources.resource.v1.0~"
+        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
+        id="instance_type_minor_flexibility",
+    ),
+    pytest.param(
+        INSTANCE,
+        RESOURCE + "acme.storage.resources.bucket.v1.2~acme.prod._.uploads.v1",
+        id="instance_derived_type_minor_flexibility",
+    ),
+    pytest.param(
+        INSTANCE,
+        "gts.x.core.resources.resource.v1.2~"
+        "acme.storage.resources.bucket.v1.3~acme.prod._.uploads.v1.4",
+        id="instance_all_segment_minors",
+    ),
+    pytest.param(
+        ANONYMOUS,
+        "gts.x.core.resources.resource.v1.2~" + _UUID,
+        id="anonymous_type_minor_flexibility",
+    ),
     pytest.param(ANONYMOUS, ANONYMOUS, id="exact_uuid_instance"),
     pytest.param(
         BUCKET,
@@ -186,10 +242,20 @@ COVERED_CASES = (
     ),
     pytest.param(
         RESOURCE,
-        "gts.x.core.resources.resource.v1." + "9" * 80 + "~",
+        "gts.x.core.resources.resource.v1." + _MAX_VERSION + "~",
         id="large_minor_flexibility",
     ),
     # A value whose every completion exceeds 1024 characters selects nothing.
+    pytest.param(
+        _MINOR_BOUNDARY_INSTANCE,
+        _MINOR_BOUNDARY_WILDCARD,
+        id="minor_wildcard_selects_only_instances_at_length_limit",
+    ),
+    pytest.param(
+        _MINOR_BOUNDARY_WILDCARD,
+        _MINOR_BOUNDARY_INSTANCE + ".0",
+        id="length_limited_minor_wildcard_covers_instance",
+    ),
     pytest.param(FAMILY, _LONGEST_PATTERN, id="empty_value_longest"),
     pytest.param(FAMILY, _EMPTY_VENDOR_PATTERN, id="empty_value_vendor"),
     pytest.param(FAMILY, _EMPTY_VERSION_PATTERN, id="empty_value_version_marker"),
@@ -203,6 +269,42 @@ COVERED_CASES = (
 # (operand, value, witness): the witness is a canonical identifier that the
 # value selects and the operand does not.
 UNCOVERED_CASES = (
+    pytest.param(
+        _MINOR_BOUNDARY_WILDCARD,
+        _MINOR_BOUNDARY_INSTANCE,
+        _MINOR_BOUNDARY_INSTANCE,
+        id="length_limited_minor_wildcard_rejects_omitted_minor",
+    ),
+    pytest.param(
+        _MINOR_BOUNDARY_INSTANCE + ".0",
+        _MINOR_BOUNDARY_WILDCARD,
+        _MINOR_BOUNDARY_INSTANCE + ".1",
+        id="explicit_minor_does_not_cover_length_limited_wildcard",
+    ),
+    pytest.param(
+        "gts.x.core.resources.resource.v1.*",
+        RESOURCE,
+        RESOURCE,
+        id="first_segment_minor_wildcard_rejects_omitted_minor",
+    ),
+    pytest.param(
+        "gts.x.core.resources.resource.v1.*",
+        RESOURCE + "*",
+        RESOURCE,
+        id="first_segment_minor_wildcard_rejects_flexible_type_scope",
+    ),
+    pytest.param(
+        RESOURCE + "acme.storage.resources.bucket.v1.*",
+        BUCKET,
+        BUCKET,
+        id="later_minor_wildcard_rejects_omitted_minor",
+    ),
+    pytest.param(
+        BUCKET + "acme.prod._.uploads.v1.*",
+        INSTANCE,
+        INSTANCE,
+        id="instance_minor_wildcard_rejects_omitted_minor",
+    ),
     pytest.param(
         RESOURCE,
         FAMILY,
@@ -246,24 +348,32 @@ UNCOVERED_CASES = (
     pytest.param(
         BUCKET,
         RESOURCE + "acme.storage.resources.bucket.v1.*",
-        RESOURCE + "acme.storage.resources.bucket.v1",
+        RESOURCE + "acme.storage.resources.bucket.v1.0",
         id="later_major_includes_instance",
     ),
-    pytest.param(
-        INSTANCE,
-        "gts.x.core.resources.resource.v1.0~"
-        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
-        "gts.x.core.resources.resource.v1.0~"
-        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
-        id="instance_type_minor_is_exact",
-    ),
-    pytest.param(
-        INSTANCE,
-        INSTANCE + ".0",
-        INSTANCE + ".0",
-        id="instance_has_no_minor_expansion",
-    ),
     pytest.param(INSTANCE + ".0", INSTANCE, INSTANCE, id="instance_minor_not_optional"),
+    pytest.param(
+        INSTANCE + ".0",
+        INSTANCE + ".1",
+        INSTANCE + ".1",
+        id="instance_explicit_minor_mismatch",
+    ),
+    pytest.param(
+        "gts.x.core.resources.resource.v1.0~"
+        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
+        INSTANCE,
+        INSTANCE,
+        id="instance_explicit_type_minor_rejects_omitted",
+    ),
+    pytest.param(
+        "gts.x.core.resources.resource.v1.0~"
+        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
+        "gts.x.core.resources.resource.v1.1~"
+        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
+        "gts.x.core.resources.resource.v1.1~"
+        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
+        id="instance_explicit_type_minor_mismatch",
+    ),
     pytest.param(
         INSTANCE, INSTANCE + "0", INSTANCE + "0", id="instance_version_boundary"
     ),
@@ -302,13 +412,13 @@ UNCOVERED_CASES = (
     pytest.param(
         BUCKET + "*",
         RESOURCE + "acme.storage.resources.bucket.v1.*",
-        RESOURCE + "acme.storage.resources.bucket.v1",
+        RESOURCE + "acme.storage.resources.bucket.v1.0",
         id="later_chain_wildcard_excludes_instance",
     ),
     pytest.param(
-        "gts.x.core.resources.resource.v" + "9" * 80 + "~",
-        "gts.x.core.resources.resource.v" + "9" * 79 + "8~",
-        "gts.x.core.resources.resource.v" + "9" * 79 + "8~",
+        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~",
+        "gts.x.core.resources.resource.v" + _PREVIOUS_VERSION + "~",
+        "gts.x.core.resources.resource.v" + _PREVIOUS_VERSION + "~",
         id="large_majors_differ",
     ),
     # The neighbours of the empty-selection boundary select a 1024-character ID.
@@ -552,6 +662,16 @@ def assert_schema_error_everywhere(api, schema, dialect, payloads):
 
 
 INVALID_OPERANDS = (
+    pytest.param(
+        RESOURCE + "acme.prod._.uploads.v" + _OVERFLOW_VERSION, id="major_overflow"
+    ),
+    pytest.param(
+        RESOURCE + "acme.prod._.uploads.v1." + _OVERFLOW_VERSION, id="minor_overflow"
+    ),
+    pytest.param(
+        RESOURCE + "acme.prod._.uploads.v" + _OVERFLOW_VERSION + ".*",
+        id="wildcard_major_overflow",
+    ),
     pytest.param(None, id="null"),
     pytest.param(True, id="boolean"),
     pytest.param(3, id="number"),
@@ -1318,13 +1438,15 @@ def test_registry_and_reference_policy_do_not_affect_coverage(
     api.check_type_schema(holder, valid=True, mode=mode)
 
 
-def test_patterns_do_not_create_relationships(gts_api, schema_dialect):
-    """An operand is not reported as an OP#7 relationship (README §9.2).
+@pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
+def test_relationship_discovery_does_not_affect_pattern_validation(
+    gts_api, schema_dialect, mode
+):
+    """Unregistered operands and values remain valid before and after OP#7.
 
-    The API declares the OP#7 response only as an object. ``refs`` is the
-    relationship map of the reference implementation's graph: this assertion
-    depends on that shape, an existing contract limitation, until the API
-    defines one. Diagnostics are not relationships and are not compared.
+    The specification does not prescribe the discovery algorithm or the
+    exact contents of the relationship graph. This test checks
+    registry-independent validation (README §9.6.2), not graph contents.
     """
     api = gts_api
     unregistered = api.type_id("unregistered")
@@ -1338,8 +1460,17 @@ def test_patterns_do_not_create_relationships(gts_api, schema_dialect):
             },
         },
         schema_dialect,
+        mode=mode,
     )
-    api.check_type_schema(holder, valid=True)
-    graph = api.request("GET", "/resolve-relationships", params={"gts_id": holder})
-    assert graph["id"] == holder, graph
-    assert not graph.get("refs"), graph
+    instance = api.register_instance(
+        holder,
+        {"scope": unregistered + "acme.prod._.uploads.v1"},
+        validate=True,
+        mode=mode,
+    )
+    api.check_type_schema(holder, valid=True, mode=mode)
+    api.check_instance(instance, valid=True, mode=mode)
+    for entity_id in (holder, instance):
+        api.request("GET", "/resolve-relationships", params={"gts_id": entity_id})
+    api.check_type_schema(holder, valid=True, mode=mode)
+    api.check_instance(instance, valid=True, mode=mode)

@@ -93,7 +93,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
   - [9.9 TypeSpec support](#99---typespec-support)
   - [9.10 UUID as object IDs](#910---uuid-as-object-ids)
   - [9.11 GTS Type Schema Modifiers (`x-gts-final` / `x-gts-abstract`)](#911---gts-type-schema-modifiers-x-gts-final--x-gts-abstract)
-- [10. Collecting Identifiers with Wildcards](#10-collecting-identifiers-with-wildcards)
+- [10. Identifier Matching and Pattern Coverage](#10-identifier-matching-and-pattern-coverage)
 - [11. JSON and JSON Schema Conventions](#11-json-and-json-schema-conventions)
 - [12. Notes and Best Practices](#12-notes-and-best-practices)
 - [13. Testing](#13-testing)
@@ -121,7 +121,7 @@ See the [Practical Benefits for Service and Platform Vendors](#51-practical-bene
 | 0.13 | CORRECTION: Define compatibility through accepted-instance-set inclusion (§4.3) and separate **Type Derivation Compatibility** (§4.1, one-way) from **Type Schema Evolution Compatibility** (§4.2). This corrects OP#8 verdicts for unchanged inputs — notably for open content models, enums, and `const` identifier fields; implementations targeting 0.12 may need to update their compatibility checker. OP#8 reports the tri-state `compatible`, `incompatible`, or `unknown` for each relation, preserving an inconclusive check instead of conflating it with incompatibility. Tolerant-reader, casting, and default-materialization guarantees MUST be reported separately (§4.3). Content models are classified on the resolved effective schema, not on `additionalProperties` alone (§4.4). §4 restructured and renumbered; later sections unchanged. OP#8 conformance tests updated. |
 | 0.14 | BREAKING: generalize and tighten `x-gts-ref` matching (§9.6.1). The operand may be any GTS wildcard pattern (§10), not just `gts.*` — e.g. `gts.cf.core.am.*` or `...v1~*` — a concrete GTS identifier, or the reserved string `/$id`; every other slash-prefixed value is prohibited and registration MUST reject it. `/$id` resolves to the canonical top-level identifier of the leaf GTS Type Schema selected for validation and retains that root through inherited or composed constraints. Reference lookup and target validation policy remain implementation-specific; an implementation may expose modes such as `gts-ref-validation=none|any-present|any-valid`. `any-present` requires registered targets without validating them, while `any-valid` requires valid targets; for wildcard constraints, at least one registered target must satisfy the selected mode. Clarify that a `~`-terminated concrete reference matches the exact identifier and any derived identifier (`gts.x...v1~` ≡ `gts.x...v1~` or `gts.x...v1~*`), that abstract types still enforce the selected `x-gts-ref` mode, and that explicit validation requires GTS `$ref` targets to resolve. Reference conformance tests updated. |
 | 0.15 | BREAKING: replace full ECMA-262 support with a bounded GTS regex profile for `pattern`, `patternProperties`, and `format: "regex"`. Require RE2 matching semantics with declared Unicode shorthand deviations, linear-time search, and explicit operational errors. See [§11.0.1](#1101-regular-expression-execution-safety) and [ADR-0006](adr/0006-safe-regexp-profile.md). |
-| 0.16 | Add `x-gts-pattern-ref` for strings that hold GTS identifier patterns, such as resource selectors in access scopes or event selectors in subscriptions. The keyword checks pattern syntax and coverage by an operand, including selected-type self-reference through `/$id`; `gts.*` checks syntax only. Results are independent of the registry and `gts-ref-validation`. OP#6 and OP#13 MUST enforce it in every supported dialect. Formalize the §10 pattern grammar and coverage relation, including their use in OP#12 derivation and OP#8 evolution checks. `x-gts-ref` is unchanged. See [§9.6.2](#962-pattern-valued-fields-x-gts-pattern-ref) and [ADR-0007](adr/0007-gts-pattern-ref.md). |
+| 0.16 | Add `x-gts-pattern-ref` for strings that hold GTS identifier patterns, such as resource selectors in access scopes or event selectors in subscriptions. The keyword checks pattern syntax and coverage by an operand, including selected-type self-reference through `/$id`; `gts.*` checks syntax only. Results are independent of the registry and `gts-ref-validation`. OP#6 and OP#13 MUST enforce it in every supported dialect. Formalize the §10 pattern grammar and coverage relation, including their use in OP#12 derivation and OP#8 evolution checks. CORRECTION to 0.16.0: apply omitted-minor flexibility in every type and instance segment, including `x-gts-ref`; require an explicit minor for `v1.*`; reject version components outside the unsigned 32-bit range. Implementations may need to update matching and parsing. See [§9.6.2](#962-pattern-valued-fields-x-gts-pattern-ref) and [ADR-0007](adr/0007-gts-pattern-ref.md). |
 
 ## Terminology
 
@@ -195,7 +195,7 @@ Segments must be lowercase ASCII letters, digits, and underscores; they must sta
 
 The `<vendor>`, `<package>`, `<namespace>`, and `<type>` segment tokens must not start with a digit.
 
-Versioning uses semantic versioning constrained to major and optional minor: `v<MAJOR>[.<MINOR>]` where `<MAJOR>` and `<MINOR>` are non-negative integers, for example:
+Versioning uses semantic versioning constrained to major and optional minor: `v<MAJOR>[.<MINOR>]` where `<MAJOR>` and `<MINOR>` are unsigned 32-bit integers (§2.3, note 7), for example:
 - `gts.x.core.events.type.v1~` - defines a base event type in the system
 - `gts.x.core.events.type.v1.2~` - defines a specific edition v1.2 of the base event type
 
@@ -304,6 +304,8 @@ uuid             = 8hex , "-" , 4hex , "-" , 4hex , "-" , 4hex , "-" , 12hex ;
 5. **Normalization**: GTS identifiers must be lowercase. Leading/trailing whitespace is not permitted. Canonical form has no optional spacing.
 
 6. **Reserved prefix**: The `gts.` prefix is mandatory and reserved. Future versions may introduce alternative prefixes but will maintain backward compatibility.
+
+7. **Version range**: Each major and minor version MUST be in the inclusive range `0`–`4294967295` (unsigned 32-bit). Larger values are invalid in both identifiers and patterns.
 
 ### 2.4 Types, instances, and JSON representation
 
@@ -1315,6 +1317,8 @@ This specification intentionally does not enforce lifecycle, operational or gove
 
 ## 8. Parsing and Validation
 
+The regexes below recognize structure only. After parsing, implementations MUST check every major and minor against the unsigned 32-bit range in §2.3, in addition to the other identifier constraints.
+
 ### 8.1 Single-segment regex (type or instance)
 
 Single-chain variant:
@@ -1443,7 +1447,7 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 
 - **OP#3 - ID Parsing**: Decompose identifiers into constituent parts (vendor, package, namespace, type, version, etc.)
 
-- **OP#4 - ID Pattern Matching**: Match identifiers against patterns containing wildcards
+- **OP#4 - ID Pattern Matching**: Match concrete identifiers or candidate patterns against a filter using the matching and coverage rules in §10.
 
 - **OP#5 - ID to UUID Mapping**: Generate deterministic UUIDs from GTS identifiers
 
@@ -1452,7 +1456,7 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 
 - **Pattern-valued fields**: OP#6 and OP#13 MUST enforce `x-gts-pattern-ref` (§9.6.2) on string values, including instance properties and materialized effective trait values, in Draft-07, Draft 2019-09, and Draft 2020-12. Operand and value syntax and pattern coverage MUST be checked independently of registry state and `gts-ref-validation`.
 
-- **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references
+- **OP#7 - Relationship Resolution**: Load schemas and instances, resolve inter-dependencies, and detect broken references.
 
 - **OP#8 - Type Schema Evolution Compatibility Checking**: Compare two definitions of one type identity, addressed by their distinct GTS Type Identifiers, and report a Compatibility Verdict (`compatible`, `incompatible`, or `unknown`) for the backward, forward, and full relations. `unknown` means the checker could not establish either compatibility or incompatibility; it is not itself evidence of incompatibility. When the compared schemas declare different JSON Schema dialects, OP#8 MUST return `unknown` for backward, forward, and full compatibility. Equivalent URI spellings of the same dialect MUST be treated as the same dialect. The checker reports evidence, while registry publication policy decides how the verdicts affect admission.
 
@@ -1467,8 +1471,6 @@ Implement and expose all operations OP#1–OP#13 listed above and add appropriat
 - **OP#13 - Schema Traits Validation**: Validate schema traits (`x-gts-traits-schema` / `x-gts-traits`). See section 9.7 for full semantics and validation rules.
 
 **Transitive validation rule:** A GTS Type or Instance is valid only if every entity on which its validation depends is also valid. Implementations MUST recursively validate the complete dependency closure, including a Type's `$id` ancestors and GTS `$ref` targets and an Instance's Type. A dependency's own ancestors and `$ref` targets are subject to the same rule; implementations MUST handle cycles without infinite recursion. Whether entities selected through `x-gts-ref` join this dependency closure is controlled by the implementation-specific policy in §9.6.1. Under the suggested policy, only `any-valid` checks their validity; `none` and `any-present` do not.
-
-Patterns constrained by `x-gts-pattern-ref` do not declare entity references: their operands and selected identifiers MUST NOT add dependencies to this closure or relationships to OP#7.
 
 ### 9.3 - GTS entities registration
 
@@ -1504,16 +1506,14 @@ pytest ./tests
 
 Use `x-gts-ref` in GTS schemas (JSON schemas) to declare that a string field is a GTS entity reference, not an arbitrary string. The `x-gts-ref` operand MUST be a valid concrete GTS identifier, a GTS wildcard pattern (§10), or exactly the reserved string `/$id`; anything else makes the schema invalid. No other JSON Pointer or slash-prefixed form is supported.
 
-`x-gts-ref` declares a reference, so its field value is always a concrete GTS identifier. A field whose value is itself a GTS pattern, such as a resource selector in an access scope, uses `x-gts-pattern-ref` instead (§9.6.2).
+`x-gts-ref` declares a reference: its field value MUST be a valid concrete GTS identifier selected by the operand under §10 matching rules. A field whose value is itself a GTS pattern, such as a resource selector in an access scope, uses `x-gts-pattern-ref` instead (§9.6.2).
 
 `x-gts-ref` has keyword semantics only when it is a member of a JSON Schema object at a schema location. A property with that name inside arbitrary JSON data held by `default`, `const`, `enum`, or `examples` is data, not an `x-gts-ref` keyword. Likewise, a key named `x-gts-ref` directly under `properties` is a property name; the schema value associated with that name is still traversed normally and may itself contain the `x-gts-ref` keyword. Implementations MUST traverse schema-valued applicator keywords according to the declared JSON Schema dialect and MUST NOT discover `x-gts-ref` by recursively scanning arbitrary JSON values.
 
 Allowed values:
-- `"x-gts-ref": "<gts-pattern>"` — **wildcard**. Any GTS wildcard pattern (§10); e.g. `gts.*`, `gts.cf.core.am.*`, or `gts.x.core.events.topic.v1~*`. The field value MUST be a syntactically valid GTS identifier (see OP#1) that matches the pattern.
-- `"x-gts-ref": "<gts-id>"` — **concrete identifier reference**, where `<gts-id>` is a concrete GTS identifier:
-  - If `<gts-id>` is a **Type Identifier** (ending in `~`, such as `gts.x.core.events.topic.v1~`), it matches the identifier itself **and** any identifier derived from or instantiated under it: `gts.cf.core.iam.user.v1~` is equivalent to matching `gts.cf.core.iam.user.v1~` **or** `gts.cf.core.iam.user.v1~*` (see §3.5, §10).
-  - If `<gts-id>` is an **Instance Identifier** (not ending in `~`, such as `...item.v1~x.vendor._.thing.v1`), it requires an **exact match** on that specific instance identifier. Textual prefix supersets across segment or version boundaries (such as `...thing.v12` when referencing `...thing.v1`) MUST NOT match.
-- `"x-gts-ref": "/$id"` — **selected-type self-reference**. Resolves to the top-level `$id` of the leaf (right-most derived) GTS Type Schema being validated, without `gts://`. This remains the root when the constraint is inherited through `$ref` or `allOf`. Rooted matching applies: the leaf and its descendants match; its ancestors and siblings do not. Use `const` for exact equality, or a literal GTS ID to keep the reference rooted at a specific base type.
+- `"x-gts-ref": "<gts-pattern>"` — **wildcard**, such as `gts.*`, `gts.cf.core.am.*`, or `gts.x.core.events.topic.v1~*`.
+- `"x-gts-ref": "<gts-id>"` — **concrete identifier operand**. Type and Instance IDs select identifiers as defined in §10, including its minor-version rules. Use `const` alongside `x-gts-ref` to require exact identifier equality.
+- `"x-gts-ref": "/$id"` — **selected-type self-reference**. Resolves to the top-level `$id` of the leaf (right-most derived) GTS Type Schema being validated, without `gts://`. This remains the root when the constraint is inherited through `$ref` or `allOf`. Rooted matching applies: the leaf and its descendants match; its ancestors and siblings do not. Use a literal GTS ID to keep the reference rooted at a specific base type.
 
 For example, if base type `A~` declares `x-gts-ref: "/$id"` and leaf type `A~B~` imports that constraint, validation against `A~B~` resolves the operand to `A~B~`. Values `A~B~` and `A~B~C` match; ancestor `A~` and sibling `A~D~` do not.
 
@@ -1530,13 +1530,8 @@ See examples in `./examples/modules` for typical patterns.
 
 Implementation notes:
 
-- Treating `x-gts-ref` like JSON Schema string constraints:
-  - For a wildcard pattern (e.g. `gts.*`, `gts.cf.core.am.*`), validate that the field value is a well-formed GTS ID (OP#1) and matches the pattern (§10).
-  - For a concrete Type Identifier ending in `~` (e.g. `gts.x.core.modules.capability.v1~`), match the identifier itself and any descendant identifier rooted at that type boundary.
-  - For a concrete Instance Identifier (not ending in `~`), match only that exact identifier on segment boundaries; a raw `startsWith(...)` check MUST NOT leak across segment or version boundaries.
-  - Treat `/$id` as a reserved operand, not as general JSON Pointer support. Resolve it directly from the canonical top-level `$id` of the selected leaf GTS Type Schema and strip `gts://` before matching.
-  - Reject every other slash-prefixed operand during registration. Implementations MUST NOT resolve schema-local paths or chain through another `x-gts-ref` value.
-  - Registry lookup and target validation for `x-gts-ref` are implementation-specific. Implementations may use policies such as `none`, `any-present`, and `any-valid` described above; operand syntax and the pointer prohibition are mandatory in every mode.
+- Apply §10 matching rules on segment boundaries; a raw `startsWith(...)` check is insufficient.
+- Reject every slash-prefixed operand other than `/$id` during registration. Implementations MUST NOT resolve schema-local paths or chain through another `x-gts-ref` value.
 
 
 #### 9.6.2 Pattern-valued fields (`x-gts-pattern-ref`)
@@ -1547,7 +1542,7 @@ Implementation notes:
 - **Operand.** MUST be a concrete GTS Type or Instance ID, a §10 wildcard pattern, or exactly `/$id`. The latter resolves to the effective leaf Type ID, without `gts://`, using §9.6.1 rules through inheritance and composition. A missing or invalid selected Type ID is a schema error.
 - **Applicability.** Constrains strings only; use `"type": "string"` separately. OP#6 and OP#13 MUST enforce it in every supported dialect, using the schema locations and traversal rules of §9.6.1, including array items and materialized effective traits (§9.7.5). Literal data MUST NOT be scanned for keywords.
 - **Errors.** Operands MUST be checked during explicit schema validation, registration with validation enabled, and before value validation. Invalid operands are schema errors that `not` cannot invert. Malformed or uncovered values are ordinary validation failures subject to JSON Schema applicators.
-- **Registry independence.** Coverage checks MUST NOT query the registry or depend on target registration or validity. `gts-ref-validation`, the §9.2 dependency closure, and OP#7 reference tracking do not apply.
+- **Registry independence.** Coverage checks MUST NOT query the registry or depend on target registration or validity. `gts-ref-validation` does not apply to this keyword, and the keyword does not introduce validation dependencies under §9.2. Whether OP#7 reports relationships inferred from its operand or constrained values is implementation-defined; reporting them MUST NOT change validation results. Dependencies introduced independently, such as GTS `$ref` targets, still follow §9.2.
 
 **Derivation and evolution.** OP#12 MUST preserve `Valid(derived) ⊆ Valid(base)` (§4.1); `allOf` conjoins inherited constraints. For isolated positive constraints with literal operands, base covering derived proves narrowing; equivalent constraints and intersections may also prove it. Resolve `/$id` for each effective schema being compared.
 
@@ -1876,20 +1871,25 @@ Enforcement follows the same pattern as existing `?validate=true` behavior: chec
 See `./examples/typespec/vms/types/states/gts.x.infra.compute.vm_state.v1~.schema.json` for an example of a final type, `./examples/modules/types/gts.x.core.modules.capability.v1~.schema.json` for another final type, and `./examples/events/types/gts.x.core.events.type.v1~.schema.json` for an example of an abstract base type.
 
 
-## 10. Collecting Identifiers with Wildcards
+<a id="10-collecting-identifiers-with-wildcards"></a>
 
-**Important:** An identifier containing a wildcard (`*`) is a **pattern for matching** and may not serve as a canonical identifier for a type or instance.
+## 10. Identifier Matching and Pattern Coverage
 
-A single wildcard (`*`) character can be used to find all identifiers matching a given prefix. The wildcard is a greedy operator that matches any sequence of characters after it, including the empty sequence and the `~` chain separator. Consequently, a bare chain-suffix wildcard such as `type.v1~*` matches `type.v1~` itself as well as identifiers derived from it.
+This section defines matching and coverage for all GTS identifier patterns: concrete Type IDs, concrete Instance IDs, and wildcard patterns. A pattern does not need to contain `*`; its selected set is defined by the matching rules below.
+
+**Wildcard syntax**
+
+Wildcard patterns cannot serve as canonical Type or Instance IDs.
+
+A trailing `*` matches any valid suffix, including an empty suffix and additional `~`-separated segments, subject to the minor-version matching rules below. Thus, `type.v1~*` includes `type.v1~` itself as well as identifiers derived from it.
 
 **Rules for using wildcards:**
 1. The wildcard (`*`) must be used only **once**.
 2. The wildcard must appear at the **end** of the pattern.
 3. The wildcard must not be used in combination with an attribute selector (`@`) or query (`[]`).
-4. The pattern must start at the beginning of a valid segment. For example, `gts.x.llm.chat.msg*` is invalid if `msg` is not a complete segment. `gts.x.llm.chat.message.v*` is valid because `v` is the start of the version segment.
-5. **Minor version semantics**: When a pattern specifies only a major version (e.g., `v0.*`), it matches candidates with any minor version of that major version (e.g., `v0.1~`, `v0.2~`, etc.). This is because the minor version is optional, and omitting it semantically means "any minor version".
+4. The wildcard must occur at a boundary allowed by the grammar below; it cannot replace only part of a name or version number.
 
-**Pattern grammar.** Rules 1–4 define the following syntax, which extends the EBNF of §2.3. A GTS identifier pattern is either a concrete GTS identifier or a wildcard pattern. The whole string is at most 1024 characters long, including the `*`, and follows the spelling rules of §2.3 note 5: lowercase, with no whitespace.
+**Pattern grammar.** The following syntax extends the EBNF of §2.3. The whole string is at most 1024 characters long, including any `*`, and follows the spelling rules of §2.3 note 5: lowercase, with no whitespace. Version components also obey the unsigned 32-bit range in §2.3 note 7.
 
 ```ebnf
 gts-id-pattern       = gts-identifier | gts-wildcard-pattern ;
@@ -1902,72 +1902,149 @@ segment-prefix       = vendor , "." , [ package , "." , [ namespace , "." ,
                        [ type , "." , [ "v" , [ major , "." ] ] ] ] ] ;
 ```
 
-The wildcard may therefore follow `gts.`, a `~`, the `.` after a complete vendor, package, namespace, type, or major-version token, or the version marker `v`. It never follows part of a token, a minor version, or a UUID: `gts.vendor*`, `gts.x.core.events.type.v1*`, and `gts.x.core.events.type.v1.0.*` are invalid. A wildcard pattern needs no type segment, so the requirement of §2.1 that instance identifiers include a left-hand type segment does not apply to it. `x-gts-pattern-ref` (§9.6.2) uses this grammar for both literal operands and string values.
+The wildcard may therefore follow `gts.`, a `~`, the `.` after a complete vendor, package, namespace, type, or major-version token, or the version marker `v`. It never follows part of a token, a minor version, or a UUID: `gts.vendor*`, `gts.vendor.package.namespace.type.v1*`, and `gts.vendor.package.namespace.type.v1.0.*` are invalid. A wildcard pattern needs no type segment, so the requirement of §2.1 that instance identifiers include a left-hand type segment does not apply to it. `x-gts-pattern-ref` (§9.6.2) uses this grammar for both literal operands and string values.
 
-**Pattern matching and coverage.** Let `U` be the set of all canonical GTS Type and Instance identifiers valid under §2, regardless of whether they are registered. For a valid pattern `p`, `M(p)` is the subset of `U` selected by the following rules:
+**Identifier matching.** Let `U` be the set of all canonical GTS Type and Instance identifiers valid under §2, regardless of whether they are registered. For a valid pattern `p`, `M(p)` is the subset of `U` selected by the following rules:
 
-- A concrete Type ID selects itself and all identifiers derived from or instantiated under it, on type-segment boundaries. In specified type segments, an omitted minor version accepts any minor version of the same major; an explicit minor version requires that exact version. A concrete Type ID ending in `~` and the same ID followed by `*` select the same set (`root~` ≡ `root~*`).
-- A concrete Instance ID selects only that exact canonical identifier. It MUST NOT expand omitted minor versions or match longer identifiers by textual prefix.
-- A wildcard pattern selects canonical identifiers matching its prefix under the wildcard and minor-version rules above. A first-segment suffix `v1.*` is equivalent to `v1~*`: it selects the type at major version 1 and all derived types and instances. In a later segment, `v1.*` additionally selects instances whose identifier ends at that segment, whereas `v1~*` requires that segment to be a type followed by `~`.
+In every specified type or instance segment, major versions match exactly. An omitted minor version accepts any minor version of the same major, including an omitted minor; an explicit minor version requires that exact minor. These matching rules do not make different canonical identifiers equal or change registry lookup keys.
 
-Pattern `a` **covers** pattern `b` if and only if `M(b) ⊆ M(a)`. Coverage MUST be evaluated over all canonical identifiers, not just registered matches. A pattern MUST NOT be considered covered merely because its current registry matches are empty or happen to fit within the operand. `gts.*` covers every valid pattern.
+- A concrete Type ID selects itself and all identifiers derived from or instantiated under it, on type-segment boundaries, applying the minor-version rules above. A concrete Type ID ending in `~` and the same ID followed by `*` select the same set (`root~` ≡ `root~*`).
+- A concrete Instance ID selects instance identifiers with the same segment structure and names (or UUID tail), applying the minor-version rules above in every segment. UUID tails match exactly. It MUST NOT match longer identifier chains or identifiers with different segment names or major versions by textual prefix.
+- A wildcard pattern selects canonical identifiers matching its prefix under the wildcard and minor-version rules above. A suffix `v1.*` requires an explicit minor version in that segment and MUST NOT match the only-major spelling `v1`, regardless of segment position. A suffix `v1~*` requires a type segment but accepts both omitted and explicit minors under major version 1; therefore `v1.*` and `v1~*` are not equivalent, even in the first segment. In a later segment, `v1.*` also selects instances whose identifier ends at that segment with an explicit minor, whereas `v1~*` requires that segment to be a type followed by `~`.
 
-**Valid Examples:**
+To select exactly one instance, use a concrete Instance ID with an explicit minor in every versioned segment. An omitted minor also selects its valid explicit-minor variants; there is no syntax to exclude those variants. `const` on a pattern-valued field fixes the selector string, not its selected set.
 
-Given the following identifiers:
-```
-gts.x.llm.chat.message.v1.0~
-gts.x.llm.chat.message.v1.0~x.llm._.system_message.v1.0~
-gts.x.llm.chat.message.v1.1~
-gts.x.llm.chat.message.v1.1~x.llm._.user_message.v1.1~
-```
+**Pattern coverage.** Pattern `a` covers pattern `b` if and only if `M(b) ⊆ M(a)`. Coverage MUST be evaluated over all canonical identifiers, not just registered matches. A pattern MUST NOT be considered covered merely because its current registry matches are empty or happen to fit within the operand. `gts.*` covers every valid pattern.
 
-- **Pattern:** `gts.x.llm.chat.message.*` - Find all base schemas versions and their derived schemas
-  - **Result:** All four identifiers listed above.
+For OP#4, when the candidate is itself a pattern, it matches the filter if and only if the filter covers the candidate.
 
-- **Pattern:** `gts.x.llm.chat.message.v1.*` - Find all base and deriver types from v1 (any minor version)
-  - **Result:** All four identifiers (matches both `v1.0~` and `v1.1~` because pattern without minor version matches any minor version)
+**Matching examples**
 
-- **Pattern:** `gts.x.llm.chat.message.v1~*` - Find the base type and all derived types from v1 (any minor version)
-  - **Result:** All four identifiers listed above.
+The tables below evaluate matching against concrete identifiers. **✅ MATCH** means that the candidate belongs to the pattern's selected set; **❌ NO MATCH** means that both strings are valid but the candidate is outside that set. These results do not depend on registry contents. When used with `x-gts-ref`, the selected reference-validation policy is an additional check (§9.6.1). Pattern coverage and invalid syntax are illustrated separately below.
 
-- **Pattern:** `gts.x.llm.chat.message.v1.0~*` - Find the base type and all derived types at version 1.0
-  - **Result:** Two matching entities: `gts.x.llm.chat.message.v1.0~`, `gts.x.llm.chat.message.v1.0~x.llm._.system_message.v1.0~`
+**Type identifiers, with and without a wildcard**
 
+Both patterns give the same results for every candidate below:
 
-**Minor Version Matching Examples:**
+- `gts.vendor.package.namespace.type.v1~`
+- `gts.vendor.package.namespace.type.v1~*`
 
-The following examples demonstrate the special case where patterns without minor versions match candidates with any minor version:
+| Candidate | Result | Reason |
+| --- | :---: | --- |
+| `gts.vendor.package.namespace.type.v1~` | ✅ MATCH | A Type ID selects itself; the optional trailing `*` can match an empty suffix. |
+| `gts.vendor.package.namespace.type.v1.0~` | ✅ MATCH | The pattern omits the minor, so an explicit minor is accepted. |
+| `gts.vendor.package.namespace.type.v1.2~` | ✅ MATCH | Any minor under major version 1 is accepted. |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.derived.v1.0~` | ✅ MATCH | A derived type under a matching base is included. |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | An instance under a matching base is included. |
+| `gts.vendor.package.namespace.type.v2.0~` | ❌ NO MATCH | The base major version differs. |
+| `gts.vendor.package.namespace.type_extra.v1~` | ❌ NO MATCH | Type names must match as complete tokens. |
 
-```
-Pattern:   gts.vendor.pkg.ns.type.v0~*
-Candidate: gts.vendor.pkg.ns.type.v0.1~
-Result:    ✅ MATCH (pattern v0~ matches any v0.x)
+To include all major versions as well, use `gts.vendor.package.namespace.type.*` or `gts.vendor.package.namespace.type.v*`.
 
-Pattern:   gts.vendor.pkg.ns.type.v0~*
-Candidate: gts.vendor.pkg.ns.type.v0~
-Result:    ✅ MATCH (exact match)
+**An explicit minor is required only in the segment containing `v1.*`**
 
-Pattern:   gts.vendor.pkg.ns.type.v0.1~*
-Candidate: gts.vendor.pkg.ns.type.v0.1~
-Result:    ✅ MATCH (exact match with minor version)
+**Pattern:** `gts.vendor.package.namespace.type.v1.*`
 
-Pattern:   gts.vendor.pkg.ns.type.v0~abc.*
-Candidate: gts.vendor.pkg.ns.type.v0.1~
-Result:    ❌ NO MATCH (pattern v0~abc.* does not match any v0.x)
+| Candidate | Result | Reason |
+| --- | :---: | --- |
+| `gts.vendor.package.namespace.type.v1.0~` | ✅ MATCH | The first type segment has an explicit minor under major version 1. |
+| `gts.vendor.package.namespace.type.v1~` | ❌ NO MATCH | The first type segment omits its minor. |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | The instance tail may omit its minor; the wildcard covers the entire suffix. |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v2.3` | ✅ MATCH | The wildcard does not constrain versions in subsequent segments. |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.derived.v1~` | ✅ MATCH | A derived type under the matching first segment is included. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ NO MATCH | The first type segment omits its minor. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.2` | ❌ NO MATCH | An explicit minor in the instance tail cannot satisfy the first segment's requirement. |
+| `gts.vendor.package.namespace.type.v2.0~acme.package._.instance.v1` | ❌ NO MATCH | The first segment has a different major version. |
 
-Pattern:   gts.vendor.pkg.ns.type.v0.1~*
-Candidate: gts.vendor.pkg.ns.type.v0.2~
-Result:    ❌ NO MATCH (different minor versions)
+**Pinning the minor of a type**
 
-Pattern:   gts.vendor.pkg.ns.type.v0~*
-Candidate: gts.vendor.pkg.ns.type.v1.0~
-Result:    ❌ NO MATCH (different major versions)
-```
+Both patterns pin the first segment's minor and give the same results below:
 
-**Invalid Pattern Examples:**
-- `gts.x.llm.chat.msg*` - Invalid if `msg` is not a complete segment.
-- `gts.x.llm.chat.message.v*~*` - Multiple wildcards are used.
+- `gts.vendor.package.namespace.type.v1.0~`
+- `gts.vendor.package.namespace.type.v1.0~*`
+
+| Candidate | Result | Reason |
+| --- | :---: | --- |
+| `gts.vendor.package.namespace.type.v1.0~` | ✅ MATCH | The specified major and minor match. |
+| `gts.vendor.package.namespace.type.v1~` | ❌ NO MATCH | An omitted minor is not an explicit zero. |
+| `gts.vendor.package.namespace.type.v1.1~` | ❌ NO MATCH | The explicit minor differs. |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v2.3` | ✅ MATCH | Only the first segment's version is pinned. |
+
+The same version rules apply to major zero: `v0~*` accepts `v0~` and `v0.1~`; `v0.*` accepts `v0.1~` but excludes `v0~`; `v0.1~*` excludes `v0.2~`.
+
+**Concrete instance selectors: minor flexibility in every segment**
+
+**Pattern:** `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1`
+
+| Candidate | Result | Reason |
+| --- | :---: | --- |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ✅ MATCH | The identifier itself is included. |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | The type segment's omitted minor accepts an explicit minor. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.2` | ✅ MATCH | The instance segment's omitted minor accepts an explicit minor. |
+| `gts.vendor.package.namespace.type.v1.3~acme.package._.instance.v1.2` | ✅ MATCH | Omitted minors are flexible independently in both segments. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v12` | ❌ NO MATCH | Major version 1 does not match 12. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance_extra.v1` | ❌ NO MATCH | The instance name differs. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~` | ❌ NO MATCH | The candidate is a type, not an instance. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~acme.package._.item.v1` | ❌ NO MATCH | A concrete instance selector does not extend to longer chains. |
+
+With both minors pinned, the pattern `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1.0` selects only that exact instance identifier. It excludes the same names with an omitted minor in either segment or a different explicit minor. Matching flexible selectors does not make distinct identifiers equal or interchangeable as registry lookup keys.
+
+**Minor and chain wildcards in a later segment**
+
+- Minor wildcard: `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.*`
+- Chain wildcard: `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~*`
+
+| Candidate | Minor wildcard | Chain wildcard | Reason |
+| --- | :---: | :---: | --- |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ NO MATCH | ❌ NO MATCH | The last segment has neither an explicit minor nor a type-ending `~`. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0` | ✅ MATCH | ❌ NO MATCH | The minor wildcard can select an instance; the chain wildcard requires a type at that position. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~` | ❌ NO MATCH | ✅ MATCH | The chain wildcard accepts the type itself with an omitted minor. |
+| `gts.vendor.package.namespace.type.v1.2~acme.package._.instance.v1.0~` | ✅ MATCH | ✅ MATCH | Both accept this type; the earlier segment retains its minor flexibility. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0~acme.package._.item.v2` | ✅ MATCH | ✅ MATCH | Both include descendants of the matching type segment. |
+
+**UUID tails and prefix boundaries**
+
+**Pattern:** `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123456`
+
+| Candidate | Result | Reason |
+| --- | :---: | --- |
+| `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123456` | ✅ MATCH | The UUID tail is identical. |
+| `gts.vendor.package.namespace.type.v1.2~7a1d2f34-5678-49ab-9012-abcdef123456` | ✅ MATCH | Minor flexibility still applies to the type segment. |
+| `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123457` | ❌ NO MATCH | UUID tails must match exactly. |
+
+| Pattern | Candidate | Result | Reason |
+| --- | --- | :---: | --- |
+| `gts.*` | `gts.vendor.package.namespace.type.v1~` | ✅ MATCH | The universal pattern selects every canonical identifier. |
+| `gts.acme.*` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ NO MATCH | A vendor prefix is anchored to the first segment, not any segment in the chain. |
+| `gts.vendor.package.namespace.type.v1~acme.*` | `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | The next segment starts with the required vendor. |
+| `gts.vendor.package.namespace.type.v1~acme.*` | `gts.vendor.package.namespace.type.v1.0~` | ❌ NO MATCH | A named suffix requires another segment; unlike bare `~*`, it cannot be empty. |
+
+**Pattern coverage examples**
+
+Here the candidate is itself a selector. **✅ YES** means `M(candidate) ⊆ M(filter)`, as required by `x-gts-pattern-ref` and OP#4 pattern-candidate matching. One common matching identifier is insufficient to prove coverage.
+
+| Filter | Candidate pattern | Covers? | Reason |
+| --- | --- | :---: | --- |
+| `gts.vendor.package.namespace.type.v1~` | `gts.vendor.package.namespace.type.v1~*` | ✅ YES | A concrete Type ID and its chain wildcard select the same set. |
+| `gts.vendor.package.namespace.type.v1~*` | `gts.vendor.package.namespace.type.v1~` | ✅ YES | The equivalence holds in both directions. |
+| `gts.vendor.package.namespace.type.v1~` | `gts.vendor.package.namespace.type.v1.*` | ✅ YES | Explicit-minor first segments are a subset of the flexible type scope. |
+| `gts.vendor.package.namespace.type.v1.*` | `gts.vendor.package.namespace.type.v1~*` | ❌ NO | The candidate also selects `gts.vendor.package.namespace.type.v1~`, which the filter excludes. |
+| `gts.vendor.package.namespace.type.v1.*` | `gts.vendor.package.namespace.type.v1.0~*` | ✅ YES | Every selected identifier has an explicit first-segment minor of zero. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0` | ✅ YES | Pinning the instance minor narrows the selected set. |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.*` | ❌ NO | The candidate can also select types and longer chains, outside the concrete instance scope. |
+
+**Invalid pattern examples**
+
+**❌ INVALID** denotes a syntax error; **❌ NO MATCH** denotes a valid pattern that does not select the candidate.
+
+| Pattern | Result | Reason |
+| --- | :---: | --- |
+| `gts.vendor.package.namespace.typ*` | ❌ INVALID | A wildcard cannot follow part of a type-name token. |
+| `gts.vendor.package.namespace.type.v1*` | ❌ INVALID | A wildcard cannot immediately follow a major-version number. |
+| `gts.vendor.package.namespace.type.v1.0.*` | ❌ INVALID | A wildcard cannot follow a minor-version token. |
+| `gts.vendor.package.namespace.type.v*~*` | ❌ INVALID | Only one wildcard is allowed, at the end. |
+| `gts.vendor.*.namespace.type.v1~` | ❌ INVALID | A wildcard cannot appear in the middle. |
+| `gts.vendor.package.namespace.type.v4294967296~*` | ❌ INVALID | A version component exceeds the unsigned 32-bit limit. |
 
 
 ## 11. JSON and JSON Schema Conventions

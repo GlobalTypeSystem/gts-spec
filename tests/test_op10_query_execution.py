@@ -1,3 +1,5 @@
+import pytest
+
 from .conftest import get_gts_base_url
 from httprunner import HttpRunner, Config, Step, RunRequest
 
@@ -568,11 +570,11 @@ def register_wildcard_usecase_entities():
 
 
 class TestCaseTestOp10Query_UseCase1_DerivedFromV10(HttpRunner):
-    """OP#10 - Use Case 1: Find all derived types from v1.0 base schema
+    """OP#10 - Use Case 1: Find the v1.0 base schema and its derived types
     Pattern: gts.x.test10_llm.chat.message.v1.0~*
-    Expected: Only gts.x.test10_llm.chat.message.v1.0~x.test10.system_message.v1.0~
+    Expected: The v1.0 base schema and its system_message derived schema
     """
-    config = Config("OP#10 - Use Case 1 (derived from v1.0)").base_url(
+    config = Config("OP#10 - Use Case 1 (base and derived from v1.0)").base_url(
         get_gts_base_url()
     )
 
@@ -581,12 +583,19 @@ class TestCaseTestOp10Query_UseCase1_DerivedFromV10(HttpRunner):
 
     teststeps = register_wildcard_usecase_entities() + [
         Step(
-            RunRequest("query derived types from v1.0")
+            RunRequest("query base and derived types from v1.0")
             .get("/query")
             .with_params(**{"expr": "gts.x.test10_llm.chat.message.v1.0~*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_length_equal("body.results", 1)
+            .assert_length_equal("body.results", 2)
+            .assert_equal(
+                'body.results[]."$$id" | sort(@)',
+                [
+                    "gts://gts.x.test10_llm.chat.message.v1.0~",
+                    "gts://gts.x.test10_llm.chat.message.v1.0~x.test10_llm._.system_message.v1.0~",
+                ],
+            )
         ),
     ]
 
@@ -616,12 +625,12 @@ class TestCaseTestOp10Query_UseCase2_AllVersions(HttpRunner):
 
 
 class TestCaseTestOp10Query_UseCase3_DerivedFromV1AnyMinor(HttpRunner):
-    """OP#10 - Use Case 3: Find all derived types from v1 (any minor)
+    """OP#10 - Use Case 3: Find base and derived types from v1 (any minor)
     Pattern: gts.x.test10_llm.chat.message.v1~*
-    Expected: Two derived entities from v1.0 and v1.1
+    Expected: Both base schemas and both derived schemas from v1.0 and v1.1
     """
     config = Config(
-        "OP#10 - Use Case 3 (derived from v1 any minor)"
+        "OP#10 - Use Case 3 (base and derived from v1 any minor)"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -629,18 +638,27 @@ class TestCaseTestOp10Query_UseCase3_DerivedFromV1AnyMinor(HttpRunner):
 
     teststeps = register_wildcard_usecase_entities() + [
         Step(
-            RunRequest("query derived types from v1 any minor")
+            RunRequest("query base and derived types from v1 any minor")
             .get("/query")
             .with_params(**{"expr": "gts.x.test10_llm.chat.message.v1~*"})
             .validate()
             .assert_equal("status_code", 200)
-            .assert_length_equal("body.results", 2)
+            .assert_length_equal("body.results", 4)
+            .assert_equal(
+                'body.results[]."$$id" | sort(@)',
+                [
+                    "gts://gts.x.test10_llm.chat.message.v1.0~",
+                    "gts://gts.x.test10_llm.chat.message.v1.0~x.test10_llm._.system_message.v1.0~",
+                    "gts://gts.x.test10_llm.chat.message.v1.1~",
+                    "gts://gts.x.test10_llm.chat.message.v1.1~x.test10_llm._.user_message.v1.1~",
+                ],
+            )
         ),
     ]
 
 
 class TestCaseTestOp10Query_UseCase4_AllV1BaseAndDerived(HttpRunner):
-    """OP#10 - Use Case 4: Find all base and derived from v1 (any minor)
+    """OP#10 - Use Case 4: Find base and derived types under v1 with an explicit minor
     Pattern: gts.x.test10_llm.chat.message.v1.*
     Expected: All 4 identifiers (matches both v1.0~ and v1.1~)
     """
@@ -701,6 +719,48 @@ class TestCaseTestOp10Query_ExplicitMajorZeroInstance(HttpRunner):
             .assert_length_equal("body.results", 1)
         ),
     ]
+
+
+@pytest.mark.parametrize(
+    "version_pattern,expected_versions",
+    [
+        pytest.param("1.*", {"1.0", "1.2"}, id="minor_wildcard"),
+        pytest.param("1~*", {"1", "1.0", "1.2"}, id="chain_wildcard_omitted_minor"),
+        pytest.param("1.0~*", {"1.0"}, id="chain_wildcard_explicit_minor"),
+    ],
+)
+def test_query_version_wildcard_selection(
+    gts_api, schema_dialect, version_pattern, expected_versions
+):
+    """Version wildcards include matching roots, derived types, and instances."""
+    api = gts_api
+    expected_ids = set()
+    for version in ("1", "1.0", "1.2", "2.0"):
+        type_id = api.register(
+            "target",
+            {"type": "object"},
+            schema_dialect,
+            type_id=api.type_id("target", version),
+        )
+        instance_id = api.register_instance(type_id, {}, validate=True)
+        derived_id = api.register(
+            "derived",
+            {"allOf": [{"$ref": "gts://" + type_id}]},
+            schema_dialect,
+            type_id=api.derived_type_id(type_id, "derived"),
+        )
+        if version in expected_versions:
+            expected_ids.update((type_id, derived_id, instance_id))
+
+    pattern = f"{api.id_prefix}.target.v{version_pattern}"
+    result = api.request("GET", "/query", params={"expr": pattern})
+    assert not result.get("error"), result
+    actual_ids = {
+        entity["$id"].removeprefix("gts://") if "$schema" in entity else entity["id"]
+        for entity in result["results"]
+    }
+    assert actual_ids == expected_ids, result
+    assert len(result["results"]) == len(expected_ids), result
 
 
 if __name__ == "__main__":

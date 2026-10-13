@@ -460,7 +460,6 @@ class TestCaseTestOp4Wildcard_GlobalPatterns(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.match", False)
-            .assert_not_equal("body.error", "")
         ),
         Step(
             RunRequest("minor version mismatch")
@@ -474,7 +473,6 @@ class TestCaseTestOp4Wildcard_GlobalPatterns(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
             .assert_equal("body.match", False)
-            .assert_not_equal("body.error", "")
         )
     ]
 
@@ -695,3 +693,69 @@ class TestCaseTestOp4WildcardInvalid_3(HttpRunner):
             .assert_not_equal("body.error", "")
         ),
     ]
+
+@pytest.mark.parametrize(
+    "candidate,pattern,expected",
+    [
+        ("gts.x.match._.item.v1~", "gts.x.match._.item.v1.*", False),
+        ("gts.x.match._.item.v1.3~", "gts.x.match._.item.v1.*", True),
+        (
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2~",
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2.*",
+            False,
+        ),
+        (
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2.3~",
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2.*",
+            True,
+        ),
+        (
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2",
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2.*",
+            False,
+        ),
+        (
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2.3",
+            "gts.x.match._.item.v1~acme.prod._.uploads.v2.*",
+            True,
+        ),
+    ],
+    ids=[
+        "first_type_omitted_minor",
+        "first_type_explicit_minor",
+        "later_type_omitted_minor",
+        "later_type_explicit_minor",
+        "instance_omitted_minor",
+        "instance_explicit_minor",
+    ],
+)
+def test_minor_wildcard_requires_explicit_minor(gts_api, candidate, pattern, expected):
+    """The dot before a minor wildcard is required in every segment (§10)."""
+    result = gts_api.request(
+        "GET", "/match-id-pattern", params={"candidate": candidate, "pattern": pattern}
+    )
+    assert result["match"] is expected, result
+
+@pytest.mark.parametrize(
+    "candidate,pattern,expected",
+    [
+        (
+            "gts.x.a.b.c.v1~acme.prod._.uploads.v2.*",
+            "gts.x.a.b.c.v1~acme.prod._.uploads.v2",
+            False,
+        ),
+        (
+            "gts.x.a.b.c.v1~acme.prod._.uploads.v2.*",
+            "gts.x.a.b.c.v1~",
+            True,
+        ),
+        ("gts." + "a" * 1018 + ".*", "gts.zzz.*", True),
+    ],
+    ids=["wildcard_beyond_instance_scope", "wildcard_within_type_scope", "empty_scope"],
+)
+def test_pattern_candidate_matches_by_coverage(gts_api, candidate, pattern, expected):
+    """Matching a pattern candidate requires inclusion of its whole selection."""
+    result = gts_api.request(
+        "GET", "/match-id-pattern", params={"candidate": candidate, "pattern": pattern}
+    )
+    assert result["match"] is expected, result

@@ -22,7 +22,7 @@ How should a schema declare a pattern-valued string and the family of identifier
 - The specification defines the pattern grammar once.
 - Express both "any valid pattern" and "a pattern within this family".
 - Results independent of registry state.
-- `x-gts-ref` unchanged.
+- Identifier-selection rules shared with `x-gts-ref`; pattern values additionally require coverage.
 
 ## Considered Options
 
@@ -55,14 +55,15 @@ For example, an access scope payload allowing reads on storage buckets can conta
 }
 ```
 
-The scope's schema should allow patterns within the resource family, including a concrete instance identifier that selects just one resource:
+The scope's schema should allow patterns within the resource family, including instance selectors with flexible or pinned minor versions:
 
 | `resource_pattern` value | Result | Resource selection |
 |---|---|---|
 | `gts.x.core.resources.resource.*` | Accept | All versions of the resource type and all derived types and instances. |
 | `gts.x.core.resources.resource.v1~` | Accept | This resource type and all derived types and instances, with minor-version flexibility within major version 1. |
 | `gts.x.core.resources.resource.v1~acme.storage.resources.bucket.*` | Accept | All versions of the bucket type and all derived types and instances under resource major version 1. |
-| `gts.x.core.resources.resource.v1~acme.storage.resources.bucket.v1~acme.prod._.uploads.v1` | Accept | One bucket instance, by its exact identifier. |
+| `gts.x.core.resources.resource.v1~acme.storage.resources.bucket.v1~acme.prod._.uploads.v1` | Accept | Bucket instances with these segment names and major versions, across minor versions. |
+| `gts.x.core.resources.resource.v1.0~acme.storage.resources.bucket.v1.0~acme.prod._.uploads.v1.0` | Accept | Exactly one bucket instance; every minor is explicit. |
 | `gts.x.core.resources.*` | Reject | Valid syntax, but a broader scope that can select identifiers outside the resource family. |
 | `gts.x.core.events.event.*` | Reject | Valid syntax, but selects a different family. |
 | `gts.x.core.resources.resource.v1*` | Reject | Invalid wildcard boundary. |
@@ -77,7 +78,7 @@ The option examples are alternatives, not keywords to combine; Options 2 and 3 i
 
 Each consumer schema copies the GTS pattern grammar, and any family scope, into a standard `pattern`.
 
-The first regex below copies the identifier and wildcard syntax; the second restricts it to the resource family. Length and whitespace checks are also consumer-owned:
+The first regex below recognizes identifier and wildcard structure; the second restricts it to the resource family. The example includes length and whitespace checks, but consumers must additionally enforce the unsigned 32-bit version bounds in §2.3:
 
 ```json
 {
@@ -95,7 +96,7 @@ The first regex below copies the identifier and wildcard syntax; the second rest
 }
 ```
 
-This accepts the wildcard for the whole resource family, the concrete resource Type ID, the narrower bucket pattern, and the exact bucket identifier above. Each consumer must maintain the copied grammar and family boundaries as GTS evolves.
+This accepts the wildcard for the whole resource family, the concrete resource Type ID, the narrower bucket pattern, and the bucket instance selectors above. Each consumer must maintain the copied grammar and family boundaries as GTS evolves.
 
 ### Option 2 — Reuse or relax `x-gts-ref`
 
@@ -108,7 +109,7 @@ Use `x-gts-ref` for pattern-valued fields, or relax it so that its value may be 
 }
 ```
 
-Under current semantics this rejects the example payload: the field value must be a concrete identifier, even though the keyword operand may be a pattern. Accepting the bucket wildcard in `resource_pattern` would require changing `x-gts-ref` to validate pattern values and their coverage, and revisiting what registry lookup means for those values. The exact bucket identifier already meets the concrete-value requirement.
+Under current semantics this rejects the example payload: the field value must be a concrete identifier, even though the keyword operand may be a pattern. Accepting the bucket wildcard in `resource_pattern` would require changing `x-gts-ref` to validate pattern values and their coverage, and revisiting what registry lookup means for those values. Both bucket instance selectors already meet the concrete-value requirement.
 
 ### Option 3 — Format with consumer constraints
 
@@ -145,22 +146,15 @@ Chosen option: "Option 4", because one keyword handles both syntax-only and fami
 
 - **Operands.** The operand is a concrete GTS Type ID, a concrete GTS Instance ID, a wildcard pattern (§10), or exactly `/$id`. Other pointer forms and invalid operands are schema errors.
 - **Effective self-reference.** `/$id` resolves to the canonical top-level `$id` of the effective leaf GTS Type Schema selected for validation, without `gts://`. That root is retained through inherited constraints, `$ref`, and `allOf`, as for `x-gts-ref` (§9.6.1); it is not the `$id` of the subschema containing the keyword. A missing or invalid selected identifier is a schema error.
-- **Validity.** A string value must be a valid GTS identifier pattern and satisfy M(value) ⊆ M(operand), after resolving `/$id`. M(p) contains all canonical GTS identifiers selected by p under the literal and wildcard matching rules of §9.6.1 and §10, regardless of registration.
-- **Matching.** A concrete Type ID selects itself and its descendants (`root~` ≡ `root~*`), with minor-version flexibility. A concrete Instance ID selects only that exact identifier, with no minor-version expansion. Wildcards follow §10: first-segment `v1.*` and `v1~*` are equivalent; in later segments, `v1.*` also selects instances.
-- **Spelling.** The GTS grammar governs spelling and length: no trimming, case folding, or `gts://` stripping from field values; at most 1024 characters; no numeric limits beyond §2.3.
+- **Validity.** A string value must be a valid GTS identifier pattern and satisfy M(value) ⊆ M(operand), after resolving `/$id`. M(p) contains all canonical GTS identifiers selected by p under [README §10](../README.md#10-identifier-matching-and-pattern-coverage), including its minor-version rules, regardless of registration.
+- **Spelling.** The GTS grammar governs spelling and length: no trimming, case folding, or `gts://` stripping from field values; at most 1024 characters; major and minor versions follow the unsigned 32-bit range of §2.3.
 - **Applicability and errors.** Use the same property-value applicability, schema locations, traversal, and validation paths as `x-gts-ref` (§9.6.1), including array-item schemas and effective trait-schema properties. The keyword constrains strings only; schemas specify `"type": "string"` separately. Literal data is not scanned. An invalid or uncovered value is a validation error that `not` can invert; an invalid operand is a schema error and cannot be inverted.
-- **No registry lookup.** `gts-ref-validation`, the §9.2 dependency closure, and OP#7 reference tracking do not apply.
+- **No registry lookup.** Coverage checks do not query the registry or depend on target registration or validity. `gts-ref-validation` does not apply to this keyword, and the keyword does not introduce validation dependencies under §9.2. OP#7 reporting for its operands and values follows [README §9.6.2](../README.md#962-pattern-valued-fields-x-gts-pattern-ref).
 
 Property schema accepting any valid pattern:
 
 ```json
 { "type": "string", "x-gts-pattern-ref": "gts.*" }
-```
-
-Property schema for patterns within the resource family:
-
-```json
-{ "type": "string", "x-gts-pattern-ref": "gts.x.core.resources.resource.*" }
 ```
 
 A property whose pattern is scoped to the selected type:
@@ -178,13 +172,12 @@ A property whose pattern is scoped to the selected type:
 
 ### Derivation and evolution
 
-- **OP#12.** Keep the semantic rule of §4.1: Valid(derived) ⊆ Valid(base). `allOf` preserves inherited constraints by conjunction. For isolated positive constraints with literal operands, base covering derived proves narrowing; equivalent constraints and intersections may also establish it. Retaining a particular keyword spelling is not required. Resolve `/$id` for each effective schema being compared.
-- **OP#8.** Compare the complete schemas under §4.3. For isolated positive constraints, widening the new operand is backward compatible, narrowing it is forward compatible, and equal scopes are fully compatible. `not` reverses those directions; compositions must be assessed as a whole. Report `unknown` when inclusion cannot be established.
+No separate compatibility model is introduced. Pattern constraints participate in the accepted-instance-set relations of §4.1 and §4.3. [README §9.6.2](../README.md#962-pattern-valued-fields-x-gts-pattern-ref) defines their treatment in OP#12 and OP#8, including composition and selected-type self-reference.
 
 ### Implications
 
 - README §9 defines the keyword, and §10 adds coverage to the pattern grammar. The specification and conformance suite implement this decision for 0.16.
-- Conformance vectors cover syntax, exact instance matching, wildcard boundaries, minor versions, segment position, inherited `/$id`, traits, and compatibility through composition in every supported dialect. Coverage is checked over canonical identifiers, not registered matches.
+- Conformance coverage and its limits are documented in [tests/README.md](../tests/README.md#gts-identifier-pattern-constraint-tests).
 - A format would be simpler to add to generic validators, while this keyword requires every implementation to compute coverage. That difference does not justify a second public mechanism.
 - OP#12 narrowing for `x-gts-ref` is a separate follow-up.
 
@@ -212,4 +205,4 @@ A property whose pattern is scoped to the selected type:
 
 ## More Information
 
-[README §9.6.1](../README.md#961-entity-references-x-gts-ref) defines literal matching and selected-type self-reference; [README §10](../README.md#10-collecting-identifiers-with-wildcards) defines wildcards. [Issue #96](https://github.com/GlobalTypeSystem/gts-spec/issues/96) concerns the kind of concrete references; this keyword accepts pattern-valued properties and does not require an additional `pattern` constraint.
+[README §9.6.1](../README.md#961-entity-references-x-gts-ref) defines entity references and selected-type self-reference; [README §10](../README.md#10-identifier-matching-and-pattern-coverage) defines matching and coverage. [Issue #96](https://github.com/GlobalTypeSystem/gts-spec/issues/96) concerns the kind of concrete references; this keyword accepts pattern-valued properties and does not require an additional `pattern` constraint.

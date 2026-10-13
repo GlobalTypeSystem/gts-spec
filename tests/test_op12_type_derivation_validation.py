@@ -4808,6 +4808,48 @@ _PATTERN_INSTANCE = _PATTERN_RESOURCE + "acme.prod._.uploads.v1"
         ),
         pytest.param(
             {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.resources.resource.v1.*"},
+            True,
+            id="pattern_minor_wildcard_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": "gts.x.core.resources.resource.v1.*"},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+            False,
+            id="pattern_minor_wildcard_widening",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE + ".0"},
+            True,
+            id="pattern_instance_minor_narrowing",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE + ".0"},
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            False,
+            id="pattern_instance_minor_widening",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            {
+                "type": "string",
+                "x-gts-pattern-ref": _PATTERN_INSTANCE.replace("v1~", "v1.0~"),
+            },
+            True,
+            id="pattern_instance_type_minor_narrowing",
+        ),
+        pytest.param(
+            {
+                "type": "string",
+                "x-gts-pattern-ref": _PATTERN_INSTANCE.replace("v1~", "v1.0~"),
+            },
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_INSTANCE},
+            False,
+            id="pattern_instance_type_minor_widening",
+        ),
+        pytest.param(
+            {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
             {"type": "string"},
             False,
             id="pattern_constraint_dropped",
