@@ -8,7 +8,7 @@ Thank you for your interest in contributing to the Global Type System (GTS) Spec
 
 - **Git** for version control
 - **Node.js 20+ and `ajv-cli`** (optional, for validating JSON Schema examples as CI does)
-- **Python 3.9–3.14** (optional, for working on the conformance test suite)
+- **Python 3.10–3.14 and pytest 9** (optional, for working on the conformance test suite)
 - **Docker** (optional, and recommended for running the conformance test suite)
 - **Your favorite editor** (VS Code with JSON Schema support recommended)
 

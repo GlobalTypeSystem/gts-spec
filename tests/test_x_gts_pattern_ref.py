@@ -2,13 +2,15 @@
 
 Each test registers a schema whose `scope` property carries the keyword and
 validates payloads against it. Syntax and coverage vectors come from the
-shared corpus in id_pattern_corpus.py: a value is valid iff
+shared test cases in shared_id_pattern_cases.py: a value is valid iff
 M(value) ⊆ M(operand), and every uncovered row names a witness.
 """
 
 import pytest
 
-from .id_pattern_corpus import (
+from .helpers.shared_cases import case_subtest
+from .helpers.http_client import GtsTestAPI
+from .shared_id_pattern_cases import (
     BUCKET,
     BUCKET_FAMILY,
     COVERAGE_CASES,
@@ -43,18 +45,22 @@ def _register_scope(api, dialect, operand, name="scope"):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("value", VALID_PATTERNS)
-def test_universal_operand_accepts_valid_pattern(gts_api, schema_dialect, value):
+def test_universal_operand_accepts_valid_pattern(gts_api, schema_dialect, subtests):
     api = gts_api
     scope_type = _register_scope(api, schema_dialect, "gts.*")
-    api.check_payload(scope_type, {"scope": value}, valid=True)
+    for case in VALID_PATTERNS:
+        (value,) = case.values
+        with case_subtest(subtests, case=case.id, value=value, expected=True):
+            api.check_payload(scope_type, {"scope": value}, valid=True)
 
 
-@pytest.mark.parametrize("value", INVALID_PATTERNS)
-def test_universal_operand_rejects_invalid_pattern(gts_api, schema_dialect, value):
+def test_universal_operand_rejects_invalid_pattern(gts_api, schema_dialect, subtests):
     api = gts_api
     scope_type = _register_scope(api, schema_dialect, "gts.*")
-    api.check_payload(scope_type, {"scope": value}, valid=False)
+    for case in INVALID_PATTERNS:
+        (value,) = case.values
+        with case_subtest(subtests, case=case.id, value=value, expected=False):
+            api.check_payload(scope_type, {"scope": value}, valid=False)
 
 
 # ---------------------------------------------------------------------------
@@ -62,29 +68,65 @@ def test_universal_operand_rejects_invalid_pattern(gts_api, schema_dialect, valu
 # ---------------------------------------------------------------------------
 
 
-def _check_coverage(api, dialect, operand, value, covered, witness):
-    scope_type = _register_scope(api, dialect, operand)
+def _check_coverage(api, dialect, operand, value, covered, witness, scopes, index):
+    def registered_scope(pattern, role):
+        if pattern not in scopes:
+            scopes[pattern] = _register_scope(
+                api, dialect, pattern, name=f"{role}{index}"
+            )
+        return scopes[pattern]
+
+    scope_type = registered_scope(operand, "scope")
     api.check_payload(scope_type, {"scope": value}, valid=covered)
     if not covered:
         # The witness proves the verdict: the value's own scope accepts it,
         # and the operand's scope rejects it.
-        value_scope_type = _register_scope(api, dialect, value, name="value_scope")
+        value_scope_type = registered_scope(value, "value_scope")
         api.check_payload(value_scope_type, {"scope": witness}, valid=True)
-        api.check_payload(scope_type, {"scope": witness}, valid=False)
+        if witness != value:
+            api.check_payload(scope_type, {"scope": witness}, valid=False)
 
 
-@pytest.mark.parametrize("operand,value,expect", MATCH_CASES)
-def test_concrete_value_coverage(gts_api, schema_dialect, operand, value, expect):
+def test_concrete_value_coverage(gts_api, schema_dialect, subtests):
     """A concrete value selects itself and, under omitted minors or a type
     chain, more identifiers; an uncovered value is its own witness."""
-    _check_coverage(gts_api, schema_dialect, operand, value, expect.covered, value)
+    scopes = {}
+    for index, case in enumerate(MATCH_CASES):
+        operand, value, expect = case.values
+        with case_subtest(
+            subtests,
+            case=case.id,
+            operand=operand,
+            value=value,
+            expected=expect.covered,
+        ):
+            _check_coverage(
+                gts_api,
+                schema_dialect,
+                operand,
+                value,
+                expect.covered,
+                value,
+                scopes,
+                index,
+            )
 
 
-@pytest.mark.parametrize("operand,value,covered,witness", COVERAGE_CASES)
-def test_wildcard_value_coverage(
-    gts_api, schema_dialect, operand, value, covered, witness
-):
-    _check_coverage(gts_api, schema_dialect, operand, value, covered, witness)
+def test_wildcard_value_coverage(gts_api, schema_dialect, subtests):
+    scopes = {}
+    for index, case in enumerate(COVERAGE_CASES):
+        operand, value, covered, witness = case.values
+        with case_subtest(
+            subtests,
+            case=case.id,
+            operand=operand,
+            value=value,
+            expected=covered,
+            witness=witness,
+        ):
+            _check_coverage(
+                gts_api, schema_dialect, operand, value, covered, witness, scopes, index
+            )
 
 
 @pytest.mark.parametrize(
@@ -189,7 +231,7 @@ def assert_schema_error_everywhere(api, schema, dialect, payloads):
             api.check_payload(deferred_type, payload, valid=False)
 
 
-# Invalid pattern strings from the shared corpus, plus non-strings and
+# Invalid pattern strings from the shared test cases, plus non-strings and
 # pointers other than `/$id`.
 INVALID_OPERANDS = (
     *INVALID_PATTERNS,
@@ -205,19 +247,23 @@ INVALID_OPERANDS = (
 )
 
 
-@pytest.mark.parametrize("operand", INVALID_OPERANDS)
-def test_invalid_operand_is_not_inverted(gts_api, schema_dialect, operand):
+def test_invalid_operand_is_not_inverted(gts_api, schema_dialect, subtests):
     """`not` around an invalid operand is still a schema error, never a match."""
-    assert_schema_error_everywhere(
-        gts_api,
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {"scope": {"not": {"x-gts-pattern-ref": operand}}},
-        },
-        schema_dialect,
-        payloads=[{"scope": RESOURCE}],
-    )
+    for case in INVALID_OPERANDS:
+        (operand,) = case.values
+        with case_subtest(subtests, case=case.id, operand=operand):
+            # Preserve a separate registry namespace for each schema-error lifecycle.
+            api = GtsTestAPI(gts_api.session, gts_api.base_url)
+            assert_schema_error_everywhere(
+                api,
+                {
+                    "type": "object",
+                    "required": ["scope"],
+                    "properties": {"scope": {"not": {"x-gts-pattern-ref": operand}}},
+                },
+                schema_dialect,
+                payloads=[{"scope": RESOURCE}],
+            )
 
 
 def test_invalid_operand_on_optional_property_is_rejected(gts_api, schema_dialect):
@@ -558,7 +604,7 @@ def test_self_reference_in_oneof(gts_api, schema_dialect):
     "trait_values,expected_validity",
     [
         pytest.param(
-            [case.values[0] for case in VALID_PATTERNS], True, id="valid_corpus"
+            [case.values[0] for case in VALID_PATTERNS], True, id="valid_shared_cases"
         ),
         pytest.param(
             [*(case.values[0] for case in VALID_PATTERNS), "gts.vendor*"],
@@ -569,7 +615,7 @@ def test_self_reference_in_oneof(gts_api, schema_dialect):
         pytest.param([FAMILY + " "], False, id="whitespace"),
     ],
 )
-def test_trait_syntax_corpus(gts_api, schema_dialect, trait_values, expected_validity):
+def test_trait_shared_syntax_cases(gts_api, schema_dialect, trait_values, expected_validity):
     """Under `gts.*`, a trait array is valid only if every item is a well-formed
     pattern."""
     api = gts_api

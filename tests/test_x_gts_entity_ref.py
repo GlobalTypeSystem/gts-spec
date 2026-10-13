@@ -2,7 +2,7 @@
 
 README §9.6.1, §9.6.3, §11.0 and ADR-0008. The operand is the keyword's value
 in the schema; the candidate is the string being validated. §10 matching uses
-the shared corpus in id_pattern_corpus.py. Combinators, array schemas, local
+the shared test cases in shared_id_pattern_cases.py. Combinators, array schemas, local
 references and registry modes on concrete fields are covered in
 test_refimpl_x_gts_ref.py.
 
@@ -19,7 +19,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from .id_pattern_corpus import COVERAGE_CASES, INVALID_PATTERNS, MATCH_CASES
+from .helpers.shared_cases import case_subtest
+from .helpers.http_client import GtsTestAPI
+from .shared_id_pattern_cases import COVERAGE_CASES, INVALID_PATTERNS, MATCH_CASES
 
 TYPE_REF = "x-gts-type-ref"
 INSTANCE_REF = "x-gts-instance-ref"
@@ -155,7 +157,7 @@ INSTANCE_OPERANDS = (
     pytest.param(lambda r: r.it + ".0", id="concrete_instance_explicit_minor"),
     pytest.param(lambda r: r.u, id="uuid_instance"),
 )
-# Invalid pattern strings are in the shared corpus
+# Invalid pattern strings are in the shared test cases
 # (test_invalid_pattern_operand_is_schema_error); these are the other forms.
 INVALID_OPERANDS = (
     pytest.param(lambda r: "/properties/anchor", id="property_pointer"),
@@ -242,18 +244,20 @@ def test_invalid_operand_is_schema_error(gts_api, schema_dialect, keyword, opera
 
 
 @pytest.mark.parametrize("keyword", KEYWORDS)
-@pytest.mark.parametrize("operand", INVALID_PATTERNS)
 def test_invalid_pattern_operand_is_schema_error(
-    gts_api, schema_dialect, keyword, operand
+    gts_api, schema_dialect, keyword, subtests
 ):
-    api = gts_api
-    targets = _operand_targets(api, schema_dialect)
-    _assert_schema_error(
-        api,
-        schema_dialect,
-        _operand_schema(keyword, operand),
-        control=_operand_schema(keyword, targets.t),
-    )
+    targets = _operand_targets(gts_api, schema_dialect)
+    for case in INVALID_PATTERNS:
+        (operand,) = case.values
+        with case_subtest(subtests, case=case.id, operand=operand):
+            api = GtsTestAPI(gts_api.session, gts_api.base_url)
+            _assert_schema_error(
+                api,
+                schema_dialect,
+                _operand_schema(keyword, operand),
+                control=_operand_schema(keyword, targets.t),
+            )
 
 
 # Schema locations are traversed according to the dialect, including locations
@@ -363,7 +367,7 @@ def test_candidate_kind_and_matching(gts_api, schema_dialect, keyword, mode):
 
     Every concrete candidate is registered and valid, so in every policy a
     rejection can come only from matching or kind (ADR-0008 candidate table).
-    Detailed §10 matching is in the corpus below.
+    Detailed §10 matching is in the shared test cases below.
     """
     api = gts_api
     r = _targets(api, schema_dialect)
@@ -399,7 +403,7 @@ def test_instance_operand_matching_under_lookup(
     gts_api, schema_dialect, operand_tail, mode
 ):
     """A registered, valid instance outside M(operand) is still rejected when
-    lookup is enabled. Version and chain combinations are in the corpus."""
+    lookup is enabled. Version and chain combinations are in the shared test cases."""
     api = gts_api
     t = _register_type(api, schema_dialect, api.type_id("target"))
     if operand_tail == "named":
@@ -533,7 +537,7 @@ def test_transient_payload_rejects_deferred_invalid_operand(
             _check_transient_payload(api, deferred, payload, False, type_selection)
 
 
-# §10 matching corpus (id_pattern_corpus.py), shared with OP#4 and
+# §10 matching test cases (shared_id_pattern_cases.py), shared with OP#4 and
 # x-gts-pattern-ref. Lookup is disabled, so candidates are not registered: a
 # verdict comes only from candidate syntax, kind and matching.
 
@@ -541,69 +545,96 @@ def _is_concrete_instance(pattern):
     return "*" not in pattern and not _is_type_id(pattern)
 
 
-def _keyword_cases(cases):
-    """Each case once per keyword; a concrete Instance ID operand is a schema
-    error under x-gts-type-ref (test_corpus_instance_operand_is_type_ref_error)."""
-    return [
-        pytest.param(keyword, *case.values, id=f"{keyword[6:]}-{case.id}")
-        for keyword in KEYWORDS
-        for case in cases
-        if keyword == INSTANCE_REF or not _is_concrete_instance(case.values[0])
-    ]
-
-
-def _check_corpus_ref(api, dialect, keyword, operand, candidate, valid):
-    holder = api.register(
-        "holder", _holder({"type": "string", keyword: operand}), dialect, mode="none"
+def _check_shared_case_ref(api, dialect, keyword, operand, candidate, valid, holders, index):
+    if operand not in holders:
+        holders[operand] = api.register(
+            f"holder{index}",
+            _holder({"type": "string", keyword: operand}),
+            dialect,
+            mode="none",
+        )
+    instance = api.register_instance(
+        holders[operand], {"ref": candidate}, name=f"c{index}"
     )
-    _check_refs(api, holder, [(candidate, valid)])
+    api.check_instance(instance, valid=valid, mode="none")
 
 
-@pytest.mark.parametrize("keyword,operand,candidate,expect", _keyword_cases(MATCH_CASES))
-def test_corpus_candidate(gts_api, schema_dialect, keyword, operand, candidate, expect):
+@pytest.mark.parametrize("keyword", KEYWORDS)
+def test_shared_candidate(gts_api, schema_dialect, keyword, subtests):
     """A candidate is accepted iff it is in M(operand) and has the kind."""
-    valid = expect.matches and _is_type_id(candidate) == (keyword == TYPE_REF)
-    _check_corpus_ref(gts_api, schema_dialect, keyword, operand, candidate, valid)
+    holders = {}
+    for index, case in enumerate(MATCH_CASES):
+        operand, candidate, expect = case.values
+        # Concrete Instance ID operands are schema errors for type-ref, tested below.
+        if keyword == TYPE_REF and _is_concrete_instance(operand):
+            continue
+        valid = expect.matches and _is_type_id(candidate) == (keyword == TYPE_REF)
+        with case_subtest(
+            subtests, case=case.id, operand=operand, candidate=candidate, expected=valid
+        ):
+            _check_shared_case_ref(
+                gts_api,
+                schema_dialect,
+                keyword,
+                operand,
+                candidate,
+                valid,
+                holders,
+                index,
+            )
 
 
-@pytest.mark.parametrize(
-    "keyword,operand,candidate,covered,witness",
-    _keyword_cases([case for case in COVERAGE_CASES if case.values[2]]),
-)
-def test_corpus_pattern_candidate_is_rejected(
-    gts_api, schema_dialect, keyword, operand, candidate, covered, witness
+@pytest.mark.parametrize("keyword", KEYWORDS)
+def test_shared_pattern_candidate_is_rejected(
+    gts_api, schema_dialect, keyword, subtests
 ):
     """Coverage does not apply to entity references: a pattern candidate is
     rejected even when the operand covers it."""
-    _check_corpus_ref(gts_api, schema_dialect, keyword, operand, candidate, False)
+    holders = {}
+    for index, case in enumerate(COVERAGE_CASES):
+        operand, candidate, covered, _ = case.values
+        if not covered or (keyword == TYPE_REF and _is_concrete_instance(operand)):
+            continue
+        with case_subtest(
+            subtests, case=case.id, operand=operand, candidate=candidate, expected=False
+        ):
+            _check_shared_case_ref(
+                gts_api,
+                schema_dialect,
+                keyword,
+                operand,
+                candidate,
+                False,
+                holders,
+                index,
+            )
 
 
-@pytest.mark.parametrize(
-    "operand",
-    sorted(
+def test_shared_instance_operand_is_type_ref_error(gts_api, schema_dialect, subtests):
+    """A concrete Instance ID operand is valid for x-gts-instance-ref and a
+    schema error, not a value failure, for x-gts-type-ref. POST /validate-json
+    is checked with registered targets in
+    test_instance_operand_is_valid_only_for_instance_ref."""
+    operands = sorted(
         {
             case.values[0]
             for case in (*MATCH_CASES, *COVERAGE_CASES)
             if _is_concrete_instance(case.values[0])
         }
-    ),
-)
-def test_corpus_instance_operand_is_type_ref_error(gts_api, schema_dialect, operand):
-    """A concrete Instance ID operand is valid for x-gts-instance-ref and a
-    schema error, not a value failure, for x-gts-type-ref. POST /validate-json
-    is checked with registered targets in
-    test_instance_operand_is_valid_only_for_instance_ref."""
-    api = gts_api
-    control = api.register(
-        "control",
-        _holder({"type": "string", INSTANCE_REF: operand}),
-        schema_dialect,
-        mode="none",
     )
-    api.check_type_schema(control, valid=True, mode="none")
-    _assert_stored_schema_error(
-        api, schema_dialect, _holder({"type": "string", TYPE_REF: operand})
-    )
+    for operand in operands:
+        with case_subtest(subtests, case=operand, operand=operand):
+            api = GtsTestAPI(gts_api.session, gts_api.base_url)
+            control = api.register(
+                "control",
+                _holder({"type": "string", INSTANCE_REF: operand}),
+                schema_dialect,
+                mode="none",
+            )
+            api.check_type_schema(control, valid=True, mode="none")
+            _assert_stored_schema_error(
+                api, schema_dialect, _holder({"type": "string", TYPE_REF: operand})
+            )
 
 
 @pytest.mark.parametrize("keyword", KEYWORDS)

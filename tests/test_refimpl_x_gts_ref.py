@@ -3,7 +3,7 @@
 Each field uses the keyword matching the kind of its candidates. These cases
 cover combinator traversal, local references, arrays, and registry modes. §10
 matching itself (minor versions, segment and UUID boundaries) is covered by
-the shared corpus in test_x_gts_entity_ref.py; operand validity, candidate
+the shared test cases in test_x_gts_entity_ref.py; operand validity, candidate
 kind, selected-leaf `/$id`, and the removed `x-gts-ref` keyword are covered
 there too.
 """

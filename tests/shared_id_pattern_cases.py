@@ -1,4 +1,4 @@
-"""Shared identifier-matching and pattern-coverage corpus (README §10).
+"""Shared identifier-matching and pattern-coverage test cases (README §10).
 
 Plain data with explicit expected results; no matcher is implemented here. The
 same rows drive OP#4 (test_op4_id_match_pattern.py), x-gts-type-ref and

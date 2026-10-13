@@ -1,16 +1,18 @@
 #
 # Test dependencies for the GTS specification test suite.
 #
-# Supports Python 3.9 - 3.14.
+# Supports Python 3.10 - 3.14 and pytest 9 (built-in subtests).
 #
 # NOTE:
-# - `httprunner 4.x` declares `pydantic>=1.8,<1.9`, but pydantic 1.8.x is
+# - `httprunner 4.x` declares pytest<8, pytest-html<4 and pydantic>=1.8,<1.9.
+#   We use pytest 9, pytest-html 4 and pydantic 1.10.x; pydantic 1.8.x is
 #   incompatible with Python >=3.12 (ForwardRef API changes) and >=3.14
 #   (type-inference failures).
 # - Pydantic 1.10.x is backwards-compatible with 1.8.x at the API level, so
 #   we override the pin here.
-# - httprunner is installed with --no-deps in the Makefile to sidestep the
-#   pip resolver conflict; the transitive deps it needs are listed below.
+# - Install httprunner separately with --no-deps after this file, as in
+#   tests/Dockerfile, CI and tests/README.md. Keeping it out of this file
+#   avoids resolving its legacy pins against the overrides below.
 #
 # -- httprunner transitive deps (version-compatible overrides) ---------------
 pydantic>=1.10.13,<2
@@ -20,10 +22,9 @@ Brotli>=1.0.9
 jinja2>=3.0.3
 jmespath>=0.9.5
 loguru>=0.4.1
-pytest
-pytest-html
+pytest>=9,<10
+pytest-html>=4,<5
 requests>=2.22.0
 sentry-sdk
 toml
 urllib3
-httprunner
