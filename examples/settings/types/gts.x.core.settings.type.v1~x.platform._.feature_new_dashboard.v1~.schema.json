@@ -15,7 +15,7 @@
         },
         "subject_type": {
           "type": "string",
-          "x-gts-ref": "gts.x.core.idp.user.v1~"
+          "x-gts-type-ref": "gts.x.core.idp.user.v1~"
         },
         "value": {
           "type": "object",

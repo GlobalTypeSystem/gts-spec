@@ -7,9 +7,9 @@
   "required": ["tenantId", "category", "properties"],
   "properties": {
     "type": {
-      "description": "Stable dot-separated path identifying the setting.",
+      "description": "GTS Type Identifier of this setting.",
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-type-ref": "/$id"
     },
     "tenantId": {
       "type": "string",
@@ -19,7 +19,7 @@
     "category": {
       "description": "GTS well-known instance identifier of the settings category.",
       "type": "string",
-      "x-gts-ref": "gts.x.core.iam.settings_category.v1~"
+      "x-gts-instance-ref": "gts.x.core.iam.settings_category.v1~"
     },
     "properties": {
       "description": "Type-specific settings data; see derived type schema.",

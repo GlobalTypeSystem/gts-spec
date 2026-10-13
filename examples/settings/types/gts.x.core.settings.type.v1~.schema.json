@@ -10,7 +10,7 @@
     "type": {
       "description": "GTS Type Identifier of this setting.",
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-type-ref": "/$id"
     },
     "tenant_id": {
       "description": "UUID of the tenant scope this setting value belongs to.",
@@ -20,7 +20,7 @@
     "subject_type": {
       "description": "GTS type of the object the setting belongs to (e.g. tenant, user, integration, host). When absent the subject is the tenant itself and subject_id is implied to equal tenant_id.",
       "type": "string",
-      "x-gts-ref": "gts.*"
+      "x-gts-type-ref": "gts.*"
     },
     "subject_id": {
       "description": "UUID of the object the setting belongs to. MUST NOT be null when subject_type is set.",

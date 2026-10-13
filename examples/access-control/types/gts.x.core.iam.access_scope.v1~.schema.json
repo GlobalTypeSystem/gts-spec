@@ -7,7 +7,7 @@
   "required": ["id", "type", "action", "resource_pattern"],
   "properties": {
     "id": { "type": "string", "format": "uuid" },
-    "type": { "type": "string", "x-gts-ref": "/$id" },
+    "type": { "type": "string", "x-gts-type-ref": "/$id" },
     "action": { "type": "string", "enum": ["read", "write"] },
     "resource_pattern": {
       "type": "string",

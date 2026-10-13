@@ -51,13 +51,14 @@ Each level uses `allOf` + `$ref` to derive from its parent:
 The [orders subscription](instances/gts.x.core.events.subscription.v1~x.commerce.orders.fulfillment.v1.json)
 ([schema](types/gts.x.core.events.subscription.v1~.schema.json)) pairs a reference with a pattern:
 
-- `topic_id` uses `x-gts-ref`: a concrete topic ID, here the existing orders topic.
+- `topic_id` uses `x-gts-instance-ref`: a concrete topic Instance ID, here the existing orders topic.
 - `event_patterns` uses `x-gts-pattern-ref`: patterns within `gts.x.core.events.type.*`,
   here every orders event type.
 
 | Rejected replacement | Reason |
 |---|---|
 | `topic_id`: `gts.x.core.events.topic.v1~x.commerce.orders.orders.*` | Not a concrete ID. |
+| `topic_id`: `gts.x.core.events.topic.v1~` | A Type ID, not an Instance ID. |
 | `event_patterns`: `["gts.x.core.events.*"]` | Broader than `type.*`. |
 | `event_patterns`: `["gts.x.core.events.type_combined.*"]` | `type_combined` is a different type token. |
 

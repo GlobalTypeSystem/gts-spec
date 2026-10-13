@@ -15,7 +15,7 @@
                     "type": "string",
                     "const": "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~",
                     "description": "GTS identifier of the VM type",
-                    "x-gts-ref": "/$id"
+                    "x-gts-type-ref": "/$id"
                 },
                 "metadata": {
                     "type": "object",

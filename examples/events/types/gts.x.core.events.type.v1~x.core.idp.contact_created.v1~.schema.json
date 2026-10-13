@@ -27,7 +27,7 @@
         },
         "subjectType": {
           "type": "string",
-          "x-gts-ref": "gts.x.core.idp.contact.v1.0~"
+          "x-gts-type-ref": "gts.x.core.idp.contact.v1.0~"
         }
       }
     }

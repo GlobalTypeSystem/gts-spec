@@ -16,7 +16,7 @@
         "canonical_type": {
           "description": "Uses the selected derived type as the rooted GTS reference constraint.",
           "type": "string",
-          "x-gts-ref": "/$id"
+          "x-gts-type-ref": "/$id"
         },
         "payload": {
           "type": "object",

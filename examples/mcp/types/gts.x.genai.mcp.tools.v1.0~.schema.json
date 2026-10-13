@@ -12,7 +12,7 @@
     "type": {
       "description": "Identifier of the tool type in GTS format.",
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-type-ref": "/$id"
     },
     "name": {
       "type": "string",

@@ -25,7 +25,7 @@
         },
         "subjectType": {
           "type": "string",
-          "x-gts-ref": "gts.x.commerce.orders.order.v1.0~"
+          "x-gts-type-ref": "gts.x.commerce.orders.order.v1.0~"
         }
       }
     }

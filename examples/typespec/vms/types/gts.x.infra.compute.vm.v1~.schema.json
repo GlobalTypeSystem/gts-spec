@@ -17,7 +17,7 @@
         "type": {
             "type": "string",
             "description": "GTS identifier of the VM type",
-            "x-gts-ref": "/$id"
+            "x-gts-type-ref": "/$id"
         },
         "id": {
             "type": "string",
@@ -44,8 +44,8 @@
         },
         "powerState": {
             "type": "string",
-            "description": "Current power state of the virtual machine. Reference to gts.x.infra.compute.vm_state.v1~ type.",
-            "x-gts-ref": "gts.x.infra.compute.vm_state.v1~"
+            "description": "Current power state of the virtual machine. Reference to an instance of gts.x.infra.compute.vm_state.v1~.",
+            "x-gts-instance-ref": "gts.x.infra.compute.vm_state.v1~"
         },
         "osType": {
             "type": "string",

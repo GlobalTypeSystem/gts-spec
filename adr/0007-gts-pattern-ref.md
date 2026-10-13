@@ -13,7 +13,7 @@ An access scope (§3.5) can pair an action, such as `read`, with a GTS identifie
 
 Similarly, when creating a subscription to events, a client can pass a pattern such as `gts.x.core.events.event.*`; if the subscription is a GTS type, its schema must describe that pattern-valued field.
 
-[`x-gts-ref`](../README.md#961-entity-references-x-gts-ref) cannot describe these fields: in every validation mode, its value must be a concrete identifier. Consumers therefore copy the GTS grammar into `pattern` regexes, which drift from §2 and §10.
+[`x-gts-ref`](../README.md#961-entity-references-x-gts-type-ref--x-gts-instance-ref) cannot describe these fields: in every validation mode, its value must be a concrete identifier. Consumers therefore copy the GTS grammar into `pattern` regexes, which drift from §2 and §10.
 
 How should a schema declare a pattern-valued string and the family of identifiers it may select?
 
@@ -205,4 +205,4 @@ No separate compatibility model is introduced. Pattern constraints participate i
 
 ## More Information
 
-[README §9.6.1](../README.md#961-entity-references-x-gts-ref) defines entity references and selected-type self-reference; [README §10](../README.md#10-identifier-matching-and-pattern-coverage) defines matching and coverage. [Issue #96](https://github.com/GlobalTypeSystem/gts-spec/issues/96) concerns the kind of concrete references; this keyword accepts pattern-valued properties and does not require an additional `pattern` constraint.
+[README §9.6.1](../README.md#961-entity-references-x-gts-type-ref--x-gts-instance-ref) defines entity references and selected-type self-reference; [README §10](../README.md#10-identifier-matching-and-pattern-coverage) defines matching and coverage. [Issue #96](https://github.com/GlobalTypeSystem/gts-spec/issues/96) concerns the kind of concrete references; this keyword accepts pattern-valued properties and does not require an additional `pattern` constraint.

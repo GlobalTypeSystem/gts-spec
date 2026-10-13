@@ -7,17 +7,17 @@ using TypeSpec.JsonSchema;
  *
  * GTS ID: gts.x.infra.compute.vm_state.v1~
  *
- * This is the base type for all VM power states. Each state is a derived GTS type
- * that inherits from this base, enabling backward-compatible state extensions
- * and vendor-specific states.
+ * Each power state is a well-known instance of this final GTS type.
+ * Vendors can publish additional state instances without deriving new types.
  */
 @jsonSchema("/schemas/gts.x.infra.compute.vm_state.v1~.schema.json")
+@extension("x-gts-final", true)
 model VMPowerState {
   /**
-   * GTS identifier of the power state type
+   * GTS Instance Identifier of the power state
    */
-  @jsonSchema({ "x-gts-ref": "/$id" })
-  gtsId: string;
+  @extension("x-gts-instance-ref", "/$id")
+  id: string;
 
   /**
    * Human-readable description of the power state

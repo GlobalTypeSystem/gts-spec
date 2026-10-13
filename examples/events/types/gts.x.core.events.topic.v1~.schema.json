@@ -13,7 +13,7 @@
     "id": {
       "description": "Identifier for the topic/stream in GTS notation.",
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-instance-ref": "/$id"
     },
     "name": { "type": "string", "minLength": 1 },
     "description": { "type": "string" },
