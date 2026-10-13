@@ -10,8 +10,9 @@ Structural checks (operand validity, candidate syntax, kind, matching) are
 isolated with `gts-ref-validation=none`. Negative cases are paired with a
 control that differs only in the tested aspect: schema-error controls use a
 registered, valid operand target, and wrong-kind candidates are registered and
-valid. `/validate-json` takes no reference policy, so it is used only for
-schema errors that do not depend on one.
+valid. The transient instance endpoints take no reference policy, so their
+kind, matching and self-reference cases use registered, valid targets and
+have the same expected results under every policy.
 """
 
 from types import SimpleNamespace
@@ -418,6 +419,118 @@ def test_instance_operand_matching_under_lookup(
         mode=mode,
     )
     _check_refs(api, holder, [(right, True), (wrong, False)], mode)
+
+
+# ---------------------------------------------------------------------------
+# Transient instances: explicit type and type inferred from the payload
+# ---------------------------------------------------------------------------
+
+def _check_transient_payload(api, type_id, payload, valid, type_selection):
+    """Validate without registering the payload; targets are registered separately."""
+    try:
+        if type_selection == "explicit":
+            api.check_payload(type_id, payload, valid=valid)
+        else:
+            result = api.request(
+                "POST", "/validate-json", json={**payload, "type": type_id}
+            )
+            assert result["is_type_schema"] is False, result
+            api.verdict(result, valid)
+    except AssertionError as error:
+        raise AssertionError(
+            f"{type_selection} type {type_id}: payload {payload!r} "
+            f"expected valid={valid}: {error}"
+        ) from None
+
+
+@pytest.mark.parametrize("type_selection", ["explicit", "inferred"])
+@pytest.mark.parametrize("keyword", KEYWORDS)
+def test_transient_payload_checks_candidate_kind_and_matching(
+    gts_api, schema_dialect, keyword, type_selection
+):
+    """Both transient endpoints enforce the keyword on instance field values.
+
+    All concrete candidates are registered and valid, so kind and matching
+    are tested independently of the endpoint's reference lookup policy.
+    """
+    api = gts_api
+    r = _targets(api, schema_dialect)
+    holder = api.register(
+        "holder", _holder({"type": "string", keyword: r.t}), schema_dialect
+    )
+    want_type = keyword == TYPE_REF
+    expectations = [(candidate, want_type) for candidate in (r.t, r.tm, r.d)]
+    expectations += [
+        (candidate, not want_type) for candidate in (r.it, r.itm, r.idv, r.u)
+    ]
+    expectations += [(candidate, False) for candidate in (r.t2, r.other, r.oi)]
+    expectations += [(r.t + "*", False), ("not-a-gts-id", False)]
+    for candidate, valid in expectations:
+        _check_transient_payload(
+            api, holder, {"ref": candidate}, valid, type_selection
+        )
+    _check_transient_payload(api, holder, {}, True, type_selection)
+
+
+@pytest.mark.parametrize("type_selection", ["explicit", "inferred"])
+@pytest.mark.parametrize("keyword", KEYWORDS)
+def test_transient_payload_self_reference_uses_selected_leaf(
+    gts_api, schema_dialect, keyword, type_selection
+):
+    """Inherited `/$id` is rebound to the selected leaf on both transient paths."""
+    api = gts_api
+    base = _register_type(
+        api,
+        schema_dialect,
+        api.type_id("base"),
+        _holder({"type": "string", keyword: "/$id"}),
+    )
+    sibling = _register_derived(api, schema_dialect, base, "sibling")
+    leaf = _register_derived(api, schema_dialect, base, "leaf")
+    further = _register_derived(api, schema_dialect, leaf, "further")
+    types = (base, sibling, leaf, further)
+    instances = [api.register_instance(t, {}, validate=True) for t in types]
+    want_type = keyword == TYPE_REF
+    for selected, accepted_types in ((leaf, {leaf, further}), (further, {further})):
+        for candidate_type, candidate_instance in zip(types, instances):
+            in_scope = candidate_type in accepted_types
+            _check_transient_payload(
+                api, selected, {"ref": candidate_type}, in_scope and want_type,
+                type_selection,
+            )
+            _check_transient_payload(
+                api, selected, {"ref": candidate_instance}, in_scope and not want_type,
+                type_selection,
+            )
+
+
+@pytest.mark.parametrize("type_selection", ["explicit", "inferred"])
+@pytest.mark.parametrize("keyword", KEYWORDS)
+def test_transient_payload_rejects_deferred_invalid_operand(
+    gts_api, schema_dialect, keyword, type_selection
+):
+    """Stored invalid operands fail even when the transient payload omits `ref`.
+
+    Registration without validation may reject early. If it stores the
+    schema, neither transient endpoint may treat that as proof of validity.
+    """
+    api = gts_api
+    r = _operand_targets(api, schema_dialect)
+    control = api.register(
+        "control", _operand_schema(keyword, r.t), schema_dialect
+    )
+    candidate = r.t if keyword == TYPE_REF else r.it
+    payloads = ({}, {"ref": candidate})
+    for payload in payloads:
+        _check_transient_payload(api, control, payload, True, type_selection)
+
+    invalid_operand = r.it if keyword == TYPE_REF else "/$id/"
+    deferred = api.register_deferred(
+        "deferred", _operand_schema(keyword, invalid_operand), schema_dialect
+    )
+    if deferred is not None:
+        for payload in payloads:
+            _check_transient_payload(api, deferred, payload, False, type_selection)
 
 
 # §10 matching corpus (id_pattern_corpus.py), shared with OP#4 and
