@@ -73,16 +73,15 @@ def seed_shared_topic_ref_registry():
 
 
 class TestCaseOp13_Seed_TopicRefRegistry(HttpRunner):
-    """Seed shared x-gts-ref targets for the OP#13 trait tests.
+    """Seed shared x-gts-instance-ref targets for the OP#13 trait tests.
 
     Many trait tests below annotate a `topicRef` trait with
-    `x-gts-ref: "gts.x.test13.events.topic.v1~"` and supply concrete topic
-    references as trait values. Under §9.6.1 a *specific* (non-wildcard)
-    `x-gts-ref` is existence-enforced: the concrete constraint type and each
-    referenced value MUST be registered, or validation fails. Their validity is
-    outside x-gts-ref validation. This class registers the topic type and every
-    topic instance those tests reference so their `x-gts-ref` values resolve. It
-    runs first (file order), and the entries persist for the rest of the session.
+    `x-gts-instance-ref: "gts.x.test13.events.topic.v1~"` and supply topic
+    Instance IDs as trait values. Under the default `any-valid` policy (§9.6.1)
+    the concrete operand type and each referenced instance MUST be registered
+    and valid, or validation fails. This class registers the topic type and
+    every topic instance those tests reference so their values resolve. It runs
+    first (file order), and the entries persist for the rest of the session.
     """
 
     config = Config("OP#13 - Seed topicRef registry").base_url(get_gts_base_url())
@@ -101,7 +100,7 @@ class TestCaseOp13_Seed_TopicRefRegistry(HttpRunner):
                     "name": {"type": "string"},
                 },
             },
-            "register topic type schema (x-gts-ref target)",
+            "register topic type schema (x-gts-instance-ref target)",
         ),
         _register_instance(
             {
@@ -156,7 +155,7 @@ class TestCaseOp13_TraitsValid_AllResolved(HttpRunner):
                         "topicRef": {
                             "type": "string",
                             "description": "Topic reference",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -214,7 +213,7 @@ class TestCaseOp13_TraitsValid_DefaultsUsed(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                             "default": (
                                 "gts.x.test13.events.topic.v1~"
                                 "x.core._.default.v1"
@@ -273,7 +272,7 @@ class TestCaseOp13_TraitsInvalid_MissingRequired(HttpRunner):
                         "topicRef": {
                             "type": "string",
                             "description": "Required - no default",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -366,17 +365,17 @@ class TestCaseOp13_TraitsInvalid_WrongType(HttpRunner):
 
 class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
     """Abstract types are exempt from trait *completeness* (§9.7.5) but NOT from
-    x-gts-ref reference integrity.
+    x-gts-instance-ref reference integrity.
 
     Per §9.7.5 the completeness check (standard JSON Schema validation of the
     materialized traits) is skipped for x-gts-abstract types; the separate
     "reference resolution of trait values" rule does NOT exempt abstract types.
     An unregistered constraint therefore passes in ``none`` mode and fails in
     ``any-present`` and ``any-valid`` modes, even though a descendant may later supply
-    its own x-gts-ref value.
+    its own x-gts-instance-ref value.
     """
     config = Config(
-        "OP#13 x-gts-ref: abstract still validates missing constraint type"
+        "OP#13 x-gts-instance-ref: abstract still validates missing constraint type"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -393,14 +392,14 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.absref.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.absref.topic.v1~",
                         },
                     },
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register abstract base whose x-gts-ref names an unregistered topic type",
+            "register abstract base whose x-gts-instance-ref names an unregistered topic type",
         ),
         _validate_type_schema(
             "gts.x.test13.absref.event.v1~",
@@ -424,15 +423,15 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintMissing(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_AbstractRefConstraintResolved(HttpRunner):
-    """Abstract type declaring an x-gts-ref whose constraint type IS registered,
+    """Abstract type declaring an x-gts-instance-ref whose constraint type IS registered,
     and supplying no value, MUST pass.
 
     Guards against over-strictness: an abstract type must not fail merely for
-    declaring an optional x-gts-ref trait it leaves unresolved (completeness is
+    declaring an optional x-gts-instance-ref trait it leaves unresolved (completeness is
     skipped) as long as the constraint type it names exists.
     """
     config = Config(
-        "OP#13 x-gts-ref: abstract with resolved constraint, no value, passes"
+        "OP#13 x-gts-instance-ref: abstract with resolved constraint, no value, passes"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -460,7 +459,7 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintResolved(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.absrefok.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.absrefok.topic.v1~",
                         },
                     },
                     "required": ["topicRef"],
@@ -474,7 +473,7 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintResolved(HttpRunner):
             "gts.x.test13.absrefok.event.v1~",
             True,
             "validate should pass - completeness skipped for abstract, "
-            "x-gts-ref constraint type is registered, no value to resolve",
+            "x-gts-instance-ref constraint type is registered, no value to resolve",
         ),
     ]
 
@@ -482,11 +481,11 @@ class TestCaseOp13_TraitRef_AbstractRefConstraintResolved(HttpRunner):
 class TestCaseOp13_TraitRef_AbstractRefValueUnregistered(HttpRunner):
     """Exercise all modes for an abstract type's unregistered trait target.
 
-    Abstract completeness does not change the selected x-gts-ref validation
+    Abstract completeness does not change the selected x-gts-instance-ref validation
     mode: ``none`` skips lookup, while ``any-present`` and ``any-valid`` require it.
     """
     config = Config(
-        "OP#13 x-gts-ref: abstract resolves declared trait ref values"
+        "OP#13 x-gts-instance-ref: abstract resolves declared trait ref values"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -515,7 +514,7 @@ class TestCaseOp13_TraitRef_AbstractRefValueUnregistered(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.absrefv.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.absrefv.topic.v1~",
                         },
                     },
                 },
@@ -555,7 +554,7 @@ class TestCaseOp13_TraitRef_AbstractRefValueValidationModes(HttpRunner):
     """Exercise all modes for a present but invalid abstract trait target."""
 
     config = Config(
-        "OP#13 x-gts-ref: present invalid trait target by mode"
+        "OP#13 x-gts-instance-ref: present invalid trait target by mode"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -600,7 +599,7 @@ class TestCaseOp13_TraitRef_AbstractRefValueValidationModes(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.absrefpresent.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.absrefpresent.topic.v1~",
                         },
                     },
                 },
@@ -712,7 +711,7 @@ class TestCaseOp13_TraitsValid_PartialOverride(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                             "default": (
                                 "gts.x.test13.events.topic.v1~"
                                 "x.core._.default.v1"
@@ -775,7 +774,7 @@ class TestCaseOp13_TraitsValid_BothKeywordsInSameSchema(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -1093,7 +1092,7 @@ class TestCaseOp13_TraitsValid_ValidateEntity(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -1152,7 +1151,7 @@ class TestCaseOp13_TraitsInvalid_ValidateEntity_MissingTrait(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -1317,7 +1316,7 @@ class TestCaseOp13_TraitsValid_RefBasedTraitSchema(HttpRunner):
                     "topicRef": {
                         "description": "Topic reference.",
                         "type": "string",
-                        "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                        "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                     },
                 },
             },
@@ -1416,7 +1415,7 @@ class TestCaseOp13_TraitsInvalid_RefBasedMissingTrait(HttpRunner):
                     "topicRef": {
                         "description": "Topic reference.",
                         "type": "string",
-                        "x-gts-ref": (
+                        "x-gts-instance-ref": (
                             "gts.x.test13.events.topic.v1~"
                         ),
                     },
@@ -1766,7 +1765,7 @@ class TestCaseOp13_TraitsInvalid_APBlocksExtension(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                         },
                     },
                 },
@@ -1834,7 +1833,7 @@ class TestCaseOp13_TraitsInvalid_AbstractAPBlocksSchemaExtensionNoValues(HttpRun
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.events.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.events.topic.v1~",
                         },
                     },
                 },
@@ -2189,7 +2188,7 @@ class TestCaseOp13_TraitsInvalid_CyclingRef_TwoNode(HttpRunner):
                 "properties": {
                     "topicRef": {
                         "type": "string",
-                        "x-gts-ref": (
+                        "x-gts-instance-ref": (
                             "gts.x.test13.events.topic.v1~"
                         ),
                     },
@@ -5673,28 +5672,28 @@ class TestCaseOp13_Merge_DeleteThenReadd_AcrossLayers(HttpRunner):
 
 
 # ---------------------------------------------------------------------------
-# x-gts-ref resolution inside x-gts-traits values (issue #107)
+# x-gts-instance-ref resolution inside x-gts-traits values (issue #107)
 #
-# When a trait-schema property declares x-gts-ref, the concrete value
+# When a trait-schema property declares x-gts-instance-ref, the concrete value
 # provided in x-gts-traits MUST be validated against the reference:
 #   - the value must be a syntactically valid GTS identifier, AND
 #   - the referenced entity must be registered in the registry.
 #
 # These tests exercise both the positive path (registered topic) and the
 # negative path (nonexistent topic) for a topicRef trait annotated with
-# x-gts-ref.
+# x-gts-instance-ref.
 # ---------------------------------------------------------------------------
 
 
 class TestCaseOp13_TraitRef_TopicRefValid(HttpRunner):
-    """OP#13 / x-gts-ref in traits: topicRef points to a registered topic.
+    """OP#13 / x-gts-instance-ref in traits: topicRef points to a registered topic.
 
     Registers a topic type schema, a topic instance, and an event type whose
     x-gts-traits.topicRef resolves to that topic. Validation must pass.
     """
 
     config = Config(
-        "OP#13 x-gts-ref: topicRef resolves to registered topic"
+        "OP#13 x-gts-instance-ref: topicRef resolves to registered topic"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -5725,7 +5724,7 @@ class TestCaseOp13_TraitRef_TopicRefValid(HttpRunner):
             },
             "register topic instance (orders)",
         ),
-        # Register event base with trait-schema declaring topicRef + x-gts-ref
+        # Register event base with trait-schema declaring topicRef + x-gts-instance-ref
         _register(
             "gts://gts.x.test13.tref.event.v1~",
             {
@@ -5735,7 +5734,7 @@ class TestCaseOp13_TraitRef_TopicRefValid(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.tref.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.tref.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -5748,7 +5747,7 @@ class TestCaseOp13_TraitRef_TopicRefValid(HttpRunner):
                     "id": {"type": "string"},
                 },
             },
-            "register event base with topicRef trait (x-gts-ref)",
+            "register event base with topicRef trait (x-gts-instance-ref)",
         ),
         # Derived event: topicRef points to the registered topic
         _register_derived(
@@ -5781,7 +5780,7 @@ class TestCaseOp13_TraitRef_TopicRefValid(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_TopicRefNonexistent(HttpRunner):
-    """OP#13 / x-gts-ref in traits: topicRef points to a nonexistent topic.
+    """OP#13 / x-gts-instance-ref in traits: topicRef points to a nonexistent topic.
 
     The topicRef value has valid GTS syntax and correct prefix, but the
     referenced entity does not exist in the registry. Validation must fail.
@@ -5789,7 +5788,7 @@ class TestCaseOp13_TraitRef_TopicRefNonexistent(HttpRunner):
     """
 
     config = Config(
-        "OP#13 x-gts-ref: topicRef to nonexistent topic fails"
+        "OP#13 x-gts-instance-ref: topicRef to nonexistent topic fails"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -5809,7 +5808,7 @@ class TestCaseOp13_TraitRef_TopicRefNonexistent(HttpRunner):
             },
             "register topic type schema (idempotent)",
         ),
-        # Register event base with trait-schema declaring topicRef + x-gts-ref
+        # Register event base with trait-schema declaring topicRef + x-gts-instance-ref
         _register(
             "gts://gts.x.test13.trefm.event.v1~",
             {
@@ -5819,7 +5818,7 @@ class TestCaseOp13_TraitRef_TopicRefNonexistent(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.tref.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.tref.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -5832,7 +5831,7 @@ class TestCaseOp13_TraitRef_TopicRefNonexistent(HttpRunner):
                     "id": {"type": "string"},
                 },
             },
-            "register event base with topicRef trait (x-gts-ref)",
+            "register event base with topicRef trait (x-gts-instance-ref)",
         ),
         # Derived event: topicRef points to a topic that does NOT exist
         _register_derived(
@@ -5865,24 +5864,24 @@ class TestCaseOp13_TraitRef_TopicRefNonexistent(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_MalformedValues(HttpRunner):
-    """OP#13 / x-gts-ref in traits: malformed topicRef values must fail.
+    """OP#13 / x-gts-instance-ref in traits: malformed topicRef values must fail.
 
     Exercises three classes of bad values in x-gts-traits for a property
-    annotated with x-gts-ref:
+    annotated with x-gts-instance-ref:
       - not a GTS identifier at all (plain string)
       - partial / syntactically invalid GTS identifier (too few segments)
-      - valid GTS identifier but wrong prefix (doesn't match x-gts-ref)
+      - valid GTS identifier but wrong prefix (doesn't match x-gts-instance-ref)
     """
 
     config = Config(
-        "OP#13 x-gts-ref: malformed trait ref values rejected"
+        "OP#13 x-gts-instance-ref: malformed trait ref values rejected"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
 
     teststeps = [
-        # Register topic type schema (the x-gts-ref target type)
+        # Register topic type schema (the x-gts-instance-ref target type)
         _register(
             "gts://gts.x.test13.tref.topic.v1~",
             {
@@ -5895,7 +5894,7 @@ class TestCaseOp13_TraitRef_MalformedValues(HttpRunner):
             },
             "register topic type schema (idempotent)",
         ),
-        # Register event base with topicRef trait annotated with x-gts-ref
+        # Register event base with topicRef trait annotated with x-gts-instance-ref
         _register(
             "gts://gts.x.test13.trefbad.event.v1~",
             {
@@ -5905,7 +5904,7 @@ class TestCaseOp13_TraitRef_MalformedValues(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.tref.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.tref.topic.v1~",
                         },
                         "retention": {
                             "type": "string",
@@ -5918,7 +5917,7 @@ class TestCaseOp13_TraitRef_MalformedValues(HttpRunner):
                     "id": {"type": "string"},
                 },
             },
-            "register event base with topicRef trait (x-gts-ref)",
+            "register event base with topicRef trait (x-gts-instance-ref)",
         ),
         # --- Case 1: not a GTS identifier at all ---
         _register_derived(
@@ -5993,7 +5992,7 @@ class TestCaseOp13_TraitRef_MalformedValues(HttpRunner):
                 "x.test13._.bad_wrong_prefix.v1~"
             ),
             False,
-            "reject - topicRef prefix doesn't match x-gts-ref declaration",
+            "reject - topicRef prefix doesn't match x-gts-instance-ref declaration",
         ),
         # --- Case 4: empty string ---
         _register_derived(
@@ -6124,14 +6123,17 @@ class TestCaseOp13_TraitsInvalid_StandardFormats(HttpRunner):
 
 
 # ---------------------------------------------------------------------------
-# x-gts-ref existence semantics for trait values (§9.6.1)
+# x-gts-instance-ref existence semantics for trait values (§9.6.1)
 #
-# §9.6.1 accepts two GTS constraint forms of x-gts-ref on a trait property:
+# §9.6.1 accepts these operand forms of an entity reference on a trait property:
 #   - a WILDCARD pattern (e.g. "gts.*", "gts.cf.core.am.*", "...v1~*"): the
-#     value must be a well-formed GTS id that matches the pattern (§10);
-#   - a CONCRETE identifier (e.g. "gts.x.test13.xref....v1~"): the value must be
-#     a well-formed GTS id that matches the constraint (a `~`-terminated
-#     constraint matches the exact id and any derived id).
+#     value must be a well-formed GTS id of the required kind that matches the
+#     pattern (§10);
+#   - a CONCRETE Type ID (e.g. "gts.x.test13.xref....v1~"): the value must be a
+#     well-formed GTS id of the required kind rooted at that type or a type
+#     derived from it.
+# Most cases below reference topic instances (x-gts-instance-ref); the inherited
+# cases reference users types (x-gts-type-ref).
 #
 # Operand/value syntax and matching are always enforced. Registry lookup is
 # skipped by `none`; `any-present` requires registered constraint and value targets;
@@ -6155,7 +6157,7 @@ class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
     """
 
     config = Config(
-        "OP#13 x-gts-ref: gts.* wildcard enforces existence"
+        "OP#13 x-gts-instance-ref: gts.* wildcard enforces existence"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -6192,13 +6194,13 @@ class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
                 "x-gts-traits-schema": {
                     "type": "object",
                     "properties": {
-                        "topicRef": {"type": "string", "x-gts-ref": "gts.*"},
+                        "topicRef": {"type": "string", "x-gts-instance-ref": "gts.*"},
                     },
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register base with wildcard x-gts-ref topicRef",
+            "register base with wildcard x-gts-instance-ref topicRef",
         ),
         # --- Negative: value matches gts.* but is never registered ---
         _register_derived(
@@ -6244,9 +6246,9 @@ class TestCaseOp13_TraitRef_WildcardRequiresExistence(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
-    """Trait x-gts-ref operands may not use pointers other than /$id."""
+    """Trait x-gts-instance-ref operands may not use pointers other than /$id."""
 
-    config = Config("OP#13 x-gts-ref: reject trait pointers").base_url(
+    config = Config("OP#13 x-gts-instance-ref: reject trait pointers").base_url(
         get_gts_base_url()
     )
 
@@ -6256,7 +6258,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
     teststeps = [
         Step(
             RunRequest("reject trait pointer to concrete constraint metadata")
-            .post("/entities")
+            .post("/entities?validate=true&gts-ref-validation=none")
             .with_json({
                 "$$id": "gts://gts.x.test13.xrefrel.event.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
@@ -6267,7 +6269,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "/x-gts-traits-schema/constraintType",
+                            "x-gts-instance-ref": "/x-gts-traits-schema/constraintType",
                         },
                     },
                 },
@@ -6278,7 +6280,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
         ),
         Step(
             RunRequest("reject missing trait pointer")
-            .post("/entities")
+            .post("/entities?validate=true&gts-ref-validation=none")
             .with_json({
                 "$$id": "gts://gts.x.test13.xrefrelmissing.event.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
@@ -6288,7 +6290,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "/x-gts-traits-schema/missingConstraintType",
+                            "x-gts-instance-ref": "/x-gts-traits-schema/missingConstraintType",
                         },
                     },
                 },
@@ -6299,7 +6301,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
         ),
         Step(
             RunRequest("reject trait pointer to non-string metadata")
-            .post("/entities")
+            .post("/entities?validate=true&gts-ref-validation=none")
             .with_json({
                 "$$id": "gts://gts.x.test13.xrefrelnonstring.event.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
@@ -6310,7 +6312,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "/x-gts-traits-schema/examples",
+                            "x-gts-instance-ref": "/x-gts-traits-schema/examples",
                         },
                     },
                 },
@@ -6323,7 +6325,7 @@ class TestCaseOp13_TraitRef_UnsupportedPointers(HttpRunner):
 
 
 class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
-    """§9.6.1 specific ref: the x-gts-ref CONSTRAINT type must itself exist.
+    """§9.6.1 specific ref: the x-gts-instance-ref CONSTRAINT type must itself exist.
 
     The topicRef value is a syntactically valid GTS id with the correct prefix,
     but neither the constraint type nor the value is registered. Validation MUST
@@ -6332,7 +6334,7 @@ class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
     """
 
     config = Config(
-        "OP#13 x-gts-ref: missing constraint type fails"
+        "OP#13 x-gts-instance-ref: missing constraint type fails"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -6348,14 +6350,14 @@ class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.xrefct.topic.v1~",
+                            "x-gts-instance-ref": "gts.x.test13.xrefct.topic.v1~",
                         },
                     },
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register base whose x-gts-ref points at an unregistered topic type",
+            "register base whose x-gts-instance-ref points at an unregistered topic type",
         ),
         _register_derived(
             "gts://gts.x.test13.xrefct.event.v1~x.test13._.leaf.v1~",
@@ -6374,12 +6376,12 @@ class TestCaseOp13_TraitRef_ConstraintTypeMissing(HttpRunner):
         _validate_type_schema(
             "gts.x.test13.xrefct.event.v1~",
             False,
-            "validate should fail - x-gts-ref constraint type is not registered",
+            "validate should fail - x-gts-instance-ref constraint type is not registered",
         ),
         _validate_type_schema(
             "gts.x.test13.xrefct.event.v1~x.test13._.leaf.v1~",
             False,
-            "validate should fail - x-gts-ref constraint type is not registered",
+            "validate should fail - x-gts-instance-ref constraint type is not registered",
         ),
     ]
 
@@ -6388,7 +6390,7 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
     """A failed registration-with-validation must not remove committed state.
 
     The first request deliberately omits ``validate=true``, so the schema is
-    accepted after syntax checks even though its concrete x-gts-ref target is
+    accepted after syntax checks even though its concrete x-gts-instance-ref target is
     not registered. A GET proves that registration committed the schema before
     an identical request with explicit validation fails. That later failure
     belongs only to the rejected request: the schema committed by the first
@@ -6396,7 +6398,7 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
     """
 
     config = Config(
-        "OP#13 x-gts-ref: rejected identical revalidation preserves stored schema"
+        "OP#13 x-gts-instance-ref: rejected identical revalidation preserves stored schema"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -6409,7 +6411,7 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
         "properties": {
             "topicRef": {
                 "type": "string",
-                "x-gts-ref": "gts.x.test13.xrefpreserve.topic.v1~",
+                "x-gts-instance-ref": "gts.x.test13.xrefpreserve.topic.v1~",
             },
         },
     }
@@ -6417,7 +6419,7 @@ class TestCaseOp13_TraitRef_RevalidationPreservesStoredSchema(HttpRunner):
         # This request commits the schema. Without explicit validation, the
         # concrete target is checked for syntax but not registry existence.
         Step(
-            RunRequest("register schema with an unregistered x-gts-ref target")
+            RunRequest("register schema with an unregistered x-gts-instance-ref target")
             .post("/entities")
             .with_json(schema)
             .validate()
@@ -6472,7 +6474,7 @@ class TestCaseOp13_TraitRef_ValidatedRegistrationFailureIsNotStored(HttpRunner):
     """A first-time registration rejected by validation must commit nothing."""
 
     config = Config(
-        "OP#13 x-gts-ref: rejected validated registration is not stored"
+        "OP#13 x-gts-instance-ref: rejected validated registration is not stored"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -6485,7 +6487,7 @@ class TestCaseOp13_TraitRef_ValidatedRegistrationFailureIsNotStored(HttpRunner):
         "properties": {
             "topicRef": {
                 "type": "string",
-                "x-gts-ref": "gts.x.test13.xrefreject.topic.v1~",
+                "x-gts-instance-ref": "gts.x.test13.xrefreject.topic.v1~",
             },
         },
     }
@@ -6493,7 +6495,7 @@ class TestCaseOp13_TraitRef_ValidatedRegistrationFailureIsNotStored(HttpRunner):
         # This is registration and validation in one request. Because validation
         # fails, the registration must be atomic and commit no new entity.
         Step(
-            RunRequest("reject first registration with an unregistered x-gts-ref target")
+            RunRequest("reject first registration with an unregistered x-gts-instance-ref target")
             .post("/entities?validate=true")
             .with_json(schema)
             .validate()
@@ -6523,15 +6525,15 @@ class TestCaseOp13_TraitRef_ValidatedRegistrationFailureIsNotStored(HttpRunner):
 class TestCaseOp13_TraitRef_InheritedChain_RootMissing(HttpRunner):
     """Inherited topicRef, case (a): the ref target's root/constraint type is missing.
 
-    Chain: event base E (declares topicRef x-gts-ref = users root type) ->
+    Chain: event base E (declares topicRef x-gts-type-ref = users root type) ->
     audit type A (sets topicRef to a deep users type, NOT validated) ->
     user type U (inherits A's topicRef, no own x-gts-traits). Validating U MUST
     fail because the referenced users type chain — starting at its root, which
-    is also the x-gts-ref constraint type — is not registered at all.
+    is also the x-gts-type-ref constraint type — is not registered at all.
     """
 
     config = Config(
-        "OP#13 x-gts-ref inherited: root/constraint type missing fails"
+        "OP#13 x-gts-type-ref inherited: root/constraint type missing fails"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -6548,14 +6550,14 @@ class TestCaseOp13_TraitRef_InheritedChain_RootMissing(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.xrefia.users.v1~",
+                            "x-gts-type-ref": "gts.x.test13.xrefia.users.v1~",
                         },
                     },
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register event base with x-gts-ref to users root type",
+            "register event base with x-gts-type-ref to users root type",
         ),
         _register_derived(
             "gts://gts.x.test13.xrefia.event.v1~x.test13._.audit.v1~",
@@ -6604,7 +6606,7 @@ class TestCaseOp13_TraitRef_InheritedChain_LeafMissing(HttpRunner):
     """
 
     config = Config(
-        "OP#13 x-gts-ref inherited: leaf link missing fails"
+        "OP#13 x-gts-type-ref inherited: leaf link missing fails"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -6639,14 +6641,14 @@ class TestCaseOp13_TraitRef_InheritedChain_LeafMissing(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.xrefib.users.v1~",
+                            "x-gts-type-ref": "gts.x.test13.xrefib.users.v1~",
                         },
                     },
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register event base with x-gts-ref to users root type",
+            "register event base with x-gts-type-ref to users root type",
         ),
         _register_derived(
             "gts://gts.x.test13.xrefib.event.v1~x.test13._.audit.v1~",
@@ -6695,7 +6697,7 @@ class TestCaseOp13_TraitRef_InheritedChain_FullyResolved(HttpRunner):
     """
 
     config = Config(
-        "OP#13 x-gts-ref inherited: full chain resolves"
+        "OP#13 x-gts-type-ref inherited: full chain resolves"
     ).base_url(get_gts_base_url())
 
     def test_start(self):
@@ -6740,14 +6742,14 @@ class TestCaseOp13_TraitRef_InheritedChain_FullyResolved(HttpRunner):
                     "properties": {
                         "topicRef": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.test13.xrefic.users.v1~",
+                            "x-gts-type-ref": "gts.x.test13.xrefic.users.v1~",
                         },
                     },
                 },
                 "required": ["id"],
                 "properties": {"id": {"type": "string"}},
             },
-            "register event base with x-gts-ref to users root type",
+            "register event base with x-gts-type-ref to users root type",
         ),
         _register_derived(
             "gts://gts.x.test13.xrefic.event.v1~x.test13._.audit.v1~",

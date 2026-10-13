@@ -150,22 +150,51 @@ Limitations:
 - Stress timing detects regressions, not complexity guarantees. Client timeouts do not stop server work.
 - Offline checks use fake engines (`test_regex_validation_unit.py`, `pytest tests -m unit`, run in CI), not a profile checker or RE2 implementation.
 
+### Identifier matching corpus
+
+`id_pattern_corpus.py` holds the shared [README §10](../README.md#10-identifier-matching-and-pattern-coverage) vectors as plain data with explicit expected results. It includes every matching, coverage, and invalid-pattern table of §10 and the examples in its text, plus former OP#4 and `x-gts-pattern-ref` vectors:
+
+- `MATCH_CASES` pair a pattern with a canonical candidate and state two results separately: point matching (`candidate ∈ M(pattern)`) and coverage (`M(candidate) ⊆ M(pattern)`). An unmatched candidate is its own coverage witness.
+- `COVERAGE_CASES` pair a filter with a wildcard candidate; each uncovered row names a canonical witness selected by the candidate and not by the filter.
+- `VALID_PATTERNS` and `INVALID_PATTERNS` cover syntax, spelling, length, and unsigned 32-bit version bounds.
+
+Adapters use the corpus as follows:
+
+- **OP#4** (`test_op4_id_match_pattern.py`): concrete candidates by point matching, pattern candidates by coverage, with witnesses checked in both directions. Valid pairs must report no error, so a non-match cannot pass because of a parse failure. Invalid strings, as pattern or candidate, return `match=false` and an error.
+- **Entity references** (`test_x_gts_entity_ref.py`): each match row under both keywords, accepted iff the candidate matches and has the required kind. Covered pattern candidates are still rejected. Concrete Instance ID operands are schema errors under `x-gts-type-ref`. These run with `gts-ref-validation=none` in every dialect, without registering candidates.
+- **`x-gts-pattern-ref`** (`test_x_gts_pattern_ref.py`): every row by coverage, including uncovered witnesses; `gts.*` checks the syntax lists.
+- **Invalid operands:** every `INVALID_PATTERNS` string is a schema error as the operand of all three keywords. Local operand lists add only keyword-specific forms: pointers other than `/$id`, non-string JSON values, and the operand kind restriction.
+
+`test_gts_id_pattern_syntax_unit.py` checks offline that every corpus string is spelled correctly, that match candidates and witnesses are canonical, that coverage candidates are wildcards, and that case IDs and vectors are unique. It also checks lengths at the empty-selection boundary. It does not compute matching or coverage.
+
 ### GTS identifier pattern constraint tests
 
 `test_x_gts_pattern_ref.py` checks `x-gts-pattern-ref` from [README §9.6.2](../README.md#962-pattern-valued-fields-x-gts-pattern-ref), [§10](../README.md#10-identifier-matching-and-pattern-coverage), and [ADR-0007](../adr/0007-gts-pattern-ref.md) in all three supported dialects:
 
-- **Syntax and coverage:** the universal operand `gts.*` checks concrete IDs and wildcard syntax, spelling, length, and unsigned 32-bit version bounds. Scoped cases cover narrowing, instance selectors with omitted or explicit minors, exact UUID tails, token boundaries, and segment-position semantics. Valid patterns whose every completion exceeds 1024 characters select no identifier and are covered by any operand. Each uncovered case names a witness, which the value's own scope must accept and the operand reject. Value failures are also checked under `not`; invalid operands remain schema errors in registration, transient schema validation, and value validation after deferred registration.
+- **Syntax and coverage:** the shared corpus above. Valid patterns whose every completion exceeds 1024 characters select no identifier and are covered by any operand. Each uncovered case names a witness, which the value's own scope must accept and the operand reject. A small set checks that `not` inverts covered, uncovered, and malformed verdicts; invalid operands remain schema errors in registration, transient schema validation, and value validation after deferred registration.
 - **Schema paths:** property and array schemas, local `$ref`, composition, literal data, and effective-leaf `/$id`.
 - **Traits:** trait values given on the leaf, inherited from an ancestor, supplied by `default`, and supplied on abstract types, plus `/$id` in trait schemas.
 - **Registry independence:** empty, valid, and invalid target states under every `gts-ref-validation` mode, including registration with validation. With unregistered operands and values, schema and instance validation succeed both before and after OP#7 relationship discovery. The tests do not assert which pattern-related relationships OP#7 reports.
-
-`test_gts_id_pattern_syntax_unit.py` checks syntax of the value and coverage vectors and the lengths at the empty-selection boundary offline. It does not implement a coverage oracle.
 
 Related conformance tests cover:
 
 - **OP#8 and OP#12:** evolution and derivation, including composition, self-reference, narrowing and widening between first-segment `v1~` and `v1.*`, and pinning or omitting minors in an instance selector's type and instance segments. OP#8 composition cases permit `unknown` but reject incorrect definite verdicts.
 - **OP#10:** version wildcard queries check the exact set of returned base types, derived types, and instances. A first-segment `v1.*` requires an explicit minor under major version 1; `v1~*` accepts omitted and explicit minors, while `v1.0~*` pins the minor to zero. Both chain-suffix patterns include the matching base types themselves.
-- **`x-gts-ref`:** `test_refimpl_x_gts_ref.py` requires concrete payload IDs and rejects wildcard values for universal, wildcard, and concrete operands in every reference-validation mode.
+- **Entity references:** see below; payload values are always concrete identifiers, never patterns.
+
+### Entity reference tests
+
+`test_x_gts_entity_ref.py` checks `x-gts-type-ref` and `x-gts-instance-ref` from [README §9.6.1](../README.md#961-entity-references-x-gts-type-ref--x-gts-instance-ref), [§9.6.3](../README.md#963-common-validation-rules), and [ADR-0008](../adr/0008-kind-specific-references.md) in all three supported dialects:
+
+- **Operands:** concrete Type IDs, §10 wildcards, `/$id`, and the 1024-character boundary are valid for both keywords. Concrete and UUID-tailed Instance IDs are valid only for `x-gts-instance-ref`; under `x-gts-type-ref` they are schema errors. Invalid pattern strings from the shared corpus, other pointers, and non-strings are schema errors for both. Schema errors are checked on registration with validation, `POST /validate-json`, and after registration without validation (which may also reject early), at every schema location: properties, array items, unused definitions, inactive `anyOf` and `if`/`then` branches, `not`, and trait schemas. The removed `x-gts-ref` and an unknown `x-gts-*` keyword follow the same lifecycle. Keyword-shaped keys in literal data and property names are accepted.
+- **Candidates:** detailed matching comes from the shared §10 corpus (see above), run with `gts-ref-validation=none`. Registered controls show that lookup replaces neither kind nor matching in any mode. A concrete Type ID operand is checked against registered, valid candidates: types and instances under it, including derived types, explicit minors, and UUID instances, and others outside it. Malformed values with a matching root and suffix are rejected. Concrete named and UUID Instance ID operands accept their registered target and reject a registered, valid instance outside their scope. The suite also covers string-only applicability, `anyOf`/`oneOf` unions, conjunction, `not`, and `const`.
+- **`/$id`:** selected-leaf resolution through `$ref` and inline `allOf`, further derivation, ancestor and sibling rejection, and no import through a chained `$id` alone.
+- **Registry policies:** candidate lookup and validity per mode, wrong-kind rejection of registered targets, wildcard operands witnessed by an entity of the other kind, missing or invalid concrete operand targets, and abstract or final targets.
+- **Traits:** leaf, inherited, default, abstract-type, and `/$id` trait values.
+
+Structural cases use `gts-ref-validation=none` so that registry lookup cannot cause or mask a verdict. `POST /validate-json` has no policy parameter. It is used only for schema errors, each paired with a valid control whose operand target is registered and valid.
+
+`test_refimpl_x_gts_ref.py` covers each keyword on concrete fields: combinators, local and root references, tuple and `prefixItems` arrays, nullable references, wildcard families, and registry modes, including exact lookup of a minor-flexible match. OP#13 trait cases in `test_op13_schema_traits_validation.py` use `x-gts-instance-ref` for topic instances and `x-gts-type-ref` for referenced type chains. OP#8 and OP#12 cases cover equal, narrower, and broader kind-filtered scopes, kind swaps, unions, `not`, and `/$id` on each side.
 
 ## Generating reusable examples
 

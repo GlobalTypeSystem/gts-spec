@@ -2252,5 +2252,190 @@ def test_pattern_ref_conditional_evolution_preserves_inconclusive_verdicts(
     )
 
 
+
+# ---------------------------------------------------------------------------
+# x-gts-type-ref / x-gts-instance-ref evolution (README §9.6.1, ADR-0008)
+# ---------------------------------------------------------------------------
+
+_TYPE_REF = "x-gts-type-ref"
+_INSTANCE_REF = "x-gts-instance-ref"
+_COMPATIBLE = {"backward": "compatible", "forward": "compatible", "full": "compatible"}
+_INCOMPATIBLE = {
+    "backward": "incompatible",
+    "forward": "incompatible",
+    "full": "incompatible",
+}
+_WIDENING = {"backward": "compatible", "forward": "incompatible", "full": "incompatible"}
+_NARROWING = {"backward": "incompatible", "forward": "compatible", "full": "incompatible"}
+
+
+def _entity_ref_operands(api, dialect):
+    """Registered, valid operand targets, so no policy affects either schema."""
+    target = api.register("target", {"type": "object"}, dialect)
+    derived = api.register(
+        "derived",
+        {"type": "object", "allOf": [{"$ref": "gts://" + target}]},
+        dialect,
+        type_id=api.derived_type_id(target, "derived"),
+    )
+    pinned = api.register(
+        "target", {"type": "object"}, dialect, type_id=api.type_id("target", "1.0")
+    )
+    instance = api.register_instance(target, {}, validate=True)
+    api.request(
+        "POST",
+        "/entities",
+        params={"validate": "true"},
+        json={"id": instance + ".0", "type": target},
+    )
+    return {
+        "T": target,
+        "T*": target + "*",
+        "D": derived,
+        "T1.0": pinned,
+        "I": instance,
+        "I.0": instance + ".0",
+    }
+
+
+def _entity_ref_scope(spec, keyword, operands):
+    """Builds a property schema from a spec such as ("K", "T") or ("not", "K", "D").
+
+    "K" stands for the parametrized keyword; "union" accepts both kinds.
+    """
+    head, *rest = spec
+    if head == "not":
+        return {"not": _entity_ref_scope(tuple(rest), keyword, operands)}
+    if head == "union":
+        return {
+            "type": "string",
+            "anyOf": [
+                {_TYPE_REF: operands[rest[0]]},
+                {_INSTANCE_REF: operands[rest[0]]},
+            ],
+        }
+    return {"type": "string", (keyword if head == "K" else head): operands[rest[0]]}
+
+
+_ENTITY_REF_EVOLUTION = [
+    pytest.param(("K", "T"), ("K", "T"), _COMPATIBLE, id="equal"),
+    pytest.param(("K", "T"), ("K", "T*"), _COMPATIBLE, id="chain_wildcard_equal"),
+    pytest.param(("K", "T"), ("K", "D"), _NARROWING, id="derived_root_narrows"),
+    pytest.param(("K", "D"), ("K", "T"), _WIDENING, id="base_root_widens"),
+    pytest.param(("K", "T"), ("K", "T1.0"), _NARROWING, id="pinned_minor_narrows"),
+    pytest.param(("not", "K", "T"), ("not", "K", "D"), _WIDENING, id="negated_narrowing"),
+]
+
+
+@pytest.mark.parametrize("old_spec,new_spec,expected_verdicts", _ENTITY_REF_EVOLUTION)
+@pytest.mark.parametrize("keyword", [_TYPE_REF, _INSTANCE_REF])
+def test_entity_ref_evolution(
+    gts_api, schema_dialect, keyword, old_spec, new_spec, expected_verdicts
+):
+    """Isolated constraints compare kind-filtered scopes (README §9.6.1)."""
+    _check_entity_ref_evolution(
+        gts_api, schema_dialect, keyword, old_spec, new_spec, expected_verdicts, False
+    )
+
+
+@pytest.mark.parametrize(
+    "old_spec,new_spec,expected_verdicts,unknown_allowed",
+    [
+        pytest.param(
+            (_TYPE_REF, "T"), (_INSTANCE_REF, "T"), _INCOMPATIBLE, False,
+            id="type_to_instance",
+        ),
+        pytest.param(
+            (_INSTANCE_REF, "T"), (_TYPE_REF, "T"), _INCOMPATIBLE, False,
+            id="instance_to_type",
+        ),
+        pytest.param(
+            (_INSTANCE_REF, "I"), (_INSTANCE_REF, "I.0"), _NARROWING, False,
+            id="instance_operand_pinned_minor",
+        ),
+        pytest.param(
+            (_INSTANCE_REF, "I"), (_INSTANCE_REF, "T"), _WIDENING, False,
+            id="instance_operand_to_type_root",
+        ),
+        pytest.param(
+            ("union", "T"), (_TYPE_REF, "T"), _NARROWING, True,
+            id="union_to_type_only",
+        ),
+        pytest.param(
+            (_INSTANCE_REF, "T"), ("union", "T"), _WIDENING, True,
+            id="instance_only_to_union",
+        ),
+    ],
+)
+def test_entity_ref_kind_evolution(
+    gts_api, schema_dialect, old_spec, new_spec, expected_verdicts, unknown_allowed
+):
+    """Switching between nonempty type and instance scopes satisfies neither
+    inclusion; compositions may be reported `unknown`, never wrongly."""
+    _check_entity_ref_evolution(
+        gts_api, schema_dialect, None, old_spec, new_spec, expected_verdicts,
+        unknown_allowed,
+    )
+
+
+def _check_entity_ref_evolution(
+    api, dialect, keyword, old_spec, new_spec, expected_verdicts, unknown_allowed
+):
+    operands = _entity_ref_operands(api, dialect)
+    types = []
+    for name, version, spec in (("old", "1.0", old_spec), ("new", "1.1", new_spec)):
+        types.append(
+            api.register(
+                name,
+                {
+                    "type": "object",
+                    "required": ["ref"],
+                    "properties": {"ref": _entity_ref_scope(spec, keyword, operands)},
+                },
+                dialect,
+                type_id=api.type_id("evolution", version),
+            )
+        )
+    _check_compatibility(api, *types, expected_verdicts, unknown_allowed)
+
+
+@pytest.mark.parametrize(
+    "old_operand,new_operand,expected_verdicts",
+    [
+        # The v1.0 and v1.1 roots select disjoint scopes.
+        pytest.param("/$id", "/$id", _INCOMPATIBLE, id="both_self"),
+        pytest.param("new_type_id", "/$id", _COMPATIBLE, id="new_self_equals_literal"),
+        pytest.param("/$id", "old_type_id", _COMPATIBLE, id="old_self_equals_literal"),
+    ],
+)
+@pytest.mark.parametrize("keyword", [_TYPE_REF, _INSTANCE_REF])
+def test_entity_ref_evolution_resolves_each_self_reference(
+    gts_api, schema_dialect, keyword, old_operand, new_operand, expected_verdicts
+):
+    """`/$id` names the schema it is resolved for, on each side."""
+    api = gts_api
+    type_ids = {
+        "old_type_id": api.type_id("self", "1.0"),
+        "new_type_id": api.type_id("self", "1.1"),
+    }
+    types = [
+        api.register(
+            name,
+            {
+                "type": "object",
+                "required": ["ref"],
+                "properties": {
+                    "ref": {"type": "string", keyword: type_ids.get(operand, operand)},
+                },
+            },
+            schema_dialect,
+            type_id=type_ids[name + "_type_id"],
+            # A literal operand may name the other version, registered later.
+            mode="none",
+        )
+        for name, operand in (("old", old_operand), ("new", new_operand))
+    ]
+    _check_compatibility(api, *types, expected_verdicts)
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()

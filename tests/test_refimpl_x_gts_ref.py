@@ -1,4 +1,12 @@
-"""Tests for x-gts-ref matching, /$id semantics, and combinator traversal."""
+"""Tests for x-gts-type-ref / x-gts-instance-ref on concrete schemas.
+
+Each field uses the keyword matching the kind of its candidates. These cases
+cover combinator traversal, local references, arrays, and registry modes. §10
+matching itself (minor versions, segment and UUID boundaries) is covered by
+the shared corpus in test_x_gts_entity_ref.py; operand validity, candidate
+kind, selected-leaf `/$id`, and the removed `x-gts-ref` keyword are covered
+there too.
+"""
 
 import pytest
 
@@ -11,11 +19,11 @@ from httprunner import HttpRunner, Config, Step, RunRequest
 
 
 class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
-    """x-gts-ref: prefix enforcement and /$id self-reference."""
-    config = Config("x-gts-ref: prefix and self-ref").base_url(get_gts_base_url())
+    """entity reference: prefix enforcement and /$id self-reference."""
+    config = Config("entity reference: prefix and self-ref").base_url(get_gts_base_url())
 
     def test_start(self):
-        """Run x-gts-ref prefix and self-reference test steps."""
+        """Run entity reference prefix and self-reference test steps."""
         super().test_start()
 
     teststeps = [
@@ -29,7 +37,7 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
                 "type": "object",
                 "required": ["id", "description"],
                 "properties": {
-                    "id": {"type": "string", "x-gts-ref": "/$$id"},
+                    "id": {"type": "string", "x-gts-instance-ref": "/$$id"},
                     "description": {"type": "string"}
                 },
                 "additionalProperties": False
@@ -72,7 +80,7 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
         ),
         # Register a module schema that references capability IDs by prefix and enforces /$id on its own type field
         Step(
-            RunRequest("register module schema with x-gts-ref prefix and self-ref")
+            RunRequest("register module schema with entity reference prefix and self-ref")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref._.module.v1~",
@@ -80,11 +88,11 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
                 "type": "object",
                 "required": ["type", "id", "capabilities"],
                 "properties": {
-                    "type": {"type": "string", "x-gts-ref": "/$$id"},
+                    "type": {"type": "string", "x-gts-type-ref": "/$$id"},
                     "id": {"type": "string"},
                     "capabilities": {
                         "type": "array",
-                        "items": {"type": "string", "x-gts-ref": "gts.x.testref._.capability.v1~"},
+                        "items": {"type": "string", "x-gts-instance-ref": "gts.x.testref._.capability.v1~"},
                         "minItems": 0,
                         "uniqueItems": True
                     }
@@ -169,590 +177,12 @@ class TestCaseXGtsRef_PrefixAndSelfRef(HttpRunner):
     ]
 
 
-class TestCaseXGtsRef_ExactRefSegmentBoundary(HttpRunner):
-    """x-gts-ref: a concrete (non-wildcard, non-`~`) reference matches on a segment
-    boundary, not by raw string prefix.
-
-    A concrete instance constraint ``...thing.v1`` accepts any minor of major 1,
-    but rejects a textual superset such as ``...thing.v12``. A naive
-    ``value.startsWith(pattern)`` check leaks across the major-version boundary
-    and wrongly accepts an unrelated registered instance.
-    """
-
-    config = Config("x-gts-ref: exact ref segment boundary").base_url(
-        get_gts_base_url()
-    )
-
-    def test_start(self):
-        super().test_start()
-
-    teststeps = [
-        # Base type whose instances are referenced by an exact x-gts-ref.
-        Step(
-            RunRequest("register exact-ref target type")
-            .post("/entities")
-            .with_json({
-                "$$id": "gts://gts.x.refbound._.item.v1~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        # Two instances where one id is a textual prefix of the other (v1 vs v12).
-        Step(
-            RunRequest("register exact target instance v1")
-            .post("/entities")
-            .with_json({"id": "gts.x.refbound._.item.v1~x.vendor._.thing.v1"})
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register sibling target instance v12")
-            .post("/entities")
-            .with_json({"id": "gts.x.refbound._.item.v1~x.vendor._.thing.v12"})
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        # Holder schema constrains `ref` to this instance at major version 1.
-        Step(
-            RunRequest("register holder schema with exact instance ref")
-            .post("/entities")
-            .with_json({
-                "$$id": "gts://gts.x.refbound._.holder.v1~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "required": ["ref"],
-                "properties": {
-                    "id": {"type": "string"},
-                    "ref": {
-                        "type": "string",
-                        "x-gts-ref": "gts.x.refbound._.item.v1~x.vendor._.thing.v1",
-                    },
-                },
-                "additionalProperties": False,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        # Exact match -> valid.
-        Step(
-            RunRequest("register holder instance referencing exact v1")
-            .post("/entities")
-            .with_json({
-                "ref": "gts.x.refbound._.item.v1~x.vendor._.thing.v1",
-                "id": "gts.x.refbound._.holder.v1~x.vendor._.h1.v1",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            "gts.x.refbound._.holder.v1~x.vendor._.h1.v1",
-            True,
-            "exact instance reference must pass",
-        ),
-        # Prefix superset (v12) -> must be rejected on the segment boundary.
-        Step(
-            RunRequest("register holder instance referencing superset v12")
-            .post("/entities")
-            .with_json({
-                "ref": "gts.x.refbound._.item.v1~x.vendor._.thing.v12",
-                "id": "gts.x.refbound._.holder.v1~x.vendor._.h2.v1",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            "gts.x.refbound._.holder.v1~x.vendor._.h2.v1",
-            False,
-            "prefix-superset reference must fail (segment boundary)",
-        ),
-    ]
-
-
-class TestCaseXGtsRef_UnsupportedPointers(HttpRunner):
-    """Every slash-prefixed x-gts-ref operand except /$id is prohibited."""
-
-    config = Config("x-gts-ref: reject unsupported pointers").base_url(
-        get_gts_base_url()
-    )
-
-    def test_start(self):
-        super().test_start()
-
-    teststeps = [
-        Step(
-            RunRequest("reject pointer to a concrete GTS const")
-            .post("/entities")
-            .with_json({
-                "$$id": "gts://gts.x.testref_pointer._.const.v1~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {
-                    "anchor": {
-                        "type": "string",
-                        "const": "gts.x.testref_pointer._.target.v1~",
-                    },
-                    "ref": {
-                        "type": "string",
-                        "x-gts-ref": "/properties/anchor/const",
-                    },
-                },
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-        ),
-        Step(
-            RunRequest("reject pointer chaining even when reference checks are disabled")
-            .post("/entities?validate=true&gts-ref-validation=none")
-            .with_json({
-                "$$id": "gts://gts.x.testref_pointer._.chain.v1~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {
-                    "anchor": {"type": "string", "x-gts-ref": "/$$id"},
-                    "ref": {
-                        "type": "string",
-                        "x-gts-ref": "/properties/anchor",
-                    },
-                },
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-        ),
-    ]
-
-
-class TestCaseXGtsRef_SelectedLeafSelfRef(HttpRunner):
-    """/$id remains rooted at the selected leaf through schema composition."""
-
-    config = Config("x-gts-ref: /$$id uses derived type schema id").base_url(
-        get_gts_base_url()
-    )
-
-    def test_start(self):
-        super().test_start()
-
-    base_id = "gts.x.testref_selfref._.document.v1~"
-    derived_id = base_id + "x.testref_selfref._.invoice.v1~"
-    sibling_id = base_id + "x.testref_selfref._.credit_note.v1~"
-    further_id = derived_id + "x.testref_selfref._.priority_invoice.v1~"
-    no_ref_id = base_id + "x.testref_selfref._.standalone.v1~"
-    referenced_instance_id = derived_id + "x.testref_selfref._.invoice_001.v1"
-    further_instance_id = further_id + "x.testref_selfref._.priority_001.v1"
-
-    teststeps = [
-        Step(
-            RunRequest("register base with /$id constraint")
-            .post("/entities")
-            .with_json({
-                "$$id": f"gts://{base_id}",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "required": ["id", "entityRef"],
-                "properties": {
-                    "id": {"type": "string"},
-                    "entityRef": {"type": "string", "x-gts-ref": "/$$id"},
-                },
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register derived selected leaf")
-            .post("/entities")
-            .with_json({
-                "$$id": f"gts://{derived_id}",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "allOf": [{"$$ref": f"gts://{base_id}"}],
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register sibling type")
-            .post("/entities")
-            .with_json({
-                "$$id": f"gts://{sibling_id}",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "allOf": [{"$$ref": f"gts://{base_id}"}],
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register referenced instance of selected leaf")
-            .post("/entities")
-            .with_json({
-                "id": referenced_instance_id,
-                "entityRef": derived_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register selected leaf instance referring to leaf type")
-            .post("/entities")
-            .with_json({
-                "id": derived_id + "x.testref_selfref._.type_ref.v1",
-                "entityRef": derived_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            derived_id + "x.testref_selfref._.type_ref.v1",
-            True,
-            "accept selected leaf type under inherited /$id",
-        ),
-        Step(
-            RunRequest("register selected leaf instance referring to leaf instance")
-            .post("/entities")
-            .with_json({
-                "id": derived_id + "x.testref_selfref._.instance_ref.v1",
-                "entityRef": referenced_instance_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            derived_id + "x.testref_selfref._.instance_ref.v1",
-            True,
-            "accept instance rooted at selected leaf under inherited /$id",
-        ),
-        Step(
-            RunRequest("register selected leaf instance referring to base")
-            .post("/entities")
-            .with_json({
-                "id": derived_id + "x.testref_selfref._.base_ref.v1",
-                "entityRef": base_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            derived_id + "x.testref_selfref._.base_ref.v1",
-            False,
-            "reject base type because /$id is rebound to selected leaf",
-        ),
-        Step(
-            RunRequest("register selected leaf instance referring to sibling")
-            .post("/entities")
-            .with_json({
-                "id": derived_id + "x.testref_selfref._.sibling_ref.v1",
-                "entityRef": sibling_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            derived_id + "x.testref_selfref._.sibling_ref.v1",
-            False,
-            "reject sibling type under selected-leaf /$id",
-        ),
-        Step(
-            RunRequest("register selected leaf instance with malformed reference")
-            .post("/entities")
-            .with_json({
-                "id": derived_id + "x.testref_selfref._.malformed_ref.v1",
-                "entityRef": "not-a-gts-id",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            derived_id + "x.testref_selfref._.malformed_ref.v1",
-            False,
-            "reject malformed identifier under inherited /$id",
-        ),
-        Step(
-            RunRequest("register type further derived from selected leaf")
-            .post("/entities")
-            .with_json({
-                "$$id": f"gts://{further_id}",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "allOf": [{"$$ref": f"gts://{derived_id}"}],
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register instance of further-derived type")
-            .post("/entities")
-            .with_json({
-                "id": further_instance_id,
-                "entityRef": further_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            further_instance_id,
-            True,
-            "accept further-derived instance rooted at its selected leaf",
-        ),
-        Step(
-            RunRequest("register invoice referring to further-derived type")
-            .post("/entities")
-            .with_json({
-                "id": derived_id + "x.testref_selfref._.further_type_ref.v1",
-                "entityRef": further_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            derived_id + "x.testref_selfref._.further_type_ref.v1",
-            True,
-            "accept further-derived type under invoice-rooted /$id",
-        ),
-        Step(
-            RunRequest("register invoice referring to further-derived instance")
-            .post("/entities")
-            .with_json({
-                "id": derived_id + "x.testref_selfref._.further_instance_ref.v1",
-                "entityRef": further_instance_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            derived_id + "x.testref_selfref._.further_instance_ref.v1",
-            True,
-            "accept further-derived instance under invoice-rooted /$id",
-        ),
-        Step(
-            RunRequest("register further-derived instance referring to ancestor")
-            .post("/entities")
-            .with_json({
-                "id": further_id + "x.testref_selfref._.ancestor_ref.v1",
-                "entityRef": derived_id,
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            further_id + "x.testref_selfref._.ancestor_ref.v1",
-            False,
-            "reject ancestor when /$id is rebound to further-derived leaf",
-        ),
-        Step(
-            RunRequest("register chained type without authored schema reference")
-            .post("/entities")
-            .with_json({
-                "$$id": f"gts://{no_ref_id}",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "required": ["id", "entityRef"],
-                "properties": {
-                    "id": {"type": "string"},
-                    "entityRef": {"type": "string"},
-                },
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register standalone chained instance with arbitrary string")
-            .post("/entities")
-            .with_json({
-                "id": no_ref_id + "x.testref_selfref._.arbitrary.v1",
-                "entityRef": "not-a-gts-id",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            no_ref_id + "x.testref_selfref._.arbitrary.v1",
-            True,
-            "do not import /$id through chained identifier alone",
-        ),
-        Step(
-            RunRequest("register schema with inline composed /$id constraint")
-            .post("/entities")
-            .with_json({
-                "$$id": "gts://gts.x.testref_selfref._.inline.v1~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "allOf": [{
-                    "type": "object",
-                    "required": ["id", "entityRef"],
-                    "properties": {
-                        "id": {"type": "string"},
-                        "entityRef": {"type": "string", "x-gts-ref": "/$$id"},
-                    },
-                }],
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        Step(
-            RunRequest("register inline composed self reference instance")
-            .post("/entities")
-            .with_json({
-                "id": (
-                    "gts.x.testref_selfref._.inline.v1~"
-                    "x.testref_selfref._.self.v1"
-                ),
-                "entityRef": "gts.x.testref_selfref._.inline.v1~",
-            })
-            .validate()
-            .assert_equal("status_code", 200)
-        ),
-        _validate_instance(
-            (
-                "gts.x.testref_selfref._.inline.v1~"
-                "x.testref_selfref._.self.v1"
-            ),
-            True,
-            "accept inline allOf /$id rooted at outer selected schema",
-        ),
-    ]
-
-
-class TestCaseXGtsRef_WrongGtsFormat(HttpRunner):
-    """x-gts-ref: malformed GTS ID"""
-    config = Config("x-gts-ref: malformed GTS ID").base_url(get_gts_base_url())
-
-    def test_start(self):
-        """Run x-gts-ref malformed GTS ID test steps."""
-        super().test_start()
-
-    teststeps = [
-        # Register schema with malformed x-gts-ref, test 1
-        Step(
-            RunRequest("register pointer schema")
-            .post("/entities?validation=true")
-            .with_json({
-                "$$id": "gts://gts.x.testref_malformed._.pointer.v1~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "title": "PTR-TITLE",
-                "description": "PTR-DESC",
-                "type": "object",
-                "properties": {
-                    "id": {"type": "string", "x-gts-ref": "gts.x.y.z"},
-                },
-                "required": ["id"],
-                "additionalProperties": False
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-            .assert_contains("body.error", "Invalid GTS identifier: gts.x.y.z")
-        ),
-        # Register schema with malformed x-gts-ref, test 2
-        Step(
-            RunRequest("register pointer schema")
-            .post("/entities?validation=true")
-            .with_json({
-                "$$id": "gts://gts.x.testref_malformed._.pointer.v2~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "title": "PTR-TITLE",
-                "description": "PTR-DESC",
-                "type": "object",
-                "properties": {
-                    "id": {"type": "string", "x-gts-ref": "a.b.c"},
-                },
-                "required": ["id"],
-                "additionalProperties": False
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-            .assert_contains("body.error", "x-gts-ref validation failed")
-            .assert_contains("body.error", "a.b.c")
-        ),
-        # Reject unsupported pointer even when its target is not a GTS ID
-        Step(
-            RunRequest("register pointer schema")
-            .post("/entities?validation=true")
-            .with_json({
-                "$$id": "gts://gts.x.testref_malformed._.pointer.v3~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "title": "PTR-TITLE",
-                "description": "PTR-DESC",
-                "type": "object",
-                "properties": {
-                    "some": {"type": "string", "const": "a.b.c"},
-                    "id": {"type": "string", "x-gts-ref": "/properties/some/const"},
-                },
-                "required": ["id"],
-                "additionalProperties": False
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-        ),
-        # Pointer syntax is rejected during registration without validation
-        Step(
-            RunRequest("register pointer schema")
-            .post("/entities")
-            .with_json({
-                "$$id": "gts://gts.x.testref_malformed._.pointer.v4~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "title": "PTR-TITLE",
-                "description": "PTR-DESC",
-                "type": "object",
-                "properties": {
-                    "some": {"type": "string", "const": "a.b.c"},
-                    "id": {"type": "string", "x-gts-ref": "/properties/some/const"},
-                },
-                "required": ["id"],
-                "additionalProperties": False
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-        ),
-        Step(
-            RunRequest("reject legacy dot-slash x-gts-ref pointer")
-            .post("/entities?validation=true")
-            .with_json({
-                "$$id": "gts://gts.x.testref_malformed._.pointer.v6~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "type": "object",
-                "properties": {
-                    "id": {"type": "string", "x-gts-ref": "./$$id"},
-                },
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-        ),
-        # Reject unsupported pointer even when it resolves to a valid GTS ID
-        Step(
-            RunRequest("register pointer schema")
-            .post("/entities?validation=true")
-            .with_json({
-                "$$id": "gts://gts.x.testref_malformed._.pointer.v5~",
-                "$$schema": "http://json-schema.org/draft-07/schema#",
-                "title": "PTR-TITLE",
-                "description": "PTR-DESC",
-                "type": "object",
-                "properties": {
-                    "some": {"type": "string", "const": "gts.x.testref_malformed._.pointer.v5~"},
-                    "id": {"type": "string", "x-gts-ref": "/properties/some/const"},
-                },
-                "required": ["id"],
-                "additionalProperties": False
-            })
-            .validate()
-            .assert_equal("status_code", 422)
-            .assert_equal("body.ok", False)
-        ),
-    ]
-
 class TestCaseXGtsRef_OneOf(HttpRunner):
-    """x-gts-ref: oneOf combinator - exactly one branch must match"""
-    config = Config("x-gts-ref: oneOf combinator").base_url(get_gts_base_url())
+    """x-gts-instance-ref: oneOf combinator - exactly one branch must match"""
+    config = Config("x-gts-instance-ref: oneOf combinator").base_url(get_gts_base_url())
 
     def test_start(self):
-        """Run x-gts-ref oneOf combinator test steps."""
+        """Run x-gts-instance-ref oneOf combinator test steps."""
         super().test_start()
 
     teststeps = [
@@ -837,8 +267,8 @@ class TestCaseXGtsRef_OneOf(HttpRunner):
                     "ref": {
                         "type": "string",
                         "oneOf": [
-                            {"x-gts-ref": "gts.x.testref_comb._.target_a.v1~"},
-                            {"x-gts-ref": "gts.x.testref_comb._.target_b.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_a.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_b.v1~"},
                         ]
                     }
                 },
@@ -924,8 +354,8 @@ class TestCaseXGtsRef_OneOf(HttpRunner):
                     "ref": {
                         "type": "string",
                         "oneOf": [
-                            {"x-gts-ref": "gts.x.testref_comb.*"},
-                            {"x-gts-ref": "gts.x.testref_comb._.target_a.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb.*"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_a.v1~"},
                         ]
                     }
                 },
@@ -958,18 +388,18 @@ class TestCaseXGtsRef_OneOf(HttpRunner):
 
 
 class TestCaseXGtsRef_OneOfSharedStructuralKeywords(HttpRunner):
-    """x-gts-ref: oneOf branches that share structural keywords and differ only
-    by x-gts-ref must still validate.
+    """x-gts-instance-ref: oneOf branches that share structural keywords and differ only
+    by x-gts-instance-ref must still validate.
 
-    The JSON Schema engine does not see x-gts-ref (its exclusivity is enforced
-    separately). Branches like ``{"type":"string","x-gts-ref":"...a~"}`` and
-    ``{"type":"string","x-gts-ref":"...b~"}`` are structurally identical once
-    x-gts-ref is set aside, so an implementation that hands the raw oneOf to a
+    The JSON Schema engine does not see x-gts-instance-ref (its exclusivity is enforced
+    separately). Branches like ``{"type":"string","x-gts-instance-ref":"...a~"}`` and
+    ``{"type":"string","x-gts-instance-ref":"...b~"}`` are structurally identical once
+    x-gts-instance-ref is set aside, so an implementation that hands the raw oneOf to a
     structural validator sees *every* string match *both* branches and rejects
     every value. A reference to a valid target must pass.
     """
 
-    config = Config("x-gts-ref: oneOf shared structural keywords").base_url(
+    config = Config("x-gts-instance-ref: oneOf shared structural keywords").base_url(
         get_gts_base_url()
     )
 
@@ -1013,7 +443,7 @@ class TestCaseXGtsRef_OneOfSharedStructuralKeywords(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        # oneOf branches share `type: string` and differ only by x-gts-ref.
+        # oneOf branches share `type: string` and differ only by x-gts-instance-ref.
         Step(
             RunRequest("register oneOf schema with shared structural keywords")
             .post("/entities")
@@ -1027,8 +457,8 @@ class TestCaseXGtsRef_OneOfSharedStructuralKeywords(HttpRunner):
                     "ref": {
                         "type": "string",
                         "oneOf": [
-                            {"type": "string", "x-gts-ref": "gts.x.testref_shared._.target_a.v1~"},
-                            {"type": "string", "x-gts-ref": "gts.x.testref_shared._.target_b.v1~"},
+                            {"type": "string", "x-gts-instance-ref": "gts.x.testref_shared._.target_a.v1~"},
+                            {"type": "string", "x-gts-instance-ref": "gts.x.testref_shared._.target_b.v1~"},
                         ],
                     },
                 },
@@ -1073,11 +503,11 @@ class TestCaseXGtsRef_OneOfSharedStructuralKeywords(HttpRunner):
 
 
 class TestCaseXGtsRef_AnyOf(HttpRunner):
-    """x-gts-ref: anyOf combinator - at least one branch must match"""
-    config = Config("x-gts-ref: anyOf combinator").base_url(get_gts_base_url())
+    """x-gts-instance-ref: anyOf combinator - at least one branch must match"""
+    config = Config("x-gts-instance-ref: anyOf combinator").base_url(get_gts_base_url())
 
     def test_start(self):
-        """Run x-gts-ref anyOf combinator test steps."""
+        """Run x-gts-instance-ref anyOf combinator test steps."""
         super().test_start()
 
     teststeps = [
@@ -1160,8 +590,8 @@ class TestCaseXGtsRef_AnyOf(HttpRunner):
                     "ref": {
                         "type": "string",
                         "anyOf": [
-                            {"x-gts-ref": "gts.x.testref_comb._.target_a.v1~"},
-                            {"x-gts-ref": "gts.x.testref_comb._.target_b.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_a.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_b.v1~"},
                         ]
                     }
                 },
@@ -1216,11 +646,11 @@ class TestCaseXGtsRef_AnyOf(HttpRunner):
 
 
 class TestCaseXGtsRef_AllOf(HttpRunner):
-    """x-gts-ref: allOf combinator - all branches must match"""
-    config = Config("x-gts-ref: allOf combinator").base_url(get_gts_base_url())
+    """x-gts-instance-ref: allOf combinator - all branches must match"""
+    config = Config("x-gts-instance-ref: allOf combinator").base_url(get_gts_base_url())
 
     def test_start(self):
-        """Run x-gts-ref allOf combinator test steps."""
+        """Run x-gts-instance-ref allOf combinator test steps."""
         super().test_start()
 
     teststeps = [
@@ -1273,7 +703,7 @@ class TestCaseXGtsRef_AllOf(HttpRunner):
                     "ref": {
                         "type": "string",
                         "allOf": [
-                            {"x-gts-ref": "gts.x.testref_comb._.target_a.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_a.v1~"},
                         ]
                     }
                 },
@@ -1319,8 +749,8 @@ class TestCaseXGtsRef_AllOf(HttpRunner):
                     "ref": {
                         "type": "string",
                         "allOf": [
-                            {"x-gts-ref": "gts.x.testref_comb._.target_a.v1~"},
-                            {"x-gts-ref": "gts.x.testref_comb._.target_b.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_a.v1~"},
+                            {"x-gts-instance-ref": "gts.x.testref_comb._.target_b.v1~"},
                         ]
                     }
                 },
@@ -1354,11 +784,11 @@ class TestCaseXGtsRef_AllOf(HttpRunner):
 
 
 class TestCaseXGtsRef_NestedCombinators(HttpRunner):
-    """x-gts-ref: nested combinators - allOf wrapping oneOf"""
-    config = Config("x-gts-ref: nested combinators").base_url(get_gts_base_url())
+    """x-gts-instance-ref: nested combinators - allOf wrapping oneOf"""
+    config = Config("x-gts-instance-ref: nested combinators").base_url(get_gts_base_url())
 
     def test_start(self):
-        """Run x-gts-ref nested combinator test steps."""
+        """Run x-gts-instance-ref nested combinator test steps."""
         super().test_start()
 
     teststeps = [
@@ -1433,8 +863,8 @@ class TestCaseXGtsRef_NestedCombinators(HttpRunner):
                         "allOf": [
                             {
                                 "oneOf": [
-                                    {"x-gts-ref": "gts.x.testref_comb._.target_a.v1~"},
-                                    {"x-gts-ref": "gts.x.testref_comb._.target_b.v1~"},
+                                    {"x-gts-instance-ref": "gts.x.testref_comb._.target_a.v1~"},
+                                    {"x-gts-instance-ref": "gts.x.testref_comb._.target_b.v1~"},
                                 ]
                             }
                         ]
@@ -1491,7 +921,7 @@ class TestCaseXGtsRef_NestedCombinators(HttpRunner):
 
 
 class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
-    config = Config("x-gts-ref: implicit object and local refs").base_url(
+    config = Config("x-gts-instance-ref: implicit object and local refs").base_url(
         get_gts_base_url()
     )
 
@@ -1511,7 +941,7 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
             .assert_equal("status_code", 200)
         ),
         Step(
-            RunRequest("register implicit object x-gts-ref schema")
+            RunRequest("register implicit object x-gts-instance-ref schema")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_implicit._.holder.v1~",
@@ -1521,7 +951,7 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
                     "id": {"type": "string"},
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_implicit._.target.v1~",
+                        "x-gts-instance-ref": "gts.x.testref_implicit._.target.v1~",
                     },
                 },
                 "additionalProperties": False,
@@ -1567,7 +997,7 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
             .assert_equal("status_code", 200)
         ),
         Step(
-            RunRequest("register local ref x-gts-ref schema")
+            RunRequest("register local ref x-gts-instance-ref schema")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_local._.holder.v1~",
@@ -1581,7 +1011,7 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
                 "definitions": {
                     "TargetRef": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_local._.target.v1~",
+                        "x-gts-instance-ref": "gts.x.testref_local._.target.v1~",
                     },
                 },
                 "additionalProperties": False,
@@ -1619,7 +1049,7 @@ class TestCaseXGtsRef_ImplicitObjectAndLocalRef(HttpRunner):
 
 
 class TestCaseXGtsRef_LocalRefMissingTarget(HttpRunner):
-    config = Config("x-gts-ref: local ref missing target").base_url(get_gts_base_url())
+    config = Config("x-gts-instance-ref: local ref missing target").base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
@@ -1640,7 +1070,7 @@ class TestCaseXGtsRef_LocalRefMissingTarget(HttpRunner):
                 "definitions": {
                     "TargetRef": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_local_missing._.target.v1~",
+                        "x-gts-instance-ref": "gts.x.testref_local_missing._.target.v1~",
                     },
                 },
                 "additionalProperties": False,
@@ -1657,7 +1087,7 @@ class TestCaseXGtsRef_LocalRefMissingTarget(HttpRunner):
 
 
 class TestCaseXGtsRef_AnnotationDataIgnored(HttpRunner):
-    config = Config("x-gts-ref: annotation data is not a subschema").base_url(
+    config = Config("entity reference: annotation data is not a subschema").base_url(
         get_gts_base_url()
     )
 
@@ -1666,7 +1096,7 @@ class TestCaseXGtsRef_AnnotationDataIgnored(HttpRunner):
 
     teststeps = [
         Step(
-            RunRequest("register schema with x-gts-ref-shaped annotation data")
+            RunRequest("register schema with reference-keyword-shaped annotation data")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_annotation._.holder.v1~",
@@ -1675,11 +1105,18 @@ class TestCaseXGtsRef_AnnotationDataIgnored(HttpRunner):
                 "properties": {
                     "payload": {
                         "type": "object",
-                        "default": {"x-gts-ref": "not-a-gts-id"},
-                        "const": {
-                            "x-gts-ref": "gts.x.testref_annotation._.missing.v1~"
+                        "default": {
+                            "x-gts-type-ref": "not-a-gts-id",
+                            "x-gts-ref": "not-a-gts-id",
                         },
-                        "examples": [{"x-gts-ref": 42}],
+                        "const": {
+                            "x-gts-instance-ref": (
+                                "gts.x.testref_annotation._.missing.v1~"
+                            ),
+                        },
+                        "examples": [
+                            {"x-gts-type-ref": 42, "x-gts-instance-ref": 42},
+                        ],
                     },
                 },
             })
@@ -1689,13 +1126,13 @@ class TestCaseXGtsRef_AnnotationDataIgnored(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_annotation._.holder.v1~",
             True,
-            "accept x-gts-ref-shaped values in annotation data",
+            "accept reference-keyword-shaped values in annotation data",
         ),
     ]
 
 
 class TestCaseXGtsRef_PropertyNamedKeyword(HttpRunner):
-    config = Config("x-gts-ref: property named like the keyword").base_url(
+    config = Config("entity reference: property named like the keyword").base_url(
         get_gts_base_url()
     )
 
@@ -1704,16 +1141,17 @@ class TestCaseXGtsRef_PropertyNamedKeyword(HttpRunner):
 
     teststeps = [
         Step(
-            RunRequest("register schema with a property named x-gts-ref")
+            RunRequest("register schema with properties named like reference keywords")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_property_name._.holder.v1~",
                 "$$schema": "http://json-schema.org/draft-07/schema#",
                 "type": "object",
                 "properties": {
-                    "x-gts-ref": {
+                    "x-gts-ref": {"type": "string"},
+                    "x-gts-type-ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_property_name._.missing.v1~",
+                        "x-gts-instance-ref": "gts.x.testref_property_name._.missing.v1~",
                     },
                 },
             })
@@ -1723,7 +1161,7 @@ class TestCaseXGtsRef_PropertyNamedKeyword(HttpRunner):
         _validate_type_schema(
             "gts.x.testref_property_name._.holder.v1~",
             False,
-            "reject missing target under a property named x-gts-ref",
+            "reject missing target under a property named x-gts-type-ref",
         ),
     ]
 
@@ -1733,9 +1171,9 @@ class TestCaseXGtsRef_RootLocalReference(HttpRunner):
 
     Existing local-reference coverage uses ``#/...`` pointers into a
     subschema. This case is distinct: a recursive child points to the root
-    document itself, and the nested ``x-gts-ref`` must still be validated.
+    document itself, and the nested ``x-gts-instance-ref`` must still be validated.
     """
-    config = Config("x-gts-ref: root local reference").base_url(get_gts_base_url())
+    config = Config("x-gts-instance-ref: root local reference").base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
@@ -1763,7 +1201,7 @@ class TestCaseXGtsRef_RootLocalReference(HttpRunner):
                     "id": {"type": "string"},
                     "link": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_root._.target.v1~",
+                        "x-gts-instance-ref": "gts.x.testref_root._.target.v1~",
                     },
                     "child": {"$$ref": "#"},
                 },
@@ -1797,14 +1235,14 @@ class TestCaseXGtsRef_RootLocalReference(HttpRunner):
 
 
 class TestCaseXGtsRef_WildcardPattern(HttpRunner):
-    """x-gts-ref: arbitrary wildcard patterns (not just ``gts.*``).
+    """x-gts-instance-ref: arbitrary wildcard patterns (not just ``gts.*``).
 
     §9.6.1: the constraint value may be any well-formed GTS wildcard pattern
     (§10), e.g. ``gts.x.testref_wild.am.*``. The field value must be a
     syntactically valid GTS id that matches the pattern. Registry presence and
     target validity then follow the selected gts-ref-validation mode.
     """
-    config = Config("x-gts-ref: arbitrary wildcard pattern").base_url(get_gts_base_url())
+    config = Config("x-gts-instance-ref: arbitrary wildcard pattern").base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
@@ -1848,7 +1286,7 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
         ),
         # Holder schema: ref constrained by the wildcard family pattern.
         Step(
-            RunRequest("register holder schema with wildcard x-gts-ref")
+            RunRequest("register holder schema with wildcard x-gts-instance-ref")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_wild._.holder.v1~",
@@ -1859,7 +1297,7 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
                     "id": {"type": "string"},
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_wild.am.*",
+                        "x-gts-instance-ref": "gts.x.testref_wild.am.*",
                     },
                 },
                 "additionalProperties": False,
@@ -1959,13 +1397,13 @@ class TestCaseXGtsRef_WildcardPattern(HttpRunner):
 
 
 class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
-    """x-gts-ref: ``...v1~*`` wildcard covers the base type and its descendants.
+    """x-gts-type-ref: ``...v1~*`` wildcard covers the base type and its descendants.
 
     Per §3.5/§10, ``gts....stream.v1~*`` matches the type ``...stream.v1~``
     itself as well as any entity derived from it. Registry lookup and target
     validity follow the selected gts-ref-validation mode.
     """
-    config = Config("x-gts-ref: tilde wildcard pattern").base_url(get_gts_base_url())
+    config = Config("x-gts-type-ref: tilde wildcard pattern").base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
@@ -1998,7 +1436,7 @@ class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
         ),
         # Holder schema constrained by the ~* wildcard.
         Step(
-            RunRequest("register holder schema with tilde wildcard x-gts-ref")
+            RunRequest("register holder schema with tilde wildcard x-gts-type-ref")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_wild.events.streamholder.v1~",
@@ -2009,7 +1447,7 @@ class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
                     "id": {"type": "string"},
                     "streamRef": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_wild.events.stream.v1~*",
+                        "x-gts-type-ref": "gts.x.testref_wild.events.stream.v1~*",
                     },
                 },
                 "additionalProperties": False,
@@ -2084,7 +1522,7 @@ class TestCaseXGtsRef_TildeWildcardPattern(HttpRunner):
 
 
 class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
-    config = Config("x-gts-ref: referenced instance validation modes").base_url(
+    config = Config("x-gts-instance-ref: referenced instance validation modes").base_url(
         get_gts_base_url()
     )
 
@@ -2093,7 +1531,7 @@ class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
 
     teststeps = [
         Step(
-            RunRequest("register x-gts-ref target type")
+            RunRequest("register x-gts-instance-ref target type")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_validity._.target.v1~",
@@ -2109,7 +1547,7 @@ class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
             .assert_equal("status_code", 200)
         ),
         Step(
-            RunRequest("register invalid x-gts-ref target instance")
+            RunRequest("register invalid x-gts-instance-ref target instance")
             .post("/entities")
             .with_json({
                 "id": "gts.x.testref_validity._.target.v1~x.vendor._.invalid.v1",
@@ -2118,7 +1556,7 @@ class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
             .assert_equal("status_code", 200)
         ),
         Step(
-            RunRequest("validate x-gts-ref target instance")
+            RunRequest("validate x-gts-instance-ref target instance")
             .post("/validate-instance")
             .with_json({
                 "instance_id": (
@@ -2131,7 +1569,7 @@ class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
             .assert_equal("body.ok", False)
         ),
         Step(
-            RunRequest("register x-gts-ref holder type")
+            RunRequest("register x-gts-instance-ref holder type")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_validity._.holder.v1~",
@@ -2142,7 +1580,7 @@ class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
                     "id": {"type": "string"},
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_validity._.target.v1~",
+                        "x-gts-instance-ref": "gts.x.testref_validity._.target.v1~",
                     },
                 },
             })
@@ -2191,7 +1629,7 @@ class TestCaseXGtsRef_ReferencedInstanceValidationModes(HttpRunner):
 
 
 class TestCaseXGtsRef_ConstraintValidationModes(HttpRunner):
-    config = Config("x-gts-ref: constraint validation modes").base_url(
+    config = Config("x-gts-instance-ref: constraint validation modes").base_url(
         get_gts_base_url()
     )
 
@@ -2200,7 +1638,7 @@ class TestCaseXGtsRef_ConstraintValidationModes(HttpRunner):
 
     teststeps = [
         Step(
-            RunRequest("register invalid x-gts-ref constraint type")
+            RunRequest("register invalid x-gts-instance-ref constraint type")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_constraint._.target.v1~",
@@ -2216,7 +1654,7 @@ class TestCaseXGtsRef_ConstraintValidationModes(HttpRunner):
             .assert_equal("status_code", 200)
         ),
         Step(
-            RunRequest("register holder using invalid x-gts-ref constraint type")
+            RunRequest("register holder using invalid x-gts-instance-ref constraint type")
             .post("/entities")
             .with_json({
                 "$$id": "gts://gts.x.testref_constraint._.holder.v1~",
@@ -2225,7 +1663,7 @@ class TestCaseXGtsRef_ConstraintValidationModes(HttpRunner):
                 "properties": {
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_constraint._.target.v1~",
+                        "x-gts-instance-ref": "gts.x.testref_constraint._.target.v1~",
                     },
                 },
             })
@@ -2264,7 +1702,7 @@ class TestCaseXGtsRef_ConstraintValidationModes(HttpRunner):
 
 
 class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
-    config = Config("x-gts-ref wildcard validation modes").base_url(
+    config = Config("x-gts-instance-ref wildcard validation modes").base_url(
         get_gts_base_url()
     )
 
@@ -2282,7 +1720,7 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
                 "properties": {
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_wildpresence.empty.*",
+                        "x-gts-instance-ref": "gts.x.testref_wildpresence.empty.*",
                     },
                 },
             })
@@ -2357,7 +1795,7 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
                     "id": {"type": "string"},
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_wildvalidity.target.*",
+                        "x-gts-instance-ref": "gts.x.testref_wildvalidity.target.*",
                     },
                 },
             })
@@ -2382,6 +1820,8 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
             "any-valid mode rejects wildcard with only invalid registered matches",
             gts_ref_validation="any-valid",
         ),
+        # The only valid registered match is a Type ID. It witnesses the
+        # instance-reference wildcard operand: operand lookup ignores kind.
         Step(
             RunRequest("register valid wildcard target type")
             .post("/entities")
@@ -2442,7 +1882,7 @@ class TestCaseXGtsRef_WildcardValidationModes(HttpRunner):
 
 
 class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
-    config = Config("x-gts-ref registration validation modes").base_url(
+    config = Config("x-gts-type-ref registration validation modes").base_url(
         get_gts_base_url()
     )
 
@@ -2476,7 +1916,7 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
                 "properties": {
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_regmode._.missing.v1~",
+                        "x-gts-type-ref": "gts.x.testref_regmode._.missing.v1~",
                     },
                 },
             })
@@ -2494,7 +1934,7 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
                 "properties": {
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_regmode._.missing.v1~",
+                        "x-gts-type-ref": "gts.x.testref_regmode._.missing.v1~",
                     },
                 },
             })
@@ -2512,7 +1952,7 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
                 "properties": {
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_regmode._.target.v1~",
+                        "x-gts-type-ref": "gts.x.testref_regmode._.target.v1~",
                     },
                 },
             })
@@ -2530,7 +1970,7 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
                 "properties": {
                     "ref": {
                         "type": "string",
-                        "x-gts-ref": "gts.x.testref_regmode._.target.v1~",
+                        "x-gts-type-ref": "gts.x.testref_regmode._.target.v1~",
                     },
                 },
             })
@@ -2549,7 +1989,7 @@ class TestCaseXGtsRef_RegistrationValidationModes(HttpRunner):
 
 
 class TestCaseXGtsRef_TupleAdditionalItems(HttpRunner):
-    config = Config("x-gts-ref: Draft-07 tuple additionalItems").base_url(
+    config = Config("x-gts-instance-ref: Draft-07 tuple additionalItems").base_url(
         get_gts_base_url()
     )
 
@@ -2596,7 +2036,7 @@ class TestCaseXGtsRef_TupleAdditionalItems(HttpRunner):
                         "items": [{"type": "string"}],
                         "additionalItems": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.testref_tuple._.target.v1~",
+                            "x-gts-instance-ref": "gts.x.testref_tuple._.target.v1~",
                         },
                     },
                 },
@@ -2656,7 +2096,7 @@ class TestCaseXGtsRef_TupleAdditionalItems(HttpRunner):
                 "items": [{"type": "string"}],
                 "additionalItems": {
                     "type": "string",
-                    "x-gts-ref": "gts.x.testref_tuple._.missing_target.v1~",
+                    "x-gts-instance-ref": "gts.x.testref_tuple._.missing_target.v1~",
                 },
             })
             .validate()
@@ -2671,7 +2111,7 @@ class TestCaseXGtsRef_TupleAdditionalItems(HttpRunner):
 
 
 class TestCaseXGtsRef_PrefixItems(HttpRunner):
-    config = Config("x-gts-ref: Draft 2020-12 prefixItems").base_url(
+    config = Config("x-gts-instance-ref: Draft 2020-12 prefixItems").base_url(
         get_gts_base_url()
     )
 
@@ -2718,7 +2158,7 @@ class TestCaseXGtsRef_PrefixItems(HttpRunner):
                         "prefixItems": [{"type": "string"}],
                         "items": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.testref_prefixitems._.target.v1~",
+                            "x-gts-instance-ref": "gts.x.testref_prefixitems._.target.v1~",
                         },
                     },
                 },
@@ -2789,27 +2229,27 @@ class TestCaseXGtsRef_PrefixItems(HttpRunner):
 
 
 class TestCaseXGtsRef_NullableReference(HttpRunner):
-    """x-gts-ref: nullable reference via a combinator with a neutral branch.
+    """x-gts-instance-ref: nullable reference via a combinator with a neutral branch.
 
-    The common "optional reference" shape mixes an x-gts-ref branch with a
-    plain structural branch that carries no x-gts-ref, e.g.::
+    The common "optional reference" shape mixes an x-gts-instance-ref branch with a
+    plain structural branch that carries no x-gts-instance-ref, e.g.::
 
         "oneOf": [
-            {"type": "string", "x-gts-ref": "gts.a._.b.v1~"},
+            {"type": "string", "x-gts-instance-ref": "gts.a._.b.v1~"},
             {"type": "null"}
         ]
 
-    The neutral ``{"type": "null"}`` branch has no x-gts-ref, so the standard
+    The neutral ``{"type": "null"}`` branch has no x-gts-instance-ref, so the standard
     JSON Schema engine already enforces which branch a value belongs to. An
-    implementation that runs its own x-gts-ref combinator pass must treat a
-    branch without an x-gts-ref as neutral rather than a branch that always
+    implementation that runs its own x-gts-instance-ref combinator pass must treat a
+    branch without an x-gts-instance-ref as neutral rather than a branch that always
     "matches"; otherwise a valid string reference counts as matching *both*
     branches and a valid value is rejected. Earlier combinator coverage only
-    exercised combinators where *every* branch carried an x-gts-ref, so this
+    exercised combinators where *every* branch carried an x-gts-instance-ref, so this
     mixed shape was never checked.
     """
 
-    config = Config("x-gts-ref: nullable reference").base_url(get_gts_base_url())
+    config = Config("x-gts-instance-ref: nullable reference").base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
@@ -2836,7 +2276,7 @@ class TestCaseXGtsRef_NullableReference(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        # oneOf: nullable reference (string+x-gts-ref OR null).
+        # oneOf: nullable reference (string+x-gts-instance-ref OR null).
         Step(
             RunRequest("register nullable oneOf holder schema")
             .post("/entities")
@@ -2851,7 +2291,7 @@ class TestCaseXGtsRef_NullableReference(HttpRunner):
                         "oneOf": [
                             {
                                 "type": "string",
-                                "x-gts-ref": "gts.x.testref_nullable._.target.v1~",
+                                "x-gts-instance-ref": "gts.x.testref_nullable._.target.v1~",
                             },
                             {"type": "null"},
                         ]
@@ -2862,7 +2302,7 @@ class TestCaseXGtsRef_NullableReference(HttpRunner):
             .validate()
             .assert_equal("status_code", 200)
         ),
-        # A valid string reference must match exactly the x-gts-ref branch.
+        # A valid string reference must match exactly the x-gts-instance-ref branch.
         Step(
             RunRequest("register nullable oneOf instance - valid reference")
             .post("/entities")
@@ -2894,7 +2334,7 @@ class TestCaseXGtsRef_NullableReference(HttpRunner):
             True,
             "nullable oneOf must accept null",
         ),
-        # anyOf: nullable reference (string+x-gts-ref OR null).
+        # anyOf: nullable reference (string+x-gts-instance-ref OR null).
         Step(
             RunRequest("register nullable anyOf holder schema")
             .post("/entities")
@@ -2909,7 +2349,7 @@ class TestCaseXGtsRef_NullableReference(HttpRunner):
                         "anyOf": [
                             {
                                 "type": "string",
-                                "x-gts-ref": "gts.x.testref_nullable._.target.v1~",
+                                "x-gts-instance-ref": "gts.x.testref_nullable._.target.v1~",
                             },
                             {"type": "null"},
                         ]
@@ -2954,13 +2394,13 @@ class TestCaseXGtsRef_NullableReference(HttpRunner):
 
 
 class TestCaseXGtsRef_SelfRefInOneOf(HttpRunner):
-    """x-gts-ref: a /$id branch inside oneOf must not shadow a sibling branch.
+    """x-gts-instance-ref: a /$id branch inside oneOf must not shadow a sibling branch.
 
     ``oneOf`` requires exactly one branch to match. When one branch is
-    ``{"x-gts-ref": "/$id"}`` and another is a concrete GTS pattern, an
+    ``{"x-gts-instance-ref": "/$id"}`` and another is a concrete GTS pattern, an
     implementation must resolve ``/$id`` to the selected type while selecting
     the matching branch. If ``/$id`` is instead treated as always-matching
-    (e.g. a JSON Schema engine that evaluates x-gts-ref as a keyword but
+    (e.g. a JSON Schema engine that evaluates x-gts-instance-ref as a keyword but
     short-circuits ``/$id`` to "valid" because it lacks the selected type),
     a value that matches only the sibling pattern satisfies *both* branches
     and the exactly-one rule wrongly rejects a valid value.
@@ -2969,7 +2409,7 @@ class TestCaseXGtsRef_SelfRefInOneOf(HttpRunner):
     /$id-versus-concrete combination was never exercised.
     """
 
-    config = Config("x-gts-ref: /$$id inside oneOf").base_url(get_gts_base_url())
+    config = Config("x-gts-instance-ref: /$$id inside oneOf").base_url(get_gts_base_url())
 
     def test_start(self):
         super().test_start()
@@ -3010,8 +2450,8 @@ class TestCaseXGtsRef_SelfRefInOneOf(HttpRunner):
                     "ref": {
                         "type": "string",
                         "oneOf": [
-                            {"x-gts-ref": "/$$id"},
-                            {"x-gts-ref": "gts.x.testref_selfcomb._.other.v1~"},
+                            {"x-gts-instance-ref": "/$$id"},
+                            {"x-gts-instance-ref": "gts.x.testref_selfcomb._.other.v1~"},
                         ],
                     },
                 },
@@ -3057,21 +2497,23 @@ class TestCaseXGtsRef_SelfRefInOneOf(HttpRunner):
     ]
 
 
+@pytest.mark.parametrize("keyword", ["x-gts-type-ref", "x-gts-instance-ref"])
 @pytest.mark.parametrize("operand", ["universal", "wildcard", "concrete"])
 @pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
-def test_x_gts_ref_payload_requires_concrete_ids(
-    gts_api, schema_dialect, mode, operand
+def test_entity_ref_payload_requires_concrete_ids_of_required_kind(
+    gts_api, schema_dialect, mode, operand, keyword
 ):
-    """No operand permits wildcard strings in the payload.
+    """No operand permits wildcard strings or the other kind in the payload.
 
     Under ``gts.*`` every wildcard value below would be covered if pattern
-    coverage leaked into `x-gts-ref`; ``target~*`` and ``target~`` would
-    cover the type-scoped ones.
+    coverage leaked into entity references; ``target~*`` and ``target~`` would
+    cover the type-scoped ones. Both concrete candidates are registered and
+    valid, so the wrong-kind rejection cannot come from registry lookup.
     """
     api = gts_api
     target = api.register("target", {"type": "object"}, schema_dialect)
     target_instance = api.register_instance(target, {}, validate=True)
-    x_gts_ref = {
+    operand_value = {
         "universal": "gts.*",
         "wildcard": target + "*",
         "concrete": target,
@@ -3081,19 +2523,33 @@ def test_x_gts_ref_payload_requires_concrete_ids(
         {
             "type": "object",
             "required": ["value"],
-            "properties": {"value": {"type": "string", "x-gts-ref": x_gts_ref}},
+            "properties": {"value": {"type": "string", keyword: operand_value}},
         },
         schema_dialect,
         mode=mode,
     )
-    for name, concrete_id in (
-        ("concrete_type", target),
-        ("concrete_instance", target_instance),
+    type_ref = keyword == "x-gts-type-ref"
+    for name, concrete_id, valid in (
+        ("concrete_type", target, type_ref),
+        ("concrete_instance", target_instance, not type_ref),
     ):
-        instance_id = api.register_instance(
-            holder, {"value": concrete_id}, name=name, validate=True, mode=mode
-        )
-        api.check_instance(instance_id, valid=True, mode=mode)
+        if valid:
+            instance_id = api.register_instance(
+                holder, {"value": concrete_id}, name=name, validate=True, mode=mode
+            )
+        else:
+            api.register_instance(
+                holder,
+                {"value": concrete_id},
+                name=name,
+                validate=True,
+                mode=mode,
+                status=422,
+            )
+            instance_id = api.register_instance(
+                holder, {"value": concrete_id}, name=name
+            )
+        api.check_instance(instance_id, valid=valid, mode=mode)
     for name, wildcard in (
         ("type_suffix_wildcard", target + "*"),
         ("type_family_wildcard", target.rsplit(".v", 1)[0] + ".*"),
@@ -3110,98 +2566,6 @@ def test_x_gts_ref_payload_requires_concrete_ids(
         )
         instance_id = api.register_instance(holder, {"value": wildcard}, name=name)
         api.check_instance(instance_id, valid=False, mode=mode)
-
-
-@pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
-@pytest.mark.parametrize(
-    "position,tail",
-    [
-        (0, "acme.prod._.uploads.v1"),
-        (1, "acme.prod._.uploads.v1"),
-        (2, "acme.prod._.uploads.v1"),
-        (0, "7a1d2f34-5678-49ab-9012-abcdef123456"),
-        (1, "7a1d2f34-5678-49ab-9012-abcdef123456"),
-    ],
-    ids=["base_type", "derived_type", "instance", "uuid_base", "uuid_derived"],
-)
-@pytest.mark.parametrize(
-    "operand_version,value_version,valid",
-    [
-        pytest.param("1", "1", True, id="same_major"),
-        pytest.param("1", "1.0", True, id="omitted_minor"),
-        pytest.param("1", "1.27", True, id="another_minor"),
-        pytest.param("1.0", "1.0", True, id="same_explicit_minor"),
-        pytest.param("1.0", "1", False, id="explicit_minor_rejects_omitted"),
-        pytest.param("1.0", "1.1", False, id="different_explicit_minor"),
-        pytest.param("1", "12", False, id="different_major"),
-    ],
-)
-def test_concrete_instance_reference_applies_minor_flexibility(
-    gts_api, schema_dialect, mode, position, tail, operand_version, value_version, valid
-):
-    """A concrete instance operand follows the shared minor-version rules."""
-    api = gts_api
-    registered_types = set()
-    targets = []
-    for version in dict.fromkeys((operand_version, value_version)):
-        versions = ["1", "1", "1"]
-        versions[position] = version
-        base = api.type_id("target", versions[0])
-        target_type = base + "acme.prod._.derived.v" + versions[1] + "~"
-        for type_id, schema in (
-            (base, {"type": "object"}),
-            (target_type, {"allOf": [{"$ref": "gts://" + base}]}),
-        ):
-            if type_id not in registered_types:
-                api.register("target", schema, schema_dialect, type_id=type_id)
-                registered_types.add(type_id)
-        target_tail = "acme.prod._.uploads.v" + versions[2] if position == 2 else tail
-        target = target_type + target_tail
-        targets.append(target)
-        api.request(
-            "POST",
-            "/entities",
-            params={"validate": "true", "gts-ref-validation": mode},
-            json={"id": target, "type": target_type},
-        )
-    operand, value = targets[0], targets[-1]
-    holder = api.register(
-        "holder",
-        {
-            "type": "object",
-            "properties": {"ref": {"type": "string", "x-gts-ref": operand}},
-            "required": ["ref"],
-        },
-        schema_dialect,
-        mode=mode,
-    )
-    instance = api.register_instance(holder, {"ref": value})
-    api.check_instance(instance, valid=valid, mode=mode)
-
-
-@pytest.mark.parametrize("mode", ["none", "any-present", "any-valid"])
-def test_anonymous_instance_reference_requires_same_uuid(gts_api, schema_dialect, mode):
-    api = gts_api
-    target_type = api.register("target", {"type": "object"}, schema_dialect)
-    targets = [
-        target_type + "7a1d2f34-5678-49ab-9012-abcdef123456",
-        target_type + "7a1d2f34-5678-49ab-9012-abcdef123457",
-    ]
-    for target in targets:
-        api.request(
-            "POST",
-            "/entities",
-            params={"validate": "true", "gts-ref-validation": mode},
-            json={"id": target, "type": target_type},
-        )
-    holder = api.register(
-        "holder",
-        {"properties": {"ref": {"type": "string", "x-gts-ref": targets[0]}}},
-        schema_dialect,
-        mode=mode,
-    )
-    instance = api.register_instance(holder, {"ref": targets[1]})
-    api.check_instance(instance, valid=False, mode=mode)
 
 
 @pytest.mark.parametrize(
@@ -3225,7 +2589,7 @@ def test_minor_flexible_reference_looks_up_the_actual_value(
         "holder",
         {
             "type": "object",
-            "properties": {"ref": {"type": "string", "x-gts-ref": operand}},
+            "properties": {"ref": {"type": "string", "x-gts-instance-ref": operand}},
             "required": ["ref"],
         },
         schema_dialect,
@@ -3237,9 +2601,6 @@ def test_minor_flexible_reference_looks_up_the_actual_value(
 
 if __name__ == "__main__":
     TestCaseXGtsRef_PrefixAndSelfRef().test_start()
-    TestCaseXGtsRef_UnsupportedPointers().test_start()
-    TestCaseXGtsRef_SelectedLeafSelfRef().test_start()
-    TestCaseXGtsRef_WrongGtsFormat().test_start()
     TestCaseXGtsRef_OneOf().test_start()
     TestCaseXGtsRef_AnyOf().test_start()
     TestCaseXGtsRef_AllOf().test_start()

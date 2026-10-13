@@ -2104,10 +2104,11 @@ class TestCaseOp6_AbstractType_RejectCombinedAnonInstance(HttpRunner):
 # Unknown x-gts-* extension keyword tests
 #
 # The GTS Type Schema is a JSON Schema document annotated with the GTS-specific
-# keywords in the reserved `x-gts-*` namespace (README §Terminology / §9). The
-# specification defines exactly six such keywords:
+# keywords in the reserved `x-gts-*` namespace (README §Terminology / §9 /
+# §11.0). The specification defines exactly seven such keywords:
 #
-# - x-gts-ref            (§9.6.1)
+# - x-gts-type-ref       (§9.6.1)
+# - x-gts-instance-ref   (§9.6.1)
 # - x-gts-pattern-ref    (§9.6.2)
 # - x-gts-traits-schema  (§9.7)
 # - x-gts-traits         (§9.7)
@@ -2116,7 +2117,8 @@ class TestCaseOp6_AbstractType_RejectCombinedAnonInstance(HttpRunner):
 #
 # Any other `x-gts-*` key is an **unknown extension** — a typo (`x-gts-trait`),
 # a dropped/experimental keyword (`x-gts-traits-completeness`,
-# `x-gts-trait-merge`), or a vendor keyword that never became part of the spec.
+# `x-gts-trait-merge`, `x-gts-ref` removed in GTS 0.17), or a vendor keyword
+# that never became part of the spec.
 # Because the `x-gts-*` prefix is reserved for GTS semantics, an implementation
 # MUST NOT silently ignore an unknown one: when validation is enabled
 # (`?validate=true`) registration MUST fail fast (422) rather than accept a
@@ -2160,12 +2162,12 @@ def _register_validated(gts_id, body, expected_status, label):
 
 
 class TestCaseSupportedExtensions_Accepted(HttpRunner):
-    """All six supported x-gts-* keywords, in valid positions, register cleanly.
+    """All seven supported x-gts-* keywords, in valid positions, register cleanly.
 
     Positive control: proves the rejection tests below fail because of the
     *unknown* keyword name, not because validation rejects x-gts-* wholesale.
-    Covers x-gts-abstract, x-gts-traits-schema, x-gts-ref and x-gts-pattern-ref
-    on the base, and x-gts-final and x-gts-traits on the derived type.
+    Covers x-gts-abstract, x-gts-traits-schema, x-gts-type-ref,
+    x-gts-instance-ref and x-gts-pattern-ref on the base, and x-gts-final and x-gts-traits on the derived type.
     """
 
     config = Config("unknown-ext: supported keywords accepted").base_url(get_gts_base_url())
@@ -2185,13 +2187,14 @@ class TestCaseSupportedExtensions_Accepted(HttpRunner):
                 },
                 "properties": {
                     "id": {"type": "string"},
-                    "ownerRef": {"type": "string", "x-gts-ref": "gts.*"},
+                    "ownerType": {"type": "string", "x-gts-type-ref": "gts.*"},
+                    "ownerRef": {"type": "string", "x-gts-instance-ref": "gts.*"},
                     "scope": {"type": "string", "x-gts-pattern-ref": "gts.*"},
                 },
             },
             200,
-            "register base using x-gts-abstract, x-gts-traits-schema, x-gts-ref, "
-            "x-gts-pattern-ref",
+            "register base using x-gts-abstract, x-gts-traits-schema, "
+            "x-gts-type-ref, x-gts-instance-ref, x-gts-pattern-ref",
         ),
         Step(
             RunRequest("register derived using x-gts-final and x-gts-traits")
@@ -2361,7 +2364,8 @@ class TestCaseUnknown_TraitsTypoRejected(HttpRunner):
 
 
 class TestCaseUnknown_RefTypoRejected(HttpRunner):
-    """A near-miss typo of x-gts-ref (x-gts-reference) inside a property MUST be rejected."""
+    """A near-miss typo of an entity-reference keyword (x-gts-reference) inside a
+    property MUST be rejected."""
 
     config = Config("unknown-ext: x-gts-reference typo rejected").base_url(get_gts_base_url())
 
@@ -2379,7 +2383,37 @@ class TestCaseUnknown_RefTypoRejected(HttpRunner):
                 },
             },
             422,
-            "register schema with x-gts-reference (typo of x-gts-ref) should be rejected",
+            "register schema with x-gts-reference (unknown reference keyword) "
+            "should be rejected",
+        ),
+    ]
+
+
+class TestCaseUnknown_LegacyRefRejected(HttpRunner):
+    """The removed x-gts-ref keyword is an unknown x-gts-* keyword (GTS 0.17).
+
+    The positive control above shows that the same property with
+    x-gts-instance-ref registers. The complete validation lifecycle of the
+    legacy keyword is covered by test_x_gts_entity_ref.py.
+    """
+
+    config = Config("unknown-ext: legacy x-gts-ref rejected").base_url(get_gts_base_url())
+
+    def test_start(self):
+        super().test_start()
+
+    teststeps = [
+        _register_validated(
+            "gts://gts.x.testext.legacyref.base.v1~",
+            {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "ownerRef": {"type": "string", "x-gts-ref": "gts.*"},
+                },
+            },
+            422,
+            "register schema with removed x-gts-ref should be rejected",
         ),
     ]
 
@@ -3880,8 +3914,8 @@ def test_op6_batch_validate_never_exposes_uncommitted_entities():
 class TestCaseTestOp6BatchValidate_DependentOfDiscarded(HttpRunner):
     """A survivor must not be committed when a sibling it depends on is rejected.
 
-    Under any-present ref validation, entry B carries an x-gts-ref to A, and A
-    carries an x-gts-ref to a type that is never registered. Validated against
+    Under any-present ref validation, entry B carries an x-gts-type-ref to A,
+    and A carries an x-gts-instance-ref to a type that is never registered. Validated against
     the fully staged set B passes (A is present) while A fails (its target is
     missing); a single-pass implementation would commit B with a dangling
     reference to the discarded A. A correct implementation rejects both, so
@@ -3911,7 +3945,7 @@ class TestCaseTestOp6BatchValidate_DependentOfDiscarded(HttpRunner):
                     "properties": {
                         "r": {
                             "type": "string",
-                            "x-gts-ref": "gts.x.batchdepdisc._.missing.v1~",
+                            "x-gts-instance-ref": "gts.x.batchdepdisc._.missing.v1~",
                         }
                     },
                 },
@@ -3920,7 +3954,10 @@ class TestCaseTestOp6BatchValidate_DependentOfDiscarded(HttpRunner):
                     "$$id": "gts://gts.x.batchdepdisc._.b.v1~",
                     "type": "object",
                     "properties": {
-                        "x": {"type": "string", "x-gts-ref": "gts.x.batchdepdisc._.a.v1~"}
+                        "x": {
+                            "type": "string",
+                            "x-gts-type-ref": "gts.x.batchdepdisc._.a.v1~",
+                        }
                     },
                 },
             ])

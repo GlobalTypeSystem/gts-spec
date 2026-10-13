@@ -210,7 +210,7 @@ Operand syntax checks include §2/§10 spelling, the 1024-character limit, unsig
 
 Both keywords follow the same validation lifecycle as `x-gts-pattern-ref` ([§9.6.2](../README.md#962-pattern-valued-fields-x-gts-pattern-ref)): operands MUST be checked during registration with validation enabled, explicit schema validation, and before instance or trait value validation, even if registration skipped validation. Registration with `validate=false` may defer these checks; storing a schema does not establish its validity. As with `x-gts-pattern-ref`, early rejection is also permitted: `validate=false` does not require accepting an invalid schema.
 
-When these checks run, an invalid operand is a schema error even if its property is absent or its subschema is in an unselected `anyOf`, `if`, or `not` branch. A schema error cannot be inverted by `not` or rescued by another successful branch. Follow §9.6.1's dialect-aware traversal of schema locations, including array-item schemas and effective trait schemas; do not scan literal data for keyword names.
+When these checks run, an invalid operand is a schema error even if its property is absent or its subschema is in an unselected `anyOf`, `if`, or `not` branch. A schema error cannot be inverted by `not` or rescued by another successful branch. Follow [§9.6.3](../README.md#963-common-validation-rules)'s dialect-aware traversal of schema locations, including array-item schemas and effective trait schemas; do not scan literal data for keyword names.
 
 ### Candidate validation and selected-type self-reference
 

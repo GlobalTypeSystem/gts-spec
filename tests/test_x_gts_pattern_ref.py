@@ -1,437 +1,41 @@
 """x-gts-pattern-ref conformance tests (README §9.6.2, §10; ADR-0007).
 
 Each test registers a schema whose `scope` property carries the keyword and
-validates payloads against it. Coverage expectations and negative witnesses
-are explicit test data. The offline recognizer in
-test_gts_id_pattern_syntax_unit.py checks their syntax only; it does not
-implement coverage.
+validates payloads against it. Syntax and coverage vectors come from the
+shared corpus in id_pattern_corpus.py: a value is valid iff
+M(value) ⊆ M(operand), and every uncovered row names a witness.
 """
 
 import pytest
 
-_MAX_VERSION = "4294967295"
-_PREVIOUS_VERSION = "4294967294"
-_OVERFLOW_VERSION = "4294967296"
-
-# The longest valid value: 1024 characters, including the `*`.
-_LONGEST_PATTERN = "gts." + "a" * 1018 + ".*"
-
-# Canonical identifiers have at most 1024 characters (§2.1), so a valid pattern
-# can select none of them: then M(p) is empty and every operand covers p. A
-# wildcard after the vendor token needs at least `a._.a.v0~` (a first segment
-# is a type), one after the version marker at least `0~`. Each pair below sits
-# on either side of that bound; witnesses have exactly 1024 characters.
-_EMPTY_VENDOR_PATTERN = "gts." + "a" * 1011 + ".*"
-_EMPTY_VENDOR_COMPLETION = "gts." + "a" * 1011 + ".a._.a.v0~"
-_VENDOR_PATTERN = "gts." + "a" * 1010 + ".*"
-_VENDOR_WITNESS = "gts." + "a" * 1010 + ".a._.a.v0~"
-_EMPTY_VERSION_PATTERN = "gts." + "a" * 1011 + ".b.c.d.v*"
-_EMPTY_VERSION_COMPLETION = "gts." + "a" * 1011 + ".b.c.d.v0~"
-_VERSION_PATTERN = "gts." + "a" * 1010 + ".b.c.d.v*"
-_VERSION_WITNESS = "gts." + "a" * 1010 + ".b.c.d.v0~"
-
-_UUID = "7a1d2f34-5678-49ab-9012-abcdef123456"
-
-VALID_PATTERNS = (
-    pytest.param("gts.*", id="any"),
-    pytest.param("gts.x.*", id="vendor"),
-    pytest.param("gts.x.core.*", id="package"),
-    pytest.param("gts.x.core.events.*", id="namespace"),
-    pytest.param("gts.x.core.events.type.*", id="type"),
-    pytest.param("gts.x.core.events.type.v*", id="version_marker"),
-    pytest.param("gts.x.core.events.type.v1.*", id="major"),
-    pytest.param("gts.x.core.events.type.v0.*", id="major_zero"),
-    pytest.param("gts.x.core.events.type.v1~*", id="chain"),
-    pytest.param("gts.x.core.events.type.v1.0~*", id="chain_minor"),
-    pytest.param("gts.x.core.events.type.v1~xyz.*", id="chain_vendor"),
-    pytest.param("gts.x.core.events.type.v1~x.y._.w.v1.*", id="chain_major"),
-    pytest.param(
-        "gts.x.core.events.type.v1~x.core._.audit_event.v1~xyz.app.*",
-        id="chain_two_types",
-    ),
-    pytest.param("gts.x.core.events.type.v1~", id="concrete_type"),
-    pytest.param("gts.x.core.events.type.v1.2~", id="concrete_type_minor"),
-    pytest.param(
-        "gts.x.core.events.type.v1~ven.app._.custom_event.v1~",
-        id="concrete_chained_type",
-    ),
-    pytest.param(
-        "gts.x.core.events.topic.v1~ven.app._.custom_event_topic.v1.2",
-        id="concrete_well_known_instance",
-    ),
-    pytest.param(
-        "gts.x.core.events.type.v1~7a1d2f34-5678-49ab-9012-abcdef123456",
-        id="concrete_anonymous_instance",
-    ),
-    pytest.param("gts.nobody.unregistered.*", id="unregistered_prefix"),
-    pytest.param(_LONGEST_PATTERN, id="length_1024"),
-    pytest.param(_VENDOR_WITNESS, id="concrete_length_1024"),
-    pytest.param(
-        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~", id="large_major"
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1." + _MAX_VERSION + "~", id="large_minor"
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v" + _MAX_VERSION + ".*",
-        id="large_major_wildcard",
-    ),
-)
-
-INVALID_PATTERNS = (
-    pytest.param(
-        "gts.x.core.events.type.v" + _OVERFLOW_VERSION + "~", id="major_overflow"
-    ),
-    pytest.param(
-        "gts.x.core.events.type.v1." + _OVERFLOW_VERSION + "~", id="minor_overflow"
-    ),
-    pytest.param(
-        "gts.x.core.events.type.v" + _OVERFLOW_VERSION + ".*",
-        id="wildcard_major_overflow",
-    ),
-    pytest.param(
-        "gts.x.core.events.type.v1~acme.prod._.uploads.v" + _OVERFLOW_VERSION,
-        id="instance_major_overflow",
-    ),
-    pytest.param(
-        "gts.x.core.events.type.v1~acme.prod._.uploads.v1." + _OVERFLOW_VERSION,
-        id="instance_minor_overflow",
-    ),
-    pytest.param("", id="empty"),
-    pytest.param("*", id="bare_wildcard"),
-    pytest.param("gts", id="prefix_without_dot"),
-    pytest.param("gts.", id="prefix_only"),
-    pytest.param("gts*", id="wildcard_in_prefix"),
-    pytest.param("gts.vendor*", id="partial_vendor"),
-    pytest.param("gts.x.core.events.type.v1*", id="partial_major"),
-    pytest.param("gts.x.core.events.type.v1.0*", id="partial_minor"),
-    pytest.param("gts.x.core.events.type.v1.0.*", id="after_minor"),
-    pytest.param("gts.x.core.events.type.v1~abc*", id="partial_chain_vendor"),
-    pytest.param("gts.x.core.events.type.vx.*", id="bad_major"),
-    pytest.param("gts.x.*.events.type.v1~", id="wildcard_in_middle"),
-    pytest.param("gts.x.core.*~*", id="two_wildcards"),
-    pytest.param("gts.x.llm.chat.message.v*~*", id="two_wildcards_version"),
-    pytest.param("gts.x.core.events.type.v1~**", id="double_wildcard"),
-    pytest.param("gts.x.core.events.type.v1~*~", id="wildcard_not_last"),
-    pytest.param("gts.x.core.events.type.v1~x.y._.w.v1@name", id="attribute"),
-    pytest.param('gts.x.core.events.type.v1~[name="x"]', id="query"),
-    pytest.param("gts.x.core.events.type.v1~550e8400-*", id="partial_uuid"),
-    pytest.param("gts.x.core.events.type.v1~" + _UUID + "*", id="wildcard_after_uuid"),
-    pytest.param("gts.x.core.events.type.v1~" + _UUID + "~", id="tilde_after_uuid"),
-    pytest.param("gts.x.core.events.type.v1~" + _UUID + "~*", id="chain_after_uuid"),
-    pytest.param(
-        "gts.x.core.events.type.v1~7A1D2F34-5678-49AB-9012-ABCDEF123456",
-        id="uppercase_uuid",
-    ),
-    pytest.param("GTS.x.core.*", id="uppercase_prefix"),
-    pytest.param("gts.X.core.*", id="uppercase_token"),
-    pytest.param(" gts.x.core.*", id="leading_space"),
-    pytest.param("gts.x.core.* ", id="trailing_space"),
-    pytest.param("gts.x.core.events.type.v1~\n", id="trailing_lf"),
-    pytest.param("gts.x.core.events.type.v1~\r", id="trailing_cr"),
-    pytest.param("gts.x.core.events.type.v1~\u2028", id="trailing_unicode_separator"),
-    pytest.param("gts.x. core.*", id="inner_space"),
-    pytest.param("gts://gts.x.core.events.type.v1~", id="uri_form"),
-    pytest.param("gts://gts.*", id="uri_form_wildcard"),
-    pytest.param("gts.x.core.events.type.v1", id="single_segment_instance"),
-    pytest.param("gts.x.core.events.type.v01~", id="major_leading_zero"),
-    pytest.param("gts.x.core.events.type.v1.01~*", id="minor_leading_zero"),
-    pytest.param("gts.x.core.events.type~", id="missing_version"),
-    pytest.param("gts.x.core.events.type.v1~~", id="double_tilde"),
-    pytest.param("gts.x.core-1.events.*", id="hyphen"),
-    pytest.param("gts.1x.core.*", id="token_starts_with_digit"),
-    pytest.param("gts.x.сore.*", id="non_ascii"),
-    pytest.param("gts." + "a" * 1019 + ".*", id="length_1025"),
-    pytest.param(_EMPTY_VENDOR_COMPLETION, id="concrete_length_1025"),
+from .id_pattern_corpus import (
+    BUCKET,
+    BUCKET_FAMILY,
+    COVERAGE_CASES,
+    FAMILY,
+    INSTANCE,
+    INVALID_PATTERNS,
+    MATCH_CASES,
+    OTHER,
+    RESOURCE,
+    VALID_PATTERNS,
 )
 
 
-FAMILY = "gts.x.core.resources.resource.*"
-RESOURCE = "gts.x.core.resources.resource.v1~"
-BUCKET = RESOURCE + "acme.storage.resources.bucket.v1~"
-BUCKET_FAMILY = RESOURCE + "acme.storage.resources.bucket.*"
-INSTANCE = BUCKET + "acme.prod._.uploads.v1"
-ANONYMOUS = RESOURCE + "7a1d2f34-5678-49ab-9012-abcdef123456"
-OTHER = "gts.x.core.events.event.*"
+def _scope_schema(scope):
+    return {
+        "type": "object",
+        "required": ["scope"],
+        "properties": {"scope": scope},
+    }
 
-# At 1024 characters a minor wildcard can select instances, but its type
-# marker would exceed the identifier length limit.
-_MINOR_WILDCARD_END = ".b.c.d.v0.*"
-_MINOR_BOUNDARY_NAME = "a" * (1024 - len(RESOURCE) - len(_MINOR_WILDCARD_END))
-_MINOR_BOUNDARY_INSTANCE = RESOURCE + _MINOR_BOUNDARY_NAME + ".b.c.d.v0"
-_MINOR_BOUNDARY_WILDCARD = _MINOR_BOUNDARY_INSTANCE + ".*"
 
-# (operand, value): every identifier the value selects, the operand selects too.
-COVERED_CASES = (
-    pytest.param(_LONGEST_PATTERN, _LONGEST_PATTERN, id="operand_length_1024"),
-    pytest.param(
-        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~",
-        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~",
-        id="large_operand_version",
-    ),
-    pytest.param(FAMILY, FAMILY, id="equal_wildcards"),
-    pytest.param(FAMILY, RESOURCE, id="family_covers_type"),
-    pytest.param(FAMILY, BUCKET_FAMILY, id="family_covers_derived_pattern"),
-    pytest.param(FAMILY, INSTANCE, id="family_covers_instance"),
-    pytest.param(RESOURCE, RESOURCE, id="type_covers_self"),
-    pytest.param(RESOURCE, RESOURCE + "*", id="type_covers_suffix_wildcard"),
-    pytest.param(RESOURCE + "*", RESOURCE, id="suffix_wildcard_covers_type"),
-    pytest.param(RESOURCE, BUCKET_FAMILY, id="type_covers_derived_pattern"),
-    pytest.param(RESOURCE, INSTANCE, id="type_covers_instance"),
-    pytest.param(RESOURCE, ANONYMOUS, id="type_covers_anonymous_instance"),
-    pytest.param(RESOURCE, "gts.x.core.resources.resource.v1.2~", id="omitted_minor"),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.*",
-        "gts.x.core.resources.resource.v1.0~",
-        id="first_segment_minor_wildcard_covers_explicit_minor",
-    ),
-    pytest.param(
-        RESOURCE,
-        "gts.x.core.resources.resource.v1.*",
-        id="first_segment_omitted_minor_covers_minor_wildcard",
-    ),
-    pytest.param(RESOURCE + "acme.*", BUCKET_FAMILY, id="chain_vendor_scope"),
-    pytest.param(
-        BUCKET,
-        RESOURCE + "acme.storage.resources.bucket.v1.2~",
-        id="derived_minor_flexibility",
-    ),
-    pytest.param(
-        RESOURCE + "acme.storage.resources.bucket.v1.*",
-        RESOURCE + "acme.storage.resources.bucket.v1.2~",
-        id="later_minor_wildcard_covers_explicit_minor",
-    ),
-    pytest.param(INSTANCE, INSTANCE, id="same_instance_scope"),
-    pytest.param(INSTANCE, INSTANCE + ".0", id="instance_omitted_minor"),
-    pytest.param(INSTANCE + ".0", INSTANCE + ".0", id="instance_explicit_minor"),
-    pytest.param(
-        INSTANCE,
-        "gts.x.core.resources.resource.v1.0~"
-        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
-        id="instance_type_minor_flexibility",
-    ),
-    pytest.param(
-        INSTANCE,
-        RESOURCE + "acme.storage.resources.bucket.v1.2~acme.prod._.uploads.v1",
-        id="instance_derived_type_minor_flexibility",
-    ),
-    pytest.param(
-        INSTANCE,
-        "gts.x.core.resources.resource.v1.2~"
-        "acme.storage.resources.bucket.v1.3~acme.prod._.uploads.v1.4",
-        id="instance_all_segment_minors",
-    ),
-    pytest.param(
-        ANONYMOUS,
-        "gts.x.core.resources.resource.v1.2~" + _UUID,
-        id="anonymous_type_minor_flexibility",
-    ),
-    pytest.param(ANONYMOUS, ANONYMOUS, id="exact_uuid_instance"),
-    pytest.param(
-        BUCKET,
-        "gts.x.core.resources.resource.v1.2~acme.storage.resources.bucket.v1~",
-        id="earlier_segment_minor_flexibility",
-    ),
-    pytest.param(
-        FAMILY, "gts.x.core.resources.resource.v*", id="version_marker_equivalent"
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v*",
-        FAMILY,
-        id="version_marker_equivalent_reverse",
-    ),
-    pytest.param(
-        RESOURCE,
-        "gts.x.core.resources.resource.v1." + _MAX_VERSION + "~",
-        id="large_minor_flexibility",
-    ),
-    # A value whose every completion exceeds 1024 characters selects nothing.
-    pytest.param(
-        _MINOR_BOUNDARY_INSTANCE,
-        _MINOR_BOUNDARY_WILDCARD,
-        id="minor_wildcard_selects_only_instances_at_length_limit",
-    ),
-    pytest.param(
-        _MINOR_BOUNDARY_WILDCARD,
-        _MINOR_BOUNDARY_INSTANCE + ".0",
-        id="length_limited_minor_wildcard_covers_instance",
-    ),
-    pytest.param(FAMILY, _LONGEST_PATTERN, id="empty_value_longest"),
-    pytest.param(FAMILY, _EMPTY_VENDOR_PATTERN, id="empty_value_vendor"),
-    pytest.param(FAMILY, _EMPTY_VERSION_PATTERN, id="empty_value_version_marker"),
-    pytest.param(
-        _EMPTY_VENDOR_PATTERN,
-        "gts." + "a" * 1012 + ".*",
-        id="empty_operand_covers_empty_value",
-    ),
-)
-
-# (operand, value, witness): the witness is a canonical identifier that the
-# value selects and the operand does not.
-UNCOVERED_CASES = (
-    pytest.param(
-        _MINOR_BOUNDARY_WILDCARD,
-        _MINOR_BOUNDARY_INSTANCE,
-        _MINOR_BOUNDARY_INSTANCE,
-        id="length_limited_minor_wildcard_rejects_omitted_minor",
-    ),
-    pytest.param(
-        _MINOR_BOUNDARY_INSTANCE + ".0",
-        _MINOR_BOUNDARY_WILDCARD,
-        _MINOR_BOUNDARY_INSTANCE + ".1",
-        id="explicit_minor_does_not_cover_length_limited_wildcard",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.*",
-        RESOURCE,
-        RESOURCE,
-        id="first_segment_minor_wildcard_rejects_omitted_minor",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.*",
-        RESOURCE + "*",
-        RESOURCE,
-        id="first_segment_minor_wildcard_rejects_flexible_type_scope",
-    ),
-    pytest.param(
-        RESOURCE + "acme.storage.resources.bucket.v1.*",
-        BUCKET,
-        BUCKET,
-        id="later_minor_wildcard_rejects_omitted_minor",
-    ),
-    pytest.param(
-        BUCKET + "acme.prod._.uploads.v1.*",
-        INSTANCE,
-        INSTANCE,
-        id="instance_minor_wildcard_rejects_omitted_minor",
-    ),
-    pytest.param(
-        RESOURCE,
-        FAMILY,
-        "gts.x.core.resources.resource.v2~",
-        id="broader_major_scope",
-    ),
-    pytest.param(
-        FAMILY,
-        "gts.x.core.resources.*",
-        "gts.x.core.resources.other.v1~",
-        id="broader_namespace",
-    ),
-    pytest.param(FAMILY, OTHER, "gts.x.core.events.event.v1~", id="other_family"),
-    pytest.param(
-        FAMILY,
-        "gts.x.core.resources.resource_extra.*",
-        "gts.x.core.resources.resource_extra.v1~",
-        id="type_token_boundary",
-    ),
-    pytest.param(
-        RESOURCE,
-        "gts.x.core.resources.resource.v10~",
-        "gts.x.core.resources.resource.v10~",
-        id="major_boundary",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.2~",
-        RESOURCE,
-        "gts.x.core.resources.resource.v1.3~",
-        id="explicit_minor_rejects_flexible",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.2~",
-        "gts.x.core.resources.resource.v1.3~",
-        "gts.x.core.resources.resource.v1.3~",
-        id="different_minor",
-    ),
-    pytest.param(
-        RESOURCE + "acme.*", RESOURCE, RESOURCE, id="chain_prefix_requires_suffix"
-    ),
-    pytest.param(
-        BUCKET,
-        RESOURCE + "acme.storage.resources.bucket.v1.*",
-        RESOURCE + "acme.storage.resources.bucket.v1.0",
-        id="later_major_includes_instance",
-    ),
-    pytest.param(INSTANCE + ".0", INSTANCE, INSTANCE, id="instance_minor_not_optional"),
-    pytest.param(
-        INSTANCE + ".0",
-        INSTANCE + ".1",
-        INSTANCE + ".1",
-        id="instance_explicit_minor_mismatch",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.0~"
-        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
-        INSTANCE,
-        INSTANCE,
-        id="instance_explicit_type_minor_rejects_omitted",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.0~"
-        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
-        "gts.x.core.resources.resource.v1.1~"
-        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
-        "gts.x.core.resources.resource.v1.1~"
-        "acme.storage.resources.bucket.v1~acme.prod._.uploads.v1",
-        id="instance_explicit_type_minor_mismatch",
-    ),
-    pytest.param(
-        INSTANCE, INSTANCE + "0", INSTANCE + "0", id="instance_version_boundary"
-    ),
-    pytest.param(
-        INSTANCE,
-        BUCKET + "acme.prod._.uploads.*",
-        INSTANCE + "0",
-        id="instance_rejects_wildcard",
-    ),
-    pytest.param(INSTANCE, INSTANCE + "~", INSTANCE + "~", id="instance_rejects_type"),
-    pytest.param(
-        ANONYMOUS,
-        RESOURCE + "7a1d2f34-5678-49ab-9012-abcdef123457",
-        RESOURCE + "7a1d2f34-5678-49ab-9012-abcdef123457",
-        id="different_uuid",
-    ),
-    pytest.param("gts.acme.*", BUCKET, BUCKET, id="wildcard_anchors_first_segment"),
-    pytest.param(
-        "gts.acme.storage.resources.bucket.v1~",
-        BUCKET,
-        BUCKET,
-        id="type_anchors_first_segment",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.2~",
-        "gts.x.core.resources.resource.v1.20~",
-        "gts.x.core.resources.resource.v1.20~",
-        id="explicit_minor_boundary",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v1.2~acme.*",
-        RESOURCE + "acme.*",
-        "gts.x.core.resources.resource.v1.3~acme.x._.y.v1~",
-        id="explicit_first_minor_before_wildcard",
-    ),
-    pytest.param(
-        BUCKET + "*",
-        RESOURCE + "acme.storage.resources.bucket.v1.*",
-        RESOURCE + "acme.storage.resources.bucket.v1.0",
-        id="later_chain_wildcard_excludes_instance",
-    ),
-    pytest.param(
-        "gts.x.core.resources.resource.v" + _MAX_VERSION + "~",
-        "gts.x.core.resources.resource.v" + _PREVIOUS_VERSION + "~",
-        "gts.x.core.resources.resource.v" + _PREVIOUS_VERSION + "~",
-        id="large_majors_differ",
-    ),
-    # The neighbours of the empty-selection boundary select a 1024-character ID.
-    pytest.param(FAMILY, _VENDOR_PATTERN, _VENDOR_WITNESS, id="nonempty_value_vendor"),
-    pytest.param(
-        FAMILY,
-        _VERSION_PATTERN,
-        _VERSION_WITNESS,
-        id="nonempty_value_version_marker",
-    ),
-    # An operand that selects nothing covers only values that select nothing.
-    pytest.param(_LONGEST_PATTERN, RESOURCE, RESOURCE, id="empty_operand"),
-)
+def _register_scope(api, dialect, operand, name="scope"):
+    return api.register(
+        name,
+        _scope_schema({"type": "string", "x-gts-pattern-ref": operand}),
+        dialect,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -441,66 +45,16 @@ UNCOVERED_CASES = (
 
 @pytest.mark.parametrize("value", VALID_PATTERNS)
 def test_universal_operand_accepts_valid_pattern(gts_api, schema_dialect, value):
-    """A well-formed GTS ID or wildcard pattern is covered by `gts.*`; `not`
-    inverts the verdict."""
     api = gts_api
-    scope_type = api.register(
-        "scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {"scope": {"type": "string", "x-gts-pattern-ref": "gts.*"}},
-        },
-        schema_dialect,
-    )
-    negated_scope_type = api.register(
-        "negated_scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {
-                "scope": {
-                    "type": "string",
-                    "not": {"type": "string", "x-gts-pattern-ref": "gts.*"},
-                },
-            },
-        },
-        schema_dialect,
-    )
+    scope_type = _register_scope(api, schema_dialect, "gts.*")
     api.check_payload(scope_type, {"scope": value}, valid=True)
-    api.check_payload(negated_scope_type, {"scope": value}, valid=False)
 
 
 @pytest.mark.parametrize("value", INVALID_PATTERNS)
 def test_universal_operand_rejects_invalid_pattern(gts_api, schema_dialect, value):
-    """A malformed value fails `x-gts-pattern-ref: gts.*`, so its negation
-    succeeds: a syntax failure is an ordinary validation failure."""
     api = gts_api
-    scope_type = api.register(
-        "scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {"scope": {"type": "string", "x-gts-pattern-ref": "gts.*"}},
-        },
-        schema_dialect,
-    )
-    negated_scope_type = api.register(
-        "negated_scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {
-                "scope": {
-                    "type": "string",
-                    "not": {"type": "string", "x-gts-pattern-ref": "gts.*"},
-                },
-            },
-        },
-        schema_dialect,
-    )
+    scope_type = _register_scope(api, schema_dialect, "gts.*")
     api.check_payload(scope_type, {"scope": value}, valid=False)
-    api.check_payload(negated_scope_type, {"scope": value}, valid=True)
 
 
 # ---------------------------------------------------------------------------
@@ -508,80 +62,54 @@ def test_universal_operand_rejects_invalid_pattern(gts_api, schema_dialect, valu
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("operand,value", COVERED_CASES)
-def test_covered_value_is_accepted(gts_api, schema_dialect, operand, value):
-    """The operand selects every identifier the value selects (§10)."""
+def _check_coverage(api, dialect, operand, value, covered, witness):
+    scope_type = _register_scope(api, dialect, operand)
+    api.check_payload(scope_type, {"scope": value}, valid=covered)
+    if not covered:
+        # The witness proves the verdict: the value's own scope accepts it,
+        # and the operand's scope rejects it.
+        value_scope_type = _register_scope(api, dialect, value, name="value_scope")
+        api.check_payload(value_scope_type, {"scope": witness}, valid=True)
+        api.check_payload(scope_type, {"scope": witness}, valid=False)
+
+
+@pytest.mark.parametrize("operand,value,expect", MATCH_CASES)
+def test_concrete_value_coverage(gts_api, schema_dialect, operand, value, expect):
+    """A concrete value selects itself and, under omitted minors or a type
+    chain, more identifiers; an uncovered value is its own witness."""
+    _check_coverage(gts_api, schema_dialect, operand, value, expect.covered, value)
+
+
+@pytest.mark.parametrize("operand,value,covered,witness", COVERAGE_CASES)
+def test_wildcard_value_coverage(
+    gts_api, schema_dialect, operand, value, covered, witness
+):
+    _check_coverage(gts_api, schema_dialect, operand, value, covered, witness)
+
+
+@pytest.mark.parametrize(
+    "operand,value,valid",
+    [
+        pytest.param(FAMILY, RESOURCE, True, id="covered_concrete"),
+        pytest.param(RESOURCE, BUCKET_FAMILY, True, id="covered_wildcard"),
+        pytest.param(RESOURCE, FAMILY, False, id="uncovered"),
+        pytest.param("gts.*", "gts.vendor*", False, id="malformed"),
+    ],
+)
+def test_not_inverts_value_verdict(gts_api, schema_dialect, operand, value, valid):
+    """Uncovered and malformed values are ordinary validation failures, so
+    `not` inverts them like any other verdict."""
     api = gts_api
-    scope_type = api.register(
-        "scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {"scope": {"type": "string", "x-gts-pattern-ref": operand}},
-        },
-        schema_dialect,
-    )
+    scope_type = _register_scope(api, schema_dialect, operand)
     negated_scope_type = api.register(
         "negated_scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {
-                "scope": {
-                    "type": "string",
-                    "not": {"type": "string", "x-gts-pattern-ref": operand},
-                },
-            },
-        },
+        _scope_schema(
+            {"type": "string", "not": {"type": "string", "x-gts-pattern-ref": operand}}
+        ),
         schema_dialect,
     )
-    api.check_payload(scope_type, {"scope": value}, valid=True)
-    api.check_payload(negated_scope_type, {"scope": value}, valid=False)
-
-
-@pytest.mark.parametrize("operand,value,witness", UNCOVERED_CASES)
-def test_uncovered_value_is_rejected(gts_api, schema_dialect, operand, value, witness):
-    """The value selects the witness, which the operand does not select."""
-    api = gts_api
-    scope_type = api.register(
-        "scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {"scope": {"type": "string", "x-gts-pattern-ref": operand}},
-        },
-        schema_dialect,
-    )
-    negated_scope_type = api.register(
-        "negated_scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {
-                "scope": {
-                    "type": "string",
-                    "not": {"type": "string", "x-gts-pattern-ref": operand},
-                },
-            },
-        },
-        schema_dialect,
-    )
-    api.check_payload(scope_type, {"scope": value}, valid=False)
-    api.check_payload(negated_scope_type, {"scope": value}, valid=True)
-
-    # The witness proves the verdict: the value's own scope accepts it ...
-    value_scope_type = api.register(
-        "value_scope",
-        {
-            "type": "object",
-            "required": ["scope"],
-            "properties": {"scope": {"type": "string", "x-gts-pattern-ref": value}},
-        },
-        schema_dialect,
-    )
-    api.check_payload(value_scope_type, {"scope": witness}, valid=True)
-    # ... and the operand's scope rejects it.
-    api.check_payload(scope_type, {"scope": witness}, valid=False)
+    api.check_payload(scope_type, {"scope": value}, valid=valid)
+    api.check_payload(negated_scope_type, {"scope": value}, valid=not valid)
 
 
 # ---------------------------------------------------------------------------
@@ -661,28 +189,15 @@ def assert_schema_error_everywhere(api, schema, dialect, payloads):
             api.check_payload(deferred_type, payload, valid=False)
 
 
+# Invalid pattern strings from the shared corpus, plus non-strings and
+# pointers other than `/$id`.
 INVALID_OPERANDS = (
-    pytest.param(
-        RESOURCE + "acme.prod._.uploads.v" + _OVERFLOW_VERSION, id="major_overflow"
-    ),
-    pytest.param(
-        RESOURCE + "acme.prod._.uploads.v1." + _OVERFLOW_VERSION, id="minor_overflow"
-    ),
-    pytest.param(
-        RESOURCE + "acme.prod._.uploads.v" + _OVERFLOW_VERSION + ".*",
-        id="wildcard_major_overflow",
-    ),
+    *INVALID_PATTERNS,
     pytest.param(None, id="null"),
     pytest.param(True, id="boolean"),
     pytest.param(3, id="number"),
     pytest.param([], id="array"),
     pytest.param({}, id="object"),
-    pytest.param("", id="empty"),
-    pytest.param("gts.vendor*", id="partial_token"),
-    pytest.param("gts.x.core.resources.resource.v01~", id="leading_zero"),
-    pytest.param("gts://" + RESOURCE, id="uri"),
-    pytest.param(FAMILY + " ", id="whitespace"),
-    pytest.param("gts." + "a" * 1019 + ".*", id="length_1025"),
     pytest.param("/", id="root_pointer"),
     pytest.param("/$schema", id="schema_pointer"),
     pytest.param("/properties/value", id="property_pointer"),
