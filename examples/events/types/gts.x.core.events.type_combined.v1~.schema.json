@@ -16,7 +16,7 @@
       "topicRef": {
         "description": "ID of the topic where events of this type are stored.",
         "type": "string",
-        "x-gts-ref": "gts.x.core.events.topic.v1~"
+        "x-gts-instance-ref": "gts.x.core.events.topic.v1~"
       }
     }
   },
@@ -28,7 +28,7 @@
     "id": {
       "description": "GTS instance identifier including the type chain and instance UUID.",
       "type": "string",
-      "x-gts-ref": "gts.x.core.events.type_combined.v1~*"
+      "x-gts-instance-ref": "gts.x.core.events.type_combined.v1~*"
     },
     "tenantId": {
       "type": "string",
@@ -80,7 +80,7 @@
     "subjectType": {
       "description": "GTS type of the subject of the event.",
       "type": "string",
-      "x-gts-ref": "gts.*",
+      "x-gts-type-ref": "gts.*",
       "$comment": "The value is mandatory if subject is present"
     }
   },

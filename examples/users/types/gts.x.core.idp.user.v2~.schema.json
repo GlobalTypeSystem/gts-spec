@@ -15,7 +15,7 @@
     "type": {
       "description": "GTS Type Identifier of this user.",
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-type-ref": "/$id"
     },
     "tenant_id": {
       "description": "UUID of the tenant this user belongs to.",

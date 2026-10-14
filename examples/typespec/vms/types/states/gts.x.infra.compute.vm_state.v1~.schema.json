@@ -12,8 +12,8 @@
     "properties": {
         "id": {
             "type": "string",
-            "description": "GTS identifier of the power state type",
-            "x-gts-ref": "/$id"
+            "description": "GTS Instance Identifier of the power state",
+            "x-gts-instance-ref": "/$id"
         },
         "description": {
             "type": "string",

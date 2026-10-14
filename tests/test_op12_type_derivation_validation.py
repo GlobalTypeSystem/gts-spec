@@ -5064,5 +5064,207 @@ def test_pattern_ref_derivation_resolves_self_for_each_schema(
     api.check_type_schema(leaf, valid=expected_validity)
 
 
+
+# ---------------------------------------------------------------------------
+# x-gts-type-ref / x-gts-instance-ref derivation (README §9.6.1, ADR-0008)
+# ---------------------------------------------------------------------------
+
+_TYPE_REF = "x-gts-type-ref"
+_INSTANCE_REF = "x-gts-instance-ref"
+
+
+def _entity_ref_operands(api, dialect):
+    target = api.register("target", {"type": "object"}, dialect)
+    derived = api.register(
+        "derived",
+        {"type": "object", "allOf": [{"$ref": "gts://" + target}]},
+        dialect,
+        type_id=api.derived_type_id(target, "derived"),
+    )
+    instance = target + "x.pytest._.item.v1"
+    return {
+        "T": target,
+        "T*": target + "*",
+        "D": derived,
+        "T1.0": api.type_id("target", "1.0"),
+        "I": instance,
+        "I.0": instance + ".0",
+    }
+
+
+def _entity_ref_scope(spec, keyword, operands):
+    """("K", "T") uses the parametrized keyword; ("not", ...) negates;
+    ("union", "T") accepts both kinds."""
+    head, *rest = spec
+    if head == "not":
+        return {"not": _entity_ref_scope(tuple(rest), keyword, operands)}
+    if head == "union":
+        return {
+            "type": "string",
+            "anyOf": [
+                {_TYPE_REF: operands[rest[0]]},
+                {_INSTANCE_REF: operands[rest[0]]},
+            ],
+        }
+    return {"type": "string", (keyword if head == "K" else head): operands[rest[0]]}
+
+
+def _check_entity_ref_derivation(api, dialect, keyword, base_spec, leaf_spec, valid):
+    """The leaf re-declares `ref` without importing the base (ADR-0001), so
+    OP#12 must compare the two scopes. Lookup is disabled to compare scopes,
+    not registry contents."""
+    operands = _entity_ref_operands(api, dialect)
+    base = api.register(
+        "base",
+        {
+            "type": "object",
+            "required": ["ref"],
+            "properties": {"ref": _entity_ref_scope(base_spec, keyword, operands)},
+        },
+        dialect,
+        mode="none",
+    )
+    leaf = api.register(
+        "leaf",
+        {
+            "type": "object",
+            "required": ["ref"],
+            "properties": {"ref": _entity_ref_scope(leaf_spec, keyword, operands)},
+        },
+        dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=valid, mode="none")
+
+
+@pytest.mark.parametrize(
+    "base_spec,leaf_spec,expected_validity",
+    [
+        pytest.param(("K", "T"), ("K", "T"), True, id="equal"),
+        pytest.param(("K", "T"), ("K", "T*"), True, id="chain_wildcard_equal"),
+        pytest.param(("K", "T"), ("K", "D"), True, id="derived_root_narrows"),
+        pytest.param(("K", "D"), ("K", "T"), False, id="base_root_widens"),
+        pytest.param(("K", "T"), ("K", "T1.0"), True, id="pinned_minor_narrows"),
+        pytest.param(("K", "T1.0"), ("K", "T"), False, id="unpinned_minor_widens"),
+        pytest.param(("not", "K", "D"), ("not", "K", "T"), True, id="negated_widening"),
+        pytest.param(("not", "K", "T"), ("not", "K", "D"), False, id="negated_narrowing"),
+    ],
+)
+@pytest.mark.parametrize("keyword", [_TYPE_REF, _INSTANCE_REF])
+def test_entity_ref_derivation_compares_kind_filtered_scopes(
+    gts_api, schema_dialect, keyword, base_spec, leaf_spec, expected_validity
+):
+    _check_entity_ref_derivation(
+        gts_api, schema_dialect, keyword, base_spec, leaf_spec, expected_validity
+    )
+
+
+@pytest.mark.parametrize(
+    "base_spec,leaf_spec,expected_validity",
+    [
+        pytest.param((_TYPE_REF, "T"), (_INSTANCE_REF, "T"), False, id="type_to_instance"),
+        pytest.param((_INSTANCE_REF, "T"), (_TYPE_REF, "T"), False, id="instance_to_type"),
+        pytest.param(("union", "T"), (_TYPE_REF, "T"), True, id="union_to_type"),
+        pytest.param(("union", "T"), (_INSTANCE_REF, "T"), True, id="union_to_instance"),
+        pytest.param((_TYPE_REF, "T"), ("union", "T"), False, id="type_to_union"),
+        pytest.param((_INSTANCE_REF, "T"), (_INSTANCE_REF, "I"), True, id="instance_operand"),
+        pytest.param((_INSTANCE_REF, "I"), (_INSTANCE_REF, "T"), False, id="instance_to_root"),
+        pytest.param((_INSTANCE_REF, "I"), (_INSTANCE_REF, "I.0"), True, id="pin_instance_minor"),
+        pytest.param((_INSTANCE_REF, "I.0"), (_INSTANCE_REF, "I"), False, id="unpin_instance_minor"),
+    ],
+)
+def test_entity_ref_derivation_respects_kind(
+    gts_api, schema_dialect, base_spec, leaf_spec, expected_validity
+):
+    """Switching between nonempty type and instance scopes is never a valid
+    derivation; a union may be narrowed to either kind."""
+    _check_entity_ref_derivation(
+        gts_api, schema_dialect, None, base_spec, leaf_spec, expected_validity
+    )
+
+
+@pytest.mark.parametrize(
+    "leaf_operand,expected_validity",
+    [
+        pytest.param("self", True, id="self"),
+        pytest.param("base", True, id="base"),
+        pytest.param("namespace", False, id="namespace"),
+    ],
+)
+@pytest.mark.parametrize("keyword", [_TYPE_REF, _INSTANCE_REF])
+def test_entity_ref_derivation_resolves_self_for_each_schema(
+    gts_api, schema_dialect, keyword, leaf_operand, expected_validity
+):
+    """The base's `/$id` resolves to the base's own ID; the leaf may keep
+    `/$id` (its own, narrower ID) or name the base, but not widen to the
+    namespace."""
+    api = gts_api
+    base = api.register(
+        "base",
+        {
+            "type": "object",
+            "required": ["ref"],
+            "properties": {"ref": {"type": "string", keyword: "/$id"}},
+        },
+        schema_dialect,
+        mode="none",
+    )
+    operand = {"self": "/$id", "base": base, "namespace": api.id_prefix + ".*"}[
+        leaf_operand
+    ]
+    leaf = api.register(
+        "leaf",
+        {
+            "type": "object",
+            "required": ["ref"],
+            "properties": {"ref": {"type": "string", keyword: operand}},
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=expected_validity, mode="none")
+
+
+@pytest.mark.parametrize("keyword", [_TYPE_REF, _INSTANCE_REF])
+def test_entity_ref_inherited_constraint_survives_a_wider_overlay(
+    gts_api, schema_dialect, keyword
+):
+    """`allOf` conjoins the imported base scope with a wider overlay."""
+    api = gts_api
+    operands = _entity_ref_operands(api, schema_dialect)
+    narrow, wide = operands["D"], operands["T"]
+    base = api.register(
+        "base",
+        {"type": "object", "properties": {"ref": {"type": "string", keyword: narrow}}},
+        schema_dialect,
+        mode="none",
+    )
+    leaf = api.register(
+        "leaf",
+        {
+            "allOf": [
+                {"$ref": "gts://" + base},
+                {
+                    "type": "object",
+                    "properties": {"ref": {"type": "string", keyword: wide}},
+                },
+            ]
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=True, mode="none")
+    if keyword == _TYPE_REF:
+        inside, outside = narrow, wide
+    else:
+        inside, outside = narrow + "x.pytest._.item.v1", wide + "x.pytest._.item.v1"
+    for name, ref, valid in (("inside", inside, True), ("outside", outside, False)):
+        instance_id = api.register_instance(leaf, {"ref": ref}, name=name)
+        api.check_instance(instance_id, valid=valid, mode="none")
+
+
 if __name__ == "__main__":
     TestCaseTestOp12TypeDerivationValidation_DerivedSchemaFullyMatches().test_start()

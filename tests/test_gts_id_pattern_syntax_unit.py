@@ -1,15 +1,17 @@
-"""Offline checks of the value lists in test_x_gts_pattern_ref.py.
+"""Offline checks of the shared test cases in shared_id_pattern_cases.py.
 
 The recognizer below transcribes the `gts-id-pattern` grammar of README §10
 and the identifier grammar of §2.3, with the length and u32 version limits. It guards
-the test data against mistakes; it is not a GTS implementation.
+the test data against mistakes; it is not a GTS implementation and does not
+compute matching or coverage.
 """
 
 import re
 
 import pytest
 
-from . import test_x_gts_pattern_ref as patterns
+from . import shared_id_pattern_cases as patterns
+from .helpers.shared_cases import case_subtest
 
 pytestmark = pytest.mark.unit
 
@@ -42,32 +44,36 @@ def _is_gts_id_pattern(value):
     return True
 
 
-@pytest.mark.parametrize("value", patterns.VALID_PATTERNS)
-def test_valid_patterns_match_grammar(value):
-    assert _is_gts_id_pattern(value)
+def test_valid_patterns_match_grammar(subtests):
+    for case in patterns.VALID_PATTERNS:
+        (value,) = case.values
+        with case_subtest(subtests, case=case.id, value=value, expected=True):
+            assert _is_gts_id_pattern(value)
 
 
-@pytest.mark.parametrize("value", patterns.INVALID_PATTERNS)
-def test_invalid_patterns_do_not_match_grammar(value):
-    assert not _is_gts_id_pattern(value)
+def test_invalid_patterns_do_not_match_grammar(subtests):
+    for case in patterns.INVALID_PATTERNS:
+        (value,) = case.values
+        with case_subtest(subtests, case=case.id, value=value, expected=False):
+            assert not _is_gts_id_pattern(value)
 
 
 def test_length_boundary():
-    assert len(patterns._LONGEST_PATTERN) == 1024
+    assert len(patterns.LONGEST_PATTERN) == 1024
 
 
 @pytest.mark.parametrize(
     "pattern,completion,witness",
     [
         (
-            patterns._EMPTY_VENDOR_PATTERN,
-            patterns._EMPTY_VENDOR_COMPLETION,
-            patterns._VENDOR_WITNESS,
+            patterns.EMPTY_VENDOR_PATTERN,
+            patterns.EMPTY_VENDOR_COMPLETION,
+            patterns.VENDOR_WITNESS,
         ),
         (
-            patterns._EMPTY_VERSION_PATTERN,
-            patterns._EMPTY_VERSION_COMPLETION,
-            patterns._VERSION_WITNESS,
+            patterns.EMPTY_VERSION_PATTERN,
+            patterns.EMPTY_VERSION_COMPLETION,
+            patterns.VERSION_WITNESS,
         ),
     ],
     ids=["vendor", "version_marker"],
@@ -83,17 +89,60 @@ def test_empty_selection_boundary(pattern, completion, witness):
     assert _is_gts_id_pattern(witness)
 
 
-@pytest.mark.parametrize("operand,value", patterns.COVERED_CASES)
-def test_covered_vectors_are_syntactically_valid(operand, value):
-    """Check vector spelling, without computing the expected coverage."""
-    assert _is_gts_id_pattern(operand)
-    assert _is_gts_id_pattern(value)
+def _is_canonical_id(value):
+    return "*" not in value and _is_gts_id_pattern(value)
 
 
-@pytest.mark.parametrize("operand,value,witness", patterns.UNCOVERED_CASES)
-def test_uncovered_vectors_are_syntactically_valid(operand, value, witness):
-    """Check vector spelling; the witness is a concrete identifier."""
-    assert _is_gts_id_pattern(operand)
-    assert _is_gts_id_pattern(value)
-    assert "*" not in witness
-    assert _is_gts_id_pattern(witness)
+def test_match_vectors_are_syntactically_valid(subtests):
+    """The candidate is a canonical identifier; when it is not matched it is
+    also the coverage witness, so both results must be negative."""
+    for case in patterns.MATCH_CASES:
+        pattern, candidate, expect = case.values
+        with case_subtest(
+            subtests,
+            case=case.id,
+            pattern=pattern,
+            candidate=candidate,
+            expected=expect,
+        ):
+            assert _is_gts_id_pattern(pattern)
+            assert _is_canonical_id(candidate)
+            assert expect in (patterns.IN, patterns.OUT)
+
+
+def test_coverage_vectors_are_syntactically_valid(subtests):
+    """The candidate is a wildcard pattern; exactly the uncovered rows name a
+    canonical witness."""
+    for case in patterns.COVERAGE_CASES:
+        pattern, candidate, covered, witness = case.values
+        with case_subtest(
+            subtests,
+            case=case.id,
+            pattern=pattern,
+            candidate=candidate,
+            expected=covered,
+            witness=witness,
+        ):
+            assert _is_gts_id_pattern(pattern)
+            assert _is_gts_id_pattern(candidate)
+            assert "*" in candidate
+            if covered:
+                assert witness is None
+            else:
+                assert _is_canonical_id(witness)
+
+
+@pytest.mark.parametrize(
+    "cases",
+    [
+        patterns.MATCH_CASES,
+        patterns.COVERAGE_CASES,
+        patterns.VALID_PATTERNS,
+        patterns.INVALID_PATTERNS,
+    ],
+    ids=["match", "coverage", "valid", "invalid"],
+)
+def test_case_ids_and_vectors_are_unique(cases):
+    assert len({case.id for case in cases}) == len(cases)
+    vectors = [case.values[:2] for case in cases]
+    assert len(set(vectors)) == len(vectors)

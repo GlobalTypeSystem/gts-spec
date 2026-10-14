@@ -8,7 +8,7 @@
   "properties": {
     "type": {
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-type-ref": "/$id"
     },
     "displayName": {
       "type": "string",
@@ -24,7 +24,7 @@
       "description": "List of capabilities provided by this module.",
       "items": {
         "type": "string",
-        "x-gts-ref": "gts.x.core.modules.capability.v1~"
+        "x-gts-instance-ref": "gts.x.core.modules.capability.v1~"
       },
       "minItems": 0,
       "uniqueItems": true
@@ -34,7 +34,7 @@
       "description": "List of required modules.",
       "items": {
         "type": "string",
-        "x-gts-ref": "/$id"
+        "x-gts-instance-ref": "/$id"
       },
       "minItems": 0,
       "uniqueItems": true

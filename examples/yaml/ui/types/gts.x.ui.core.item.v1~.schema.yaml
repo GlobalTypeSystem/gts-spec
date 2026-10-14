@@ -18,7 +18,7 @@ properties:
   gtsType:
     type: string
     description: GTS identifier of the UI item type
-    x-gts-ref: /$id
+    x-gts-type-ref: /$id
 
   id:
     type: string

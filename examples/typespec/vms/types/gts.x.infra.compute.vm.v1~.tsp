@@ -16,7 +16,7 @@ model BaseVM {
   /**
    * GTS identifier of the VM type
    */
-  @extension("x-gts-ref", "/$id")
+  @extension("x-gts-type-ref", "/$id")
   type: string;
 
   /**
@@ -48,10 +48,10 @@ model BaseVM {
 
   /**
    * Current power state of the virtual machine.
-   * Reference to gts.x.infra.compute.vm_state.v1~ type.
+   * Reference to an instance of gts.x.infra.compute.vm_state.v1~.
    * See states/ directory for available state definitions.
    */
-  @extension("x-gts-ref", "gts.x.infra.compute.vm_state.v1~")
+  @extension("x-gts-instance-ref", "gts.x.infra.compute.vm_state.v1~")
   powerState: string;
 
   /**
@@ -62,7 +62,6 @@ model BaseVM {
   /**
    * Timestamp when the VM was created
    */
-  @format("date-time")
   createdAt: utcDateTime;
 
   /**

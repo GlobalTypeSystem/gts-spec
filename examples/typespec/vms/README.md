@@ -7,7 +7,7 @@ This directory contains GTS examples for virtual machine types across different 
 These examples demonstrate:
 - **Base VM type**: Common properties shared by all virtual machines
 - **Derived VM types**: Platform-specific extensions for VMWare ESXi, Nutanix AHV, and Virtuozzo
-- **Power states as GTS types**: Extensible state machine with vendor support
+- **Power states as GTS instances**: Well-known state values with vendor support
 
 ## Schema Definitions (TypeSpec)
 
@@ -16,7 +16,7 @@ These examples demonstrate:
 - **[gts.x.infra.compute.vm.v1~](types/gts.x.infra.compute.vm.v1~.tsp)** ([JSON Schema](types/gts.x.infra.compute.vm.v1~.schema.json))
   - Base virtual machine type with common properties
   - Properties: `type`, `id`, `name`, `cpuCores`, `ramMb`, `powerState`, `osType`, `createdAt`, `environment`, `owner`, `metadata`
-  - `powerState` uses GTS reference pattern for backward-compatible extensibility
+  - `type` uses `x-gts-type-ref`; `powerState` uses `x-gts-instance-ref` to reference a state instance
 
 ### Derived Types
 
@@ -24,9 +24,9 @@ These examples demonstrate:
 - **[gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~](types/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.tsp)** ([JSON Schema](types/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.schema.json)) - Nutanix AHV
 - **[gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~](types/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.tsp)** ([JSON Schema](types/gts.x.infra.compute.vm.v1~vz.vz._.vm.v1~.schema.json)) - Virtuozzo
 
-## Power States (GTS Reference Pattern)
+## Power States (GTS Instance References)
 
-Power states are defined as separate GTS types in `types/states/`:
+The final power-state type is defined in `types/states/`. Each state below is a well-known instance in `instances/states/`; vendors can add state instances without deriving new types.
 
 ### Base State Type
 
@@ -53,7 +53,7 @@ Power states are defined as separate GTS types in `types/states/`:
 
 ### Vendor-Specific States
 
-Vendors can add custom states using the same pattern:
+Vendors can publish custom state instances with identifiers such as:
 ```
 gts.x.infra.compute.vm_state.v1~vmware.esxi._.paused_due_error.v1
 ```
@@ -74,5 +74,5 @@ gts.x.infra.compute.vm.v1~<vendor>.<platform>._.vm.v1~
 
 ```bash
 npm install -g @typespec/compiler @typespec/json-schema
-tsp compile gts.x.infra.compute.vm.v1~.tsp --emit @typespec/json-schema
+tsp compile types/gts.x.infra.compute.vm.v1~.tsp --emit @typespec/json-schema
 ```

@@ -73,7 +73,7 @@
               "title": "Ref Validation",
               "default": "any-valid"
             },
-            "description": "x-gts-ref validation mode used when validate=true",
+            "description": "Registry lookup policy for x-gts-type-ref and x-gts-instance-ref, used when validate=true",
             "name": "gts-ref-validation",
             "in": "query"
           }
@@ -218,7 +218,7 @@
               "title": "Ref Validation",
               "default": "any-valid"
             },
-            "description": "x-gts-ref validation mode used when validate=true",
+            "description": "Registry lookup policy for x-gts-type-ref and x-gts-instance-ref, used when validate=true",
             "name": "gts-ref-validation",
             "in": "query"
           }
@@ -485,7 +485,7 @@
               "title": "Ref Validation",
               "default": "any-valid"
             },
-            "description": "x-gts-ref validation mode",
+            "description": "Registry lookup policy for x-gts-type-ref and x-gts-instance-ref",
             "name": "gts-ref-validation",
             "in": "query"
           }
@@ -547,7 +547,7 @@
               "title": "Ref Validation",
               "default": "any-valid"
             },
-            "description": "x-gts-ref validation mode",
+            "description": "Registry lookup policy for x-gts-type-ref and x-gts-instance-ref",
             "name": "gts-ref-validation",
             "in": "query"
           }
@@ -609,7 +609,7 @@
               "title": "Ref Validation",
               "default": "any-valid"
             },
-            "description": "x-gts-ref validation mode",
+            "description": "Registry lookup policy for x-gts-type-ref and x-gts-instance-ref",
             "name": "gts-ref-validation",
             "in": "query"
           }

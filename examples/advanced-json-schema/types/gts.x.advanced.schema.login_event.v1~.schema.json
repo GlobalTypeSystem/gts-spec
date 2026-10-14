@@ -3,7 +3,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "x-gts-abstract": true,
   "title": "Advanced Login Event (Base)",
-  "description": "Abstract base schema illustrating Draft-07 format assertions, selected-type x-gts-ref, and trait schema declaration.",
+  "description": "Abstract base schema illustrating Draft-07 format assertions, selected-type x-gts-type-ref, and trait schema declaration.",
   "type": "object",
   "required": [
     "id",
@@ -28,12 +28,12 @@
     "type": {
       "description": "Concrete GTS type identifier.",
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-type-ref": "/$id"
     },
     "canonical_type": {
       "description": "Optional canonical GTS type identifier supplied by concrete derived types.",
       "type": "string",
-      "x-gts-ref": "gts.*"
+      "x-gts-type-ref": "gts.*"
     },
     "tenant_id": {
       "description": "Tenant scope for this event.",
@@ -104,7 +104,7 @@
       "topicRef": {
         "description": "Target topic for this event family.",
         "type": "string",
-        "x-gts-ref": "gts.x.core.events.topic.v1~"
+        "x-gts-instance-ref": "gts.x.core.events.topic.v1~"
       },
       "retention": {
         "description": "ISO-8601 retention duration.",

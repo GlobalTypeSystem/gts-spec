@@ -18,7 +18,7 @@
       "topicRef": {
         "description": "GTS ID of the topic/stream where events of this type are published.",
         "type": "string",
-        "x-gts-ref": "gts.x.core.events.topic.v1~",
+        "x-gts-instance-ref": "gts.x.core.events.topic.v1~",
         "default": "gts.x.core.events.topic.v1~x.core._.default.v1"
       },
       "retention": {
@@ -32,7 +32,7 @@
     "type": {
       "description": "Identifier of the event type in GTS format.",
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-type-ref": "/$id"
     },
     "$schema": {
       "description": "Link to the event type schema.",
@@ -92,7 +92,7 @@
     "subjectType": {
       "description": "GTS type of the subject of the event.",
       "type": "string",
-      "x-gts-ref": "gts.*",
+      "x-gts-type-ref": "gts.*",
       "$comment": "The value is mandatory if subject is present"
     }
   },

@@ -10,7 +10,7 @@
   "properties": {
     "id": {
       "type": "string",
-      "x-gts-ref": "/$id"
+      "x-gts-instance-ref": "/$id"
     },
     "description": {
       "type": "string",

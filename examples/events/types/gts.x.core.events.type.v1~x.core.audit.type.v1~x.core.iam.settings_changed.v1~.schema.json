@@ -39,7 +39,7 @@
         },
         "subjectType": {
           "type": "string",
-          "x-gts-ref": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~"
+          "x-gts-type-ref": "gts.x.core.iam.settings.v1~x.core.iam.security_policy.v1~"
         }
       }
     }

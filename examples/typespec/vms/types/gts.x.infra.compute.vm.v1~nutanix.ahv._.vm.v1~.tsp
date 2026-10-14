@@ -12,7 +12,7 @@ using TypeSpec.JsonSchema;
  */
 @jsonSchema("/schemas/gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~.schema.json")
 model NutanixAHVVM {
-  @extension("x-gts-ref", "/$id")
+  @extension("x-gts-type-ref", "/$id")
   type: "gts.x.infra.compute.vm.v1~nutanix.ahv._.vm.v1~";
 
   @format("uuid")
@@ -30,13 +30,12 @@ model NutanixAHVVM {
   @maxValue(1048576)
   ramMb: int32;
 
-  /** Reference to gts.x.infra.compute.vm_state.v1~ */
-  @extension("x-gts-ref", "gts.x.infra.compute.vm_state.v1~")
+  /** Reference to an instance of gts.x.infra.compute.vm_state.v1~ */
+  @extension("x-gts-instance-ref", "gts.x.infra.compute.vm_state.v1~")
   powerState: string;
 
   osType?: string;
 
-  @format("date-time")
   createdAt: utcDateTime;
 
   environment?: string;

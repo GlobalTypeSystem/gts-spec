@@ -11,7 +11,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "x-gts-ref": "gts.x.core.events.type_combined.v1~x.commerce.orders.order_placed.v1.0~*"
+          "x-gts-instance-ref": "gts.x.core.events.type_combined.v1~x.commerce.orders.order_placed.v1.0~*"
         },
         "payload": {
           "type": "object",
@@ -25,7 +25,7 @@
         },
         "subjectType": {
           "type": "string",
-          "x-gts-ref": "gts.x.commerce.orders.order.v1.0~"
+          "x-gts-type-ref": "gts.x.commerce.orders.order.v1.0~"
         }
       }
     }

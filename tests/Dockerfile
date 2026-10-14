@@ -30,9 +30,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /tests
 
 # Install dependencies in a separately cached layer. requirements.txt is
-# resolved first so pip picks the overrides listed there (notably pydantic
-# 1.10.x); httprunner is then installed with --no-deps to sidestep its
-# pydantic<1.9 pin without dragging the resolver into a downgrade spiral.
+# resolved first with pytest 9, pytest-html 4 and pydantic 1.10.x. HttpRunner
+# is then installed separately with --no-deps to bypass its legacy pins.
 COPY requirements.txt ./
 RUN pip install --upgrade pip setuptools wheel \
  && pip install -r requirements.txt \
