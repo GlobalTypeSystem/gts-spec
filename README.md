@@ -1982,7 +1982,7 @@ For OP#4, when the candidate is itself a pattern, it matches the filter if and o
 
 **Matching examples**
 
-The tables below evaluate matching against concrete identifiers. **✅ MATCH** means that the candidate belongs to the pattern's selected set; **❌ NO MATCH** means that both strings are valid but the candidate is outside that set. These results do not depend on registry contents. When used with `x-gts-type-ref` or `x-gts-instance-ref`, candidate kind and the selected reference-validation policy are additional checks (§9.6.1). Pattern coverage and invalid syntax are illustrated separately below.
+The tables below evaluate matching against concrete identifiers. **✅** means that the candidate belongs to the pattern's selected set; **❌** means that both strings are valid but the candidate is outside that set. These results do not depend on registry contents. When used with `x-gts-type-ref` or `x-gts-instance-ref`, candidate kind and the selected reference-validation policy are additional checks (§9.6.1). Pattern coverage and invalid syntax are illustrated separately below.
 
 **Type identifiers, with and without a wildcard**
 
@@ -1991,15 +1991,17 @@ Both patterns give the same results for every candidate below:
 - `gts.vendor.package.namespace.type.v1~`
 - `gts.vendor.package.namespace.type.v1~*`
 
-| Candidate | Result | Reason |
-| --- | :---: | --- |
-| `gts.vendor.package.namespace.type.v1~` | ✅ MATCH | A Type ID selects itself; the optional trailing `*` can match an empty suffix. |
-| `gts.vendor.package.namespace.type.v1.0~` | ✅ MATCH | The pattern omits the minor, so an explicit minor is accepted. |
-| `gts.vendor.package.namespace.type.v1.2~` | ✅ MATCH | Any minor under major version 1 is accepted. |
-| `gts.vendor.package.namespace.type.v1.0~acme.package._.derived.v1.0~` | ✅ MATCH | A derived type under a matching base is included. |
-| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | An instance under a matching base is included. |
-| `gts.vendor.package.namespace.type.v2.0~` | ❌ NO MATCH | The base major version differs. |
-| `gts.vendor.package.namespace.type_extra.v1~` | ❌ NO MATCH | Type names must match as complete tokens. |
+Both include the type itself and its derived types and instances. The omitted minor accepts any minor under major version 1, including an omitted minor.
+
+| Candidate | Result |
+| --- | :---: |
+| `gts.vendor.package.namespace.type.v1~` | ✅ |
+| `gts.vendor.package.namespace.type.v1.0~` | ✅ |
+| `gts.vendor.package.namespace.type.v1.2~` | ✅ |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.derived.v1.0~` | ✅ |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ |
+| `gts.vendor.package.namespace.type.v2.0~` | ❌ |
+| `gts.vendor.package.namespace.type_extra.v1~` | ❌ |
 
 To include all major versions as well, use `gts.vendor.package.namespace.type.*` or `gts.vendor.package.namespace.type.v*`.
 
@@ -2007,16 +2009,18 @@ To include all major versions as well, use `gts.vendor.package.namespace.type.*`
 
 **Pattern:** `gts.vendor.package.namespace.type.v1.*`
 
-| Candidate | Result | Reason |
-| --- | :---: | --- |
-| `gts.vendor.package.namespace.type.v1.0~` | ✅ MATCH | The first type segment has an explicit minor under major version 1. |
-| `gts.vendor.package.namespace.type.v1~` | ❌ NO MATCH | The first type segment omits its minor. |
-| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | The instance tail may omit its minor; the wildcard covers the entire suffix. |
-| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v2.3` | ✅ MATCH | The wildcard does not constrain versions in subsequent segments. |
-| `gts.vendor.package.namespace.type.v1.0~acme.package._.derived.v1~` | ✅ MATCH | A derived type under the matching first segment is included. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ NO MATCH | The first type segment omits its minor. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.2` | ❌ NO MATCH | An explicit minor in the instance tail cannot satisfy the first segment's requirement. |
-| `gts.vendor.package.namespace.type.v2.0~acme.package._.instance.v1` | ❌ NO MATCH | The first segment has a different major version. |
+The first segment must have an explicit minor. The wildcard covers the entire suffix without constraining versions in later segments; a minor in a later segment cannot satisfy the first segment's requirement.
+
+| Candidate | Result |
+| --- | :---: |
+| `gts.vendor.package.namespace.type.v1.0~` | ✅ |
+| `gts.vendor.package.namespace.type.v1~` | ❌ |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v2.3` | ✅ |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.derived.v1~` | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.2` | ❌ |
+| `gts.vendor.package.namespace.type.v2.0~acme.package._.instance.v1` | ❌ |
 
 **Pinning the minor of a type**
 
@@ -2025,12 +2029,14 @@ Both patterns pin the first segment's minor and give the same results below:
 - `gts.vendor.package.namespace.type.v1.0~`
 - `gts.vendor.package.namespace.type.v1.0~*`
 
-| Candidate | Result | Reason |
-| --- | :---: | --- |
-| `gts.vendor.package.namespace.type.v1.0~` | ✅ MATCH | The specified major and minor match. |
-| `gts.vendor.package.namespace.type.v1~` | ❌ NO MATCH | An omitted minor is not an explicit zero. |
-| `gts.vendor.package.namespace.type.v1.1~` | ❌ NO MATCH | The explicit minor differs. |
-| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v2.3` | ✅ MATCH | Only the first segment's version is pinned. |
+The pinned `v1.0` excludes both an omitted minor and any different minor. Only the first segment's version is pinned; versions in later segments are unrestricted.
+
+| Candidate | Result |
+| --- | :---: |
+| `gts.vendor.package.namespace.type.v1.0~` | ✅ |
+| `gts.vendor.package.namespace.type.v1~` | ❌ |
+| `gts.vendor.package.namespace.type.v1.1~` | ❌ |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v2.3` | ✅ |
 
 The same version rules apply to major zero: `v0~*` accepts `v0~` and `v0.1~`; `v0.*` accepts `v0.1~` but excludes `v0~`; `v0.1~*` excludes `v0.2~`.
 
@@ -2038,16 +2044,18 @@ The same version rules apply to major zero: `v0~*` accepts `v0~` and `v0.1~`; `v
 
 **Pattern:** `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1`
 
-| Candidate | Result | Reason |
-| --- | :---: | --- |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ✅ MATCH | The identifier itself is included. |
-| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | The type segment's omitted minor accepts an explicit minor. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.2` | ✅ MATCH | The instance segment's omitted minor accepts an explicit minor. |
-| `gts.vendor.package.namespace.type.v1.3~acme.package._.instance.v1.2` | ✅ MATCH | Omitted minors are flexible independently in both segments. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v12` | ❌ NO MATCH | Major version 1 does not match 12. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance_extra.v1` | ❌ NO MATCH | The instance name differs. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~` | ❌ NO MATCH | The candidate is a type, not an instance. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~acme.package._.item.v1` | ❌ NO MATCH | A concrete instance selector does not extend to longer chains. |
+Omitted minors are flexible independently in both segments. The selector requires the same instance structure, names, and major versions; it excludes types and longer chains.
+
+| Candidate | Result |
+| --- | :---: |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ✅ |
+| `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.2` | ✅ |
+| `gts.vendor.package.namespace.type.v1.3~acme.package._.instance.v1.2` | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v12` | ❌ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance_extra.v1` | ❌ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~` | ❌ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~acme.package._.item.v1` | ❌ |
 
 With both minors pinned, the pattern `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1.0` selects only that exact instance identifier. It excludes the same names with an omitted minor in either segment or a different explicit minor. Matching flexible selectors does not make distinct identifiers equal or interchangeable as registry lookup keys.
 
@@ -2056,57 +2064,68 @@ With both minors pinned, the pattern `gts.vendor.package.namespace.type.v1.0~acm
 - Minor wildcard: `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.*`
 - Chain wildcard: `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~*`
 
-| Candidate | Minor wildcard | Chain wildcard | Reason |
-| --- | :---: | :---: | --- |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ NO MATCH | ❌ NO MATCH | The last segment has neither an explicit minor nor a type-ending `~`. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0` | ✅ MATCH | ❌ NO MATCH | The minor wildcard can select an instance; the chain wildcard requires a type at that position. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~` | ❌ NO MATCH | ✅ MATCH | The chain wildcard accepts the type itself with an omitted minor. |
-| `gts.vendor.package.namespace.type.v1.2~acme.package._.instance.v1.0~` | ✅ MATCH | ✅ MATCH | Both accept this type; the earlier segment retains its minor flexibility. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0~acme.package._.item.v2` | ✅ MATCH | ✅ MATCH | Both include descendants of the matching type segment. |
+The minor wildcard requires an explicit minor in the second segment and accepts either an instance or a type there. The chain wildcard requires a type at that position and accepts an omitted minor. Both include descendants of a matching type, and the earlier segment retains its minor flexibility.
+
+| Candidate | Minor wildcard | Chain wildcard |
+| --- | :---: | :---: |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ | ❌ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0` | ✅ | ❌ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1~` | ❌ | ✅ |
+| `gts.vendor.package.namespace.type.v1.2~acme.package._.instance.v1.0~` | ✅ | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0~acme.package._.item.v2` | ✅ | ✅ |
 
 **UUID tails and prefix boundaries**
 
 **Pattern:** `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123456`
 
-| Candidate | Result | Reason |
-| --- | :---: | --- |
-| `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123456` | ✅ MATCH | The UUID tail is identical. |
-| `gts.vendor.package.namespace.type.v1.2~7a1d2f34-5678-49ab-9012-abcdef123456` | ✅ MATCH | Minor flexibility still applies to the type segment. |
-| `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123457` | ❌ NO MATCH | UUID tails must match exactly. |
+The UUID tail must match exactly; minor flexibility still applies to the type segment.
 
-| Pattern | Candidate | Result | Reason |
-| --- | --- | :---: | --- |
-| `gts.*` | `gts.vendor.package.namespace.type.v1~` | ✅ MATCH | The universal pattern selects every canonical identifier. |
-| `gts.acme.*` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ NO MATCH | A vendor prefix is anchored to the first segment, not any segment in the chain. |
-| `gts.vendor.package.namespace.type.v1~acme.*` | `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ MATCH | The next segment starts with the required vendor. |
-| `gts.vendor.package.namespace.type.v1~acme.*` | `gts.vendor.package.namespace.type.v1.0~` | ❌ NO MATCH | A named suffix requires another segment; unlike bare `~*`, it cannot be empty. |
+| Candidate | Result |
+| --- | :---: |
+| `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123456` | ✅ |
+| `gts.vendor.package.namespace.type.v1.2~7a1d2f34-5678-49ab-9012-abcdef123456` | ✅ |
+| `gts.vendor.package.namespace.type.v1~7a1d2f34-5678-49ab-9012-abcdef123457` | ❌ |
+
+Vendor prefixes are anchored to their segment position. A named suffix such as `~acme.*` requires another segment; unlike bare `~*`, it cannot be empty.
+
+| Pattern | Candidate | Result |
+| --- | --- | :---: |
+| `gts.*` | `gts.vendor.package.namespace.type.v1~` | ✅ |
+| `gts.acme.*` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | ❌ |
+| `gts.vendor.package.namespace.type.v1~acme.*` | `gts.vendor.package.namespace.type.v1.0~acme.package._.instance.v1` | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.*` | `gts.vendor.package.namespace.type.v1.0~` | ❌ |
 
 **Pattern coverage examples**
 
-Here the candidate is itself a selector. **✅ YES** means `M(candidate) ⊆ M(filter)`, as required by `x-gts-pattern-ref` and OP#4 pattern-candidate matching. One common matching identifier is insufficient to prove coverage.
+Here the candidate is itself a selector. **✅** means `M(candidate) ⊆ M(filter)`, as required by `x-gts-pattern-ref` and OP#4 pattern-candidate matching. One common matching identifier is insufficient to prove coverage.
 
-| Filter | Candidate pattern | Covers? | Reason |
-| --- | --- | :---: | --- |
-| `gts.vendor.package.namespace.type.v1~` | `gts.vendor.package.namespace.type.v1~*` | ✅ YES | A concrete Type ID and its chain wildcard select the same set. |
-| `gts.vendor.package.namespace.type.v1~*` | `gts.vendor.package.namespace.type.v1~` | ✅ YES | The equivalence holds in both directions. |
-| `gts.vendor.package.namespace.type.v1~` | `gts.vendor.package.namespace.type.v1.*` | ✅ YES | Explicit-minor first segments are a subset of the flexible type scope. |
-| `gts.vendor.package.namespace.type.v1.*` | `gts.vendor.package.namespace.type.v1~*` | ❌ NO | The candidate also selects `gts.vendor.package.namespace.type.v1~`, which the filter excludes. |
-| `gts.vendor.package.namespace.type.v1.*` | `gts.vendor.package.namespace.type.v1.0~*` | ✅ YES | Every selected identifier has an explicit first-segment minor of zero. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0` | ✅ YES | Pinning the instance minor narrows the selected set. |
-| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.*` | ❌ NO | The candidate can also select types and longer chains, outside the concrete instance scope. |
+A concrete Type ID and its chain wildcard cover each other. Pinning an omitted minor narrows the selected set. For a type scope, `v1.*` excludes the omitted-minor spelling selected by `v1~*`. A minor wildcard at an instance's position also selects types and longer chains outside that concrete instance scope.
+
+For the `~acme.*` filter below, the omitted base minor accepts `v1.0`, and the wildcard covers the derived type and every further derived type or instance selected by it.
+
+| Filter | Candidate pattern | Covers? |
+| --- | --- | :---: |
+| `gts.vendor.package.namespace.type.v1~` | `gts.vendor.package.namespace.type.v1~*` | ✅ |
+| `gts.vendor.package.namespace.type.v1~*` | `gts.vendor.package.namespace.type.v1~` | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.*` | `gts.vendor.package.namespace.type.v1.0~acme.package._.derived.v1.0~` | ✅ |
+| `gts.vendor.package.namespace.type.v1~` | `gts.vendor.package.namespace.type.v1.*` | ✅ |
+| `gts.vendor.package.namespace.type.v1.*` | `gts.vendor.package.namespace.type.v1~*` | ❌ |
+| `gts.vendor.package.namespace.type.v1.*` | `gts.vendor.package.namespace.type.v1.0~*` | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.0` | ✅ |
+| `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1` | `gts.vendor.package.namespace.type.v1~acme.package._.instance.v1.*` | ❌ |
 
 **Invalid pattern examples**
 
-**❌ INVALID** denotes a syntax error; **❌ NO MATCH** denotes a valid pattern that does not select the candidate.
+In this table, **❌** denotes invalid pattern syntax. In the matching and coverage tables above, both operands are valid patterns or identifiers.
 
 | Pattern | Result | Reason |
 | --- | :---: | --- |
-| `gts.vendor.package.namespace.typ*` | ❌ INVALID | A wildcard cannot follow part of a type-name token. |
-| `gts.vendor.package.namespace.type.v1*` | ❌ INVALID | A wildcard cannot immediately follow a major-version number. |
-| `gts.vendor.package.namespace.type.v1.0.*` | ❌ INVALID | A wildcard cannot follow a minor-version token. |
-| `gts.vendor.package.namespace.type.v*~*` | ❌ INVALID | Only one wildcard is allowed, at the end. |
-| `gts.vendor.*.namespace.type.v1~` | ❌ INVALID | A wildcard cannot appear in the middle. |
-| `gts.vendor.package.namespace.type.v4294967296~*` | ❌ INVALID | A version component exceeds the unsigned 32-bit limit. |
+| `gts.vendor.package.namespace.typ*` | ❌ | A wildcard cannot follow part of a type-name token. |
+| `gts.vendor.package.namespace.type.v1*` | ❌ | A wildcard cannot immediately follow a major-version number. |
+| `gts.vendor.package.namespace.type.v1.0.*` | ❌ | A wildcard cannot follow a minor-version token. |
+| `gts.vendor.package.namespace.type.v*~*` | ❌ | Only one wildcard is allowed, at the end. |
+| `gts.vendor.*.namespace.type.v1~` | ❌ | A wildcard cannot appear in the middle. |
+| `gts.vendor.package.namespace.type.v4294967296~*` | ❌ | A version component exceeds the unsigned 32-bit limit. |
 
 
 ## 11. JSON and JSON Schema Conventions
