@@ -5266,5 +5266,164 @@ def test_entity_ref_inherited_constraint_survives_a_wider_overlay(
         api.check_instance(instance_id, valid=valid, mode="none")
 
 
+# ---------------------------------------------------------------------------
+# Reference scopes at non-property locations.
+#
+# OP#12 admits a derived schema only when Valid(derived) ⊆ Valid(base) (spec
+# §4.1). For the reference keywords that subset comparison is kind- and
+# coverage-aware (§9.6.1/§9.6.2): a narrower operand is admissible, a wider one
+# is rejected. The reference keywords are *not* special to top-level properties
+# — §9.6.3 requires the same dialect-aware traversal of every schema location,
+# "including array-item schemas" and composition branches. The tests above only
+# place reference keywords on top-level properties, so the cases below cover the
+# two locations that traversal is most likely to miss: array `items` and a
+# reference nested inside a property's own `allOf`.
+#
+# The two §9.6.2 operands anchor every "narrower vs wider" pair:
+#   _PATTERN_RESOURCE = "gts.x.core.resources.resource.v1~"  (this type family,
+#       its derived types and instances, within major version 1)
+#   _PATTERN_FAMILY   = "gts.x.core.resources.resource.*"    (the same, but the
+#       wildcard also admits every *other* major version — strictly wider)
+# so FAMILY ⊋ RESOURCE: deriving RESOURCE from FAMILY narrows (admissible),
+# deriving FAMILY from RESOURCE widens (rejected).
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "base_operand,leaf_operand,expected_validity",
+    [
+        # Narrowing (RESOURCE ⊆ FAMILY) and an equal scope are admissible;
+        # widening (FAMILY ⊄ RESOURCE) is rejected.
+        pytest.param(_PATTERN_FAMILY, _PATTERN_RESOURCE, True, id="narrowing"),
+        pytest.param(_PATTERN_RESOURCE, _PATTERN_RESOURCE, True, id="equal"),
+        pytest.param(_PATTERN_RESOURCE, _PATTERN_FAMILY, False, id="widening"),
+    ],
+)
+def test_pattern_ref_derivation_compares_array_items(
+    gts_api, schema_dialect, base_operand, leaf_operand, expected_validity
+):
+    """`x-gts-pattern-ref` under array `items` is compared like one under a
+    property (§9.6.2/§9.6.3): the derived item scope must be covered by the
+    base's. An implementation that only compares `properties` would treat the
+    array element scope as unconstrained and wrongly admit the widening case.
+    """
+    api = gts_api
+
+    def schema(operand):
+        return {
+            "type": "object",
+            "properties": {
+                "scopes": {
+                    "type": "array",
+                    "items": {"type": "string", "x-gts-pattern-ref": operand},
+                },
+            },
+        }
+
+    base = api.register("base", schema(base_operand), schema_dialect)
+    # validate=False: the widening leaf is intentionally non-admissible, so it is
+    # registered without validation and judged by check_type_schema below.
+    leaf = api.register(
+        "leaf",
+        schema(leaf_operand),
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=expected_validity)
+
+
+@pytest.mark.parametrize(
+    "base_operand,leaf_operand,expected_validity",
+    [
+        # "T" is the target type root; "D" is a type derived from it, so the
+        # kind-filtered scope of D is contained in that of T for both keywords
+        # (derived types ⊆ T; instances under D ⊆ instances under T).
+        pytest.param("T", "D", True, id="narrowing"),
+        pytest.param("T", "T", True, id="equal"),
+        pytest.param("D", "T", False, id="widening"),
+    ],
+)
+@pytest.mark.parametrize("keyword", [_TYPE_REF, _INSTANCE_REF])
+def test_entity_ref_derivation_compares_array_items(
+    gts_api, schema_dialect, keyword, base_operand, leaf_operand, expected_validity
+):
+    """`x-gts-type-ref` / `x-gts-instance-ref` under array `items` take part in
+    the kind-filtered scope comparison (§9.6.1/§9.6.3), exactly as under a
+    property. Registry lookup is disabled (mode="none") so the verdict reflects
+    the operand scopes, not whether the targets are registered.
+    """
+    api = gts_api
+    operands = _entity_ref_operands(api, schema_dialect)
+
+    def schema(operand):
+        return {
+            "type": "object",
+            "properties": {
+                "refs": {
+                    "type": "array",
+                    "items": {"type": "string", keyword: operand},
+                },
+            },
+        }
+
+    base = api.register(
+        "base", schema(operands[base_operand]), schema_dialect, mode="none"
+    )
+    leaf = api.register(
+        "leaf",
+        schema(operands[leaf_operand]),
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=expected_validity, mode="none")
+
+
+def test_pattern_ref_derivation_conjoins_allof_within_a_property(
+    gts_api, schema_dialect
+):
+    """A reference nested inside a property's own `allOf` is part of that
+    property's effective scope.
+
+    Here the base `scope` is an `allOf` of a RESOURCE pattern reference and a
+    plain `{"type": "string"}` branch. `allOf` is a conjunction (§9.6.3), so the
+    effective scope is still RESOURCE; the plain branch must not erase it. The
+    leaf redeclares `scope` with the wider FAMILY pattern, which is not covered
+    by RESOURCE, so the derivation must be rejected. An implementation that
+    folds `allOf` branches but copies only direct reference keywords would drop
+    the inherited reference and wrongly admit the leaf.
+    """
+    api = gts_api
+    base = api.register(
+        "base",
+        {
+            "type": "object",
+            "properties": {
+                "scope": {
+                    "allOf": [
+                        {"type": "string", "x-gts-pattern-ref": _PATTERN_RESOURCE},
+                        {"type": "string"},
+                    ],
+                },
+            },
+        },
+        schema_dialect,
+    )
+    leaf = api.register(
+        "leaf",
+        {
+            "type": "object",
+            "properties": {
+                "scope": {"type": "string", "x-gts-pattern-ref": _PATTERN_FAMILY},
+            },
+        },
+        schema_dialect,
+        type_id=api.derived_type_id(base, "leaf"),
+        validate=False,
+    )
+    api.check_type_schema(leaf, valid=False)
+
+
 if __name__ == "__main__":
     TestCaseTestOp12TypeDerivationValidation_DerivedSchemaFullyMatches().test_start()
