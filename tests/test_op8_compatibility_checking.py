@@ -2437,5 +2437,119 @@ def test_entity_ref_evolution_resolves_each_self_reference(
     ]
     _check_compatibility(api, *types, expected_verdicts)
 
+
+# ---------------------------------------------------------------------------
+# Reference scopes under array items.
+#
+# OP#8 compatibility is defined by accepted-instance-set inclusion (spec §4.3):
+# old→new is *backward* compatible when Valid(old) ⊆ Valid(new) (new readers
+# accept old data) and *forward* compatible when Valid(new) ⊆ Valid(old). So a
+# widening change (new scope strictly broader) is backward- but not
+# forward-compatible (_WIDENING); a narrowing change is the reverse (_NARROWING);
+# equal scopes are fully compatible (_COMPATIBLE).
+#
+# §9.6.3 requires this scope comparison at every dialect schema location, "incl-
+# uding array-item schemas", not just top-level properties. The evolution tests
+# above exercise properties; the two below move the identical reference operands
+# under array `items` and expect the same verdicts, so an implementation that
+# compares only `properties` (and silently ignores a reference under `items`)
+# would report the wrong verdict. Operands reuse the §9.6.2 RESOURCE ⊊ FAMILY
+# pair and the entity "T" (type root) ⊋ "D" (derived type) pair.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "old_operand,new_operand,expected_verdicts",
+    [
+        # new widens RESOURCE → FAMILY: backward-compatible, forward-incompatible.
+        pytest.param(
+            _PATTERN_RESOURCE, _PATTERN_FAMILY, _WIDENING, id="pattern_widening"
+        ),
+        # new narrows FAMILY → RESOURCE: the reverse.
+        pytest.param(
+            _PATTERN_FAMILY, _PATTERN_RESOURCE, _NARROWING, id="pattern_narrowing"
+        ),
+        pytest.param(
+            _PATTERN_RESOURCE, _PATTERN_RESOURCE, _COMPATIBLE, id="pattern_equal"
+        ),
+    ],
+)
+def test_pattern_ref_evolution_compares_array_items(
+    gts_api, schema_dialect, old_operand, new_operand, expected_verdicts
+):
+    """`x-gts-pattern-ref` under array `items` evolves like one under a property
+    (§9.6.2/§9.6.3): the verdict is decided by coverage between the old and new
+    item-element scopes, in both directions."""
+    api = gts_api
+    types = []
+    # old is v1.0 and new is v1.1 of the same type root, differing only in the
+    # pattern reference carried by the array's element schema.
+    for name, version, operand in (
+        ("old", "1.0", old_operand),
+        ("new", "1.1", new_operand),
+    ):
+        types.append(
+            api.register(
+                name,
+                {
+                    "type": "object",
+                    "properties": {
+                        "scopes": {
+                            "type": "array",
+                            "items": {"type": "string", "x-gts-pattern-ref": operand},
+                        },
+                    },
+                },
+                schema_dialect,
+                type_id=api.type_id("evolution", version),
+            )
+        )
+    _check_compatibility(api, *types, expected_verdicts)
+
+
+@pytest.mark.parametrize(
+    "old_operand,new_operand,expected_verdicts",
+    [
+        # new widens D → T (derived type root → type root): backward-compatible.
+        pytest.param("D", "T", _WIDENING, id="widening"),
+        # new narrows T → D: forward-compatible.
+        pytest.param("T", "D", _NARROWING, id="narrowing"),
+        pytest.param("T", "T", _COMPATIBLE, id="equal"),
+    ],
+)
+@pytest.mark.parametrize("keyword", [_TYPE_REF, _INSTANCE_REF])
+def test_entity_ref_evolution_compares_array_items(
+    gts_api, schema_dialect, keyword, old_operand, new_operand, expected_verdicts
+):
+    """`x-gts-type-ref` / `x-gts-instance-ref` under array `items` evolve with
+    the same kind-filtered scope comparison as under a property (§9.6.1/§9.6.3).
+    The operands are registered valid targets, so the verdict reflects the scope
+    relation rather than registry contents."""
+    api = gts_api
+    operands = _entity_ref_operands(api, schema_dialect)
+    types = []
+    for name, version, operand in (
+        ("old", "1.0", old_operand),
+        ("new", "1.1", new_operand),
+    ):
+        types.append(
+            api.register(
+                name,
+                {
+                    "type": "object",
+                    "properties": {
+                        "refs": {
+                            "type": "array",
+                            "items": {"type": "string", keyword: operands[operand]},
+                        },
+                    },
+                },
+                schema_dialect,
+                type_id=api.type_id("evolution", version),
+            )
+        )
+    _check_compatibility(api, *types, expected_verdicts)
+
+
 if __name__ == "__main__":
     TestCaseTestOp8Compatibility_BackwardCompatible().test_start()
