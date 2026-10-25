@@ -979,6 +979,107 @@ def test_abstract_and_final_targets(gts_api, schema_dialect, mode):
 
 
 # ---------------------------------------------------------------------------
+# Reference depth: `any-valid` paths of up to 64 hops get the verdict they would
+# get without a limit; a longer path may fail, but only as an explicit failure
+# of the whole validation (§9.6.1)
+# ---------------------------------------------------------------------------
+
+REFERENCE_DEPTH = 64
+BROKEN_TYPE = {
+    "type": "object",
+    "x-gts-traits-schema": {
+        "type": "object",
+        "required": ["retention"],
+        "properties": {"retention": {"type": "string"}},
+    },
+}
+
+
+def _instance_chain(api, dialect, name, hops, *, valid_tail=True, validate_head=False):
+    """`hops + 1` instances of one type, each referencing the next.
+
+    Validating the head under `any-valid` follows `hops` reference hops. Every
+    instance needs a `name`; the tail lacks it when `valid_tail` is false.
+    Returns the type ID and the head instance ID.
+    """
+    item = _register_type(
+        api,
+        dialect,
+        api.type_id(name),
+        {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+                "name": {"type": "string"},
+                "next": {"type": "string", INSTANCE_REF: api.type_id(name)},
+            },
+        },
+    )
+    for index in range(hops, -1, -1):
+        payload = {"name": f"n{index}"} if index < hops or valid_tail else {}
+        if index < hops:
+            payload["next"] = f"{item}x.pytest._.n{index + 1}.v1"
+        head = api.register_instance(
+            item, payload, name=f"n{index}", validate=validate_head and index == 0
+        )
+    return item, head
+
+
+def _not_holder(api, dialect, name, item):
+    return api.register(name, _holder({"type": "string", "not": {INSTANCE_REF: item}}), dialect)
+
+
+def test_reference_depth_supports_64_instance_hops(gts_api, schema_dialect):
+    """Registration with validation and explicit validation of a 64-hop head."""
+    api = gts_api
+    _, head = _instance_chain(
+        api, schema_dialect, "valid", REFERENCE_DEPTH, validate_head=True
+    )
+    api.check_instance(head, valid=True)
+    _, head = _instance_chain(
+        api, schema_dialect, "broken", REFERENCE_DEPTH, valid_tail=False
+    )
+    api.check_instance(head, valid=False)
+
+
+def test_reference_depth_supports_64_hops_under_not(gts_api, schema_dialect):
+    """Within the limit `not` inverts the target verdict as usual. The holder
+    instance adds one hop, so a 63-hop chain makes a 64-hop path."""
+    api = gts_api
+    for name, valid_tail in (("valid", True), ("broken", False)):
+        item, head = _instance_chain(
+            api, schema_dialect, name, REFERENCE_DEPTH - 1, valid_tail=valid_tail
+        )
+        holder = _not_holder(api, schema_dialect, f"holder_{name}", item)
+        _check_refs(api, holder, [(head, not valid_tail)], mode="any-valid")
+
+
+def test_reference_depth_supports_64_operand_hops(gts_api, schema_dialect):
+    """Concrete operand targets of type schemas are hops too."""
+    api = gts_api
+    for name, tail in (("valid", {"type": "object"}), ("broken", BROKEN_TYPE)):
+        types = [api.type_id(f"{name}{index}") for index in range(REFERENCE_DEPTH + 1)]
+        _register_type(api, schema_dialect, types[-1], tail, validate=False)
+        for index in range(REFERENCE_DEPTH - 1, -1, -1):
+            ref = {"type": "string", TYPE_REF: types[index + 1]}
+            _register_type(api, schema_dialect, types[index], _holder(ref), validate=False)
+        api.check_type_schema(types[0], valid=name == "valid")
+
+
+def test_reference_depth_failure_is_not_inverted(gts_api, schema_dialect):
+    """Past the limit an implementation may fail the whole validation, which
+    `not` cannot turn into a pass. Without a limit, the valid head fails `not`
+    anyway, so the payload is rejected either way. `none` and `any-present`
+    check no target validity and follow no hops."""
+    api = gts_api
+    item, head = _instance_chain(api, schema_dialect, "long", 500)
+    api.check_instance(head, valid=True, mode="none")
+    api.check_instance(head, valid=True, mode="any-present")
+    holder = _not_holder(api, schema_dialect, "holder", item)
+    _check_refs(api, holder, [(head, False)], mode="any-valid")
+
+
+# ---------------------------------------------------------------------------
 # Traits
 # ---------------------------------------------------------------------------
 
