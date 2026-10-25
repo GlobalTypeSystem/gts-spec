@@ -1080,6 +1080,130 @@ def test_reference_depth_failure_is_not_inverted(gts_api, schema_dialect):
 
 
 # ---------------------------------------------------------------------------
+# Reference cycles: without negated references a cycle gets its greatest
+# consistent verdicts; a negated reference within a cycle makes it undecidable,
+# which fails every validation that reaches it as a whole (§9.6.1)
+# ---------------------------------------------------------------------------
+
+
+def _cycle_type(api, dialect, name, ref_schema):
+    """A type whose `ref` property holds `ref_schema`, registered unvalidated so
+    that types can reference each other in either order."""
+    return _register_type(
+        api,
+        dialect,
+        api.type_id(name),
+        {"type": "object", "properties": {"ref": ref_schema}},
+        validate=False,
+    )
+
+
+def _cycle_instance(api, type_id, name, ref):
+    return api.register_instance(type_id, {"ref": ref}, name=name)
+
+
+def _instance_id(type_id, name):
+    return f"{type_id}x.pytest._.{name}.v1"
+
+
+def test_reference_cycle_without_negation(gts_api, schema_dialect):
+    """Entities that only reference each other are valid; once one fails on
+    its own, every entity requiring it to be valid fails as well."""
+    api = gts_api
+    item = _register_type(
+        api,
+        schema_dialect,
+        api.type_id("item"),
+        {
+            "type": "object",
+            "required": ["name"],
+            "properties": {
+                "name": {"type": "string"},
+                "ref": {"type": "string", INSTANCE_REF: api.type_id("item")},
+            },
+        },
+        validate=False,
+    )
+    a, b = _instance_id(item, "a"), _instance_id(item, "b")
+    api.register_instance(item, {"name": "a", "ref": b}, name="a")
+    api.register_instance(item, {"name": "b", "ref": a}, name="b")
+    api.check_instance(a, valid=True)
+    api.check_instance(b, valid=True)
+
+    c, d = _instance_id(item, "c"), _instance_id(item, "d")
+    api.register_instance(item, {"name": "c", "ref": d}, name="c")
+    api.register_instance(item, {"ref": c}, name="d")
+    api.check_instance(c, valid=False)
+    api.check_instance(d, valid=False)
+
+    # A negated reference to a cycle that does not reach back to the referrer
+    # is outside it: `not` inverts its verdict as usual.
+    holder = _not_holder(api, schema_dialect, "holder", item)
+    _check_refs(api, holder, [(a, False), (c, True)], mode="any-valid")
+
+
+@pytest.mark.parametrize(
+    "negated",
+    [
+        pytest.param(lambda ref: {"not": ref}, id="not"),
+        pytest.param(lambda ref: {"oneOf": [ref, {"type": "string"}]}, id="oneOf"),
+        pytest.param(lambda ref: {"if": ref, "then": False}, id="if"),
+    ],
+)
+def test_reference_cycle_through_negation_is_undecidable(gts_api, schema_dialect, negated):
+    """`p` requires its target not to be valid and `q` requires `p` to be
+    valid, so `p` would be valid exactly when it is invalid. Both fail,
+    whichever is validated."""
+    api = gts_api
+    p_type, q_type = api.type_id("p"), api.type_id("q")
+    _cycle_type(api, schema_dialect, "p", {"type": "string", **negated({INSTANCE_REF: q_type})})
+    _cycle_type(api, schema_dialect, "q", {"type": "string", INSTANCE_REF: p_type})
+    p = _cycle_instance(api, p_type, "p", _instance_id(q_type, "q"))
+    q = _cycle_instance(api, q_type, "q", p)
+    api.check_instance(p, valid=False)
+    api.check_instance(q, valid=False)
+
+
+def test_mutually_exclusive_entities_are_undecidable(gts_api, schema_dialect):
+    """Each entity requires the other not to be valid. Either one valid is
+    consistent, so neither verdict may depend on which entity is validated
+    first: both fail."""
+    api = gts_api
+    item = _cycle_type(
+        api, schema_dialect, "item", {"type": "string", "not": {INSTANCE_REF: api.type_id("item")}}
+    )
+    p, q = _instance_id(item, "p"), _instance_id(item, "q")
+    _cycle_instance(api, item, "p", q)
+    _cycle_instance(api, item, "q", p)
+    api.check_instance(p, valid=False)
+    api.check_instance(q, valid=False)
+
+
+def test_undecidable_cycle_is_not_inverted_or_rescued(gts_api, schema_dialect):
+    """A holder outside the undecidable cycle reaches it through `not` or an
+    `anyOf` branch; the failure of the whole validation still stands. `none`
+    and `any-present` check no target validity and form no cycles."""
+    api = gts_api
+    p_type, q_type = api.type_id("p"), api.type_id("q")
+    _cycle_type(api, schema_dialect, "p", {"type": "string", "not": {INSTANCE_REF: q_type}})
+    _cycle_type(api, schema_dialect, "q", {"type": "string", INSTANCE_REF: p_type})
+    p = _cycle_instance(api, p_type, "p", _instance_id(q_type, "q"))
+    _cycle_instance(api, q_type, "q", p)
+    for mode in ("none", "any-present"):
+        api.check_instance(p, valid=False, mode=mode)
+
+    not_holder = _not_holder(api, schema_dialect, "not_holder", q_type)
+    any_holder = api.register(
+        "any_holder",
+        _holder({"type": "string", "anyOf": [{INSTANCE_REF: q_type}, {"type": "string"}]}),
+        schema_dialect,
+    )
+    q = _instance_id(q_type, "q")
+    _check_refs(api, not_holder, [(q, False)], mode="any-valid")
+    _check_refs(api, any_holder, [(q, False)], mode="any-valid")
+
+
+# ---------------------------------------------------------------------------
 # Traits
 # ---------------------------------------------------------------------------
 
