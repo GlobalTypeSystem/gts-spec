@@ -2269,6 +2269,122 @@ _WIDENING = {"backward": "compatible", "forward": "incompatible", "full": "incom
 _NARROWING = {"backward": "incompatible", "forward": "compatible", "full": "incompatible"}
 
 
+def test_nullable_any_of_widening_is_backward_compatible(gts_api, schema_dialect):
+    """Adding literal B preserves the previously accepted null and A (gts-rust #152)."""
+    old_type_id = gts_api.register(
+        "nullable",
+        {
+            "type": ["string", "null"],
+            "anyOf": [
+                {"type": "null"},
+                {"type": "string", "const": "A"},
+            ],
+        },
+        schema_dialect,
+        type_id=gts_api.type_id("nullable", "1.0"),
+    )
+    new_type_id = gts_api.register(
+        "nullable",
+        {
+            "type": ["string", "null"],
+            "anyOf": [
+                {"type": "null"},
+                {"type": "string", "const": "A"},
+                {"type": "string", "const": "B"},
+            ],
+        },
+        schema_dialect,
+        type_id=gts_api.type_id("nullable", "1.1"),
+    )
+
+    _check_compatibility(gts_api, old_type_id, new_type_id, {"backward": "compatible"})
+
+
+def test_inherited_nullable_any_of_widening_is_backward_compatible(
+    gts_api, schema_dialect
+):
+    """A derived schema widens the parent families of an inherited nullable field."""
+    resource_id = gts_api.type_id("resource")
+    resource_uri = "gts://" + resource_id
+    gts_api.register(
+        "resource",
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["parent_type"],
+            "properties": {
+                "parent_type": {
+                    "type": ["string", "null"],
+                    "x-gts-type-ref": resource_id,
+                },
+            },
+        },
+        schema_dialect,
+        type_id=resource_id,
+    )
+
+    tenant_id = gts_api.register(
+        "tenant",
+        {"allOf": [{"$ref": resource_uri}]},
+        schema_dialect,
+        type_id=gts_api.derived_type_id(resource_id, "tenant"),
+    )
+    team_id = gts_api.register(
+        "team",
+        {"allOf": [{"$ref": resource_uri}]},
+        schema_dialect,
+        type_id=gts_api.derived_type_id(resource_id, "team"),
+    )
+
+    old_department_id = gts_api.register(
+        "department",
+        {
+            "allOf": [
+                {"$ref": resource_uri},
+                {
+                    "type": "object",
+                    "properties": {
+                        "parent_type": {
+                            "anyOf": [
+                                {"type": "null"},
+                                {"type": "string", "x-gts-type-ref": tenant_id},
+                            ],
+                        },
+                    },
+                },
+            ],
+        },
+        schema_dialect,
+        type_id=f"{resource_id}x.pytest._.department.v1.0~",
+    )
+    new_department_id = gts_api.register(
+        "department",
+        {
+            "allOf": [
+                {"$ref": resource_uri},
+                {
+                    "type": "object",
+                    "properties": {
+                        "parent_type": {
+                            "anyOf": [
+                                {"type": "null"},
+                                {"type": "string", "x-gts-type-ref": tenant_id},
+                                {"type": "string", "x-gts-type-ref": team_id},
+                            ],
+                        },
+                    },
+                },
+            ],
+        },
+        schema_dialect,
+        type_id=f"{resource_id}x.pytest._.department.v1.1~",
+    )
+
+    _check_compatibility(
+        gts_api, old_department_id, new_department_id, {"backward": "compatible"}
+    )
+
+
 def _entity_ref_operands(api, dialect):
     """Registered, valid operand targets, so no policy affects either schema."""
     target = api.register("target", {"type": "object"}, dialect)
